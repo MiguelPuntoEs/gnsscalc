@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>GNSS Time Calculator</title>
+	<link rel="stylesheet" href="styles/index.css">
+</head>
+
+<body>
+	<h1>GNSS Time Calculator</h1>
+
+	<div class="form-container">
+		<section class="calculator">
+			<form id="initial_time" class="container">
+				<label class="label-text"></label>
+				<label class="label-text">Initial Time</label>
+				<label class="label-text">Week no.</label>
+				<input class="week_number" type="text" />
+				<label class="label-text">Time of week</label>
+				<input class="time_of_week" type="text" />
+				<label class="label-text">GPS Time</label>
+				<input class="gps_time" type="text" />
+				<label class="label-text">GAL Time</label>
+				<input class="gal_time" type="text" />
+				<label class="label-text">BDS Time</label>
+				<input class="bds_time" type="text" />
+				<label class="label-text">UNIX Time</label>
+				<input class="unix_time" type="text" />
+				<label class="label-text">GLO N<sub>4</sub></label>
+				<input class="glo_n4" type="text" />
+				<label class="label-text">GLO N<sup>A</sup></label>
+				<input class="glo_na" type="text" />
+				<label class="label-text">Day of Year</label>
+				<input class="day_of_year" type="text" />
+				<label class="label-text">Week of Year</label>
+				<input class="week_of_year" type="text" />
+				<label class="label-text">Time of Day</label>
+				<input class="time_of_day" type="text" />
+				<label class="label-text">Day of Week</label>
+				<input class="day_of_week" type="text" />
+				<label class="label-text">Hour Code</label>
+				<input class="hour_code" type="text" />
+				<label class="label-text">Julian Date</label>
+				<input class="julian_date" type="text" />
+				<label class="label-text">MJD</label>
+				<input class="mjd" type="text" />
+				<label class="label-text">MJD2000</label>
+				<input class="mjd_2000" type="text" />
+				<label class="label-text">Leap Sec.</label>
+				<input class="leap_sec" type="text" disabled />
+				<label class="label-text">Date [TAI]</label>
+				<input class="date_tai" type="text" disabled />
+				<label class="label-text">Time [TAI]</label>
+				<input class="time_tai" type="text" disabled />
+				<label class="label-text">Date [TT]</label>
+				<input class="date_tt" type="text" disabled />
+				<label class="label-text">Time [TT]</label>
+				<input class="time_tt" type="text" disabled />
+				<label class="label-text">Date [UTC]</label>
+				<input class="date" type="text" />
+				<label class="label-text">Time [UTC]</label>
+				<input class="time" type="text" />
+				<label class="label-text">RINEX</label>
+				<input class="rinex" type="text" />
+				<label class="label-text"></label>
+				<button type="button" class="now">Now</button>
+				<label class="label-text"></label>
+				<button type="button" class="rnx">Copy RINEX</button>
+			</form>
+			<form id="final_time" class="container">
+				<label class="label-text"></label>
+				<label class="label-text">Final Time</label>
+				<label class="label-text">Week no.</label>
+				<input class="week_number" type="text" />
+				<label class="label-text">Time of week</label>
+				<input class="time_of_week" type="text" />
+				<label class="label-text">GPS Time</label>
+				<input class="gps_time" type="text" />
+				<label class="label-text">GAL Time</label>
+				<input class="gal_time" type="text" />
+				<label class="label-text">BDS Time</label>
+				<input class="bds_time" type="text" />
+				<label class="label-text">UNIX Time</label>
+				<input class="unix_time" type="text" />
+				<label class="label-text">GLO N<sub>4</sub></label>
+				<input class="glo_n4" type="text" />
+				<label class="label-text">GLO N<sup>A</sup></label>
+				<input class="glo_na" type="text" />
+				<label class="label-text">Day of Year</label>
+				<input class="day_of_year" type="text" />
+				<label class="label-text">Week of Year</label>
+				<input class="week_of_year" type="text" />
+				<label class="label-text">Time of Day</label>
+				<input class="time_of_day" type="text" />
+				<label class="label-text">Day of Week</label>
+				<input class="day_of_week" type="text" />
+				<label class="label-text">Hour Code</label>
+				<input class="hour_code" type="text" />
+				<label class="label-text">Julian Date</label>
+				<input class="julian_date" type="text" />
+				<label class="label-text">MJD</label>
+				<input class="mjd" type="text" />
+				<label class="label-text">MJD2000</label>
+				<input class="mjd_2000" type="text" />
+				<label class="label-text">Leap Sec.</label>
+				<input class="leap_sec" type="text" disabled />
+				<label class="label-text">Date [TAI]</label>
+				<input class="date_tai" type="text" disabled />
+				<label class="label-text">Time [TAI]</label>
+				<input class="time_tai" type="text" disabled />
+				<label class="label-text">Date [TT]</label>
+				<input class="date_tt" type="text" disabled />
+				<label class="label-text">Time [TT]</label>
+				<input class="time_tt" type="text" disabled />
+				<label class="label-text">Date [UTC]</label>
+				<input class="date" type="text" />
+				<label class="label-text">Time [UTC]</label>
+				<input class="time" type="text" />
+				<label class="label-text">RINEX</label>
+				<input class="rinex" type="text" />
+				<label class="label-text"></label>
+				<button type="button" class="now">Now</button>
+				<label class="label-text"></label>
+				<button type="button" class="rnx">Copy RINEX</button>
+			</form>
+
+			<form id="time_difference" class="container">
+					<label class="label-text"></label>
+					<label class="label-text">Difference</label>
+					<label class="label-text">Weeks</label>
+					<input id="weeks_difference" type="number"/>
+					<label class="label-text">Days</label>
+					<input id="days_difference" type="number"/>
+					<label class="label-text">Hours</label>
+					<input id="hours_difference" type="number"/>
+					<label class="label-text">Minutes</label>
+					<input id="minutes_difference" type="number"/>
+					<label class="label-text">Seconds</label>
+					<input id="seconds_difference" type="number"/>
+					<label class="label-text"></label>
+					<button type="button" class="reset btn btn-primary btn-xs">Reset</button>
+			</form>
+		</section>
+		
+		<section class="glossary">
+			<aside>
+				<h4>Glossary</h4>
+			</aside>
+			<div>
+				<p><strong>GPS Time</strong> is the number of seconds since January 6, 1980, 00:00:00</p>
+				<p><strong>GAL Time</strong> (Galileo Time) is the number of seconds since August 22, 1999, 00:00:00</p>
+				<p><strong>UNIX Time</strong> is the number of seconds since January 1, 1970, 00:00:00</p>
+				<p><strong>Julian Date</strong> is the number of days since January 1, 4713 B.C., 12:00:00; defines the
+					number of mean solar days elapsed since the epoch January 1.5d, 4713 before
+					Christ.[Hoffman-Wellenhof]</p>
+				<p><strong>MJD</strong> (Modified Julian Date) is the number of days since January 1, 4713 B.C.,
+					00:00:00, removing the first two digits. MJD=JD-24000000.5</p>
+				<p><strong>MJD2000</strong> (Modified Julian Date 2000) is the number of days since January 1, 2000,
+					00:00:00</p>
+				<p><em>Important note:</em> No leap seconds are considered in the computations except for TAI and TT</p>
+				<p>Leap seconds to be updated Jun. 2021</p>
+			</div>
+		</section>
+	</div>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+	<script src="js/index.js"></script>
+</body>
+
+</html>
