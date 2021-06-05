@@ -1,0 +1,5 @@
+User-agent: *
+Disallow:
+
+Sitemap: https:/gnsscalc.com/sitemap.xml
+Sitemap: http://www.gnsscalc.com/sitemap.xml
