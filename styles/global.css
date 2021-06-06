@@ -1,0 +1,43 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: Helvetica, sans-serif;
+  color: #333;
+  margin: auto;
+  min-height: 100vh;
+  padding: 16px 0 0;
+}
+
+h1 {
+  margin-bottom: 16px;
+  font-size: 36px;
+  font-weight: 500;
+}
+
+h2 {
+  font-weight: 500;
+  margin-bottom: 10px;
+  /* padding: 4px; */
+}
+
+.content {
+  margin: 0 10%;
+}
+
+p {
+  margin-bottom: 20px;
+}
+
+a {
+  text-decoration: none;
+  color: #337ab7;
+}
+a:hover {
+  color: #286090;
+}
