@@ -46,7 +46,7 @@ button {
   color: white;
   font-weight: 400;
   font-size: 12px;
-  height: 20px;
+  /* height: 20px; */
 }
 button.rnx {
   background-color: #f0f0f0;
@@ -95,5 +95,19 @@ button:active {
 @media (max-width: 768px) {
   .container {
     grid-template-columns: 1fr 1.5fr;
+  }
+}
+@media (max-width: 768px) {
+  .container input {
+    padding: 5px;
+  }
+  .container input {
+    margin-top: 5px;
+  }
+  .container button {
+    padding: 20px;
+    display: grid;
+    place-content: center;
+    margin-top: 5px;
   }
 }
