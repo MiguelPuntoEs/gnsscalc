@@ -1,5 +1,4 @@
 User-agent: *
-Disallow: /privacy.html
 Disallow: /img
 
 User-agent: Twitterbot
