@@ -34,3 +34,20 @@ footer .company {
   font-family: "Poppins", sans-serif;
   color: #323139;
 }
+.footer-icon {
+  height: 30px;
+}
+/* li + li {
+  margin-left: 50px;
+} */
+@media only screen and (max-width: 600px) {
+  footer ul {
+    flex-direction: column;
+  }
+  footer ul ul {
+    flex-direction: row;
+  }
+  footer ul li {
+    margin: 5px;
+  }
+}
