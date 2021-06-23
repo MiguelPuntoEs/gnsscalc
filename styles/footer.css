@@ -35,9 +35,11 @@ footer .company {
   color: #323139;
 }
 .footer-icon {
-  height: 1.875rem;
   margin: 0 0.625rem;
+  height: auto;
+  width: 30px;
 }
+
 @media only screen and (max-width: 48rem) {
   footer ul {
     flex-direction: column;
