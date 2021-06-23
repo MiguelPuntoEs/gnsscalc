@@ -6,5 +6,5 @@ User-agent: Twitterbot
 Disallow: *
 Allow: /img
 
-Sitemap: https:/gnsscalc.com/sitemap.xml
+Sitemap: https://gnsscalc.com/sitemap.xml
 Sitemap: http://www.gnsscalc.com/sitemap.xml
