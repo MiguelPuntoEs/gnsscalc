@@ -7,9 +7,9 @@ footer {
   /* w*.8/.8 */
   margin: auto 0 0;
 
-  border-top: .0625rem solid #ddd;
-  border-bottom: .0625rem solid #ddd;
-  font-size: .875rem;
+  border-top: 0.0625rem solid #ddd;
+  border-bottom: 0.0625rem solid #ddd;
+  font-size: 0.875rem;
 }
 
 footer ul {
@@ -36,9 +36,9 @@ footer .company {
 }
 .footer-icon {
   height: 1.875rem;
-  margin: 0 .625rem;
+  margin: 0 0.625rem;
 }
-@media only screen and (max-width: 600px) {
+@media only screen and (max-width: 48rem) {
   footer ul {
     flex-direction: column;
   }
