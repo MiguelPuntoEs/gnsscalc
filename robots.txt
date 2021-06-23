@@ -1,5 +1,10 @@
 User-agent: *
-Disallow: /privacy.html/
+Disallow: /privacy.html
+Disallow: /img
+
+User-agent: Twitterbot
+Disallow: *
+Allow: /img
 
 Sitemap: https:/gnsscalc.com/sitemap.xml
 Sitemap: http://www.gnsscalc.com/sitemap.xml
