@@ -7,7 +7,7 @@
   const getCookie = () => {
     return document.cookie.split(";").reduce((r, v) => {
       const parts = v.split("=");
-      return parts[0] === COOKIE_NAME ? decodeURIComponent(parts[1]) : r;
+      return parts[0].trim() === COOKIE_NAME ? decodeURIComponent(parts[1]) : r;
     }, "");
   }
 
