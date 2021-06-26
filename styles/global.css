@@ -26,6 +26,10 @@ h2 {
   /* padding: 4px; */
 }
 
+button {
+  cursor: pointer;
+}
+
 .content {
   margin: 0 10%;
 }
