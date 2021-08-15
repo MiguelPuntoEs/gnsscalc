@@ -1,5 +1,6 @@
 import styles from "./footer.module.scss";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Footer() {
   return (
@@ -11,7 +12,7 @@ export default function Footer() {
             href="https://www.varheight.com"
             className={styles.company}
             target="_blank"
-            rel="noopener"
+            rel="noopener noreferrer"
           >
             <em>var</em>height
           </a>
@@ -24,7 +25,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <img
+                <Image
                   src="/icons/linkedin.svg"
                   alt="linkedIn"
                   className={styles.footerIcon}
@@ -39,7 +40,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <img
+                <Image
                   src="/icons/twitter.svg"
                   alt="twitter"
                   className={styles.footerIcon}
@@ -54,7 +55,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <img
+                <Image
                   src="/icons/facebook.svg"
                   alt="facebook"
                   className={styles.footerIcon}
@@ -69,7 +70,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <img
+                <Image
                   src="/icons/instagram.svg"
                   alt="Instagram"
                   className={styles.footerIcon}
