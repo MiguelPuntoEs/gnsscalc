@@ -4,7 +4,7 @@
   box-sizing: border-box;
 }
 
-body {
+#__next {
   display: flex;
   flex-direction: column;
   font-family: Helvetica, sans-serif;
@@ -44,4 +44,16 @@ a {
 }
 a:hover {
   color: #286090;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
 }
