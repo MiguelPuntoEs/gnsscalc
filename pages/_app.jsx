@@ -3,10 +3,17 @@ import '../styles/global.css';
 
 import Head from 'next/head';
 
+import { useRouter } from 'next/router';
 import Footer from '../components/Footer';
 import Consent from '../components/Consent';
 
 function MyApp({ Component, pageProps }) {
+  const baseUrl = 'https://gnsscalc.com';
+
+  const { pathname } = useRouter();
+
+  const canonicalUrl = baseUrl + pathname;
+
   return (
     <>
       <Head>
@@ -107,13 +114,12 @@ function MyApp({ Component, pageProps }) {
           content="icons/mstile-310x310.png"
         />
 
-        <title>GNSS Time Calculator | Calculator</title>
         <meta
           name="description"
           content="GNSS Calculator is a tool to perform time conversions between different scales and several time computations."
         />
         <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://gnsscalc.com" />
+        <link rel="canonical" href={canonicalUrl} />
 
         <script
           type="application/ld+json"
@@ -121,7 +127,7 @@ function MyApp({ Component, pageProps }) {
             __html: `{
               "@context": "http://schema.org",
               "@type": "WebSite",
-              "url": "https://gnsscalc.com",
+              "url": "${canonicalUrl}",
               "abstract": "GNSS Calculator is a tool to perform time conversions between different scales and several time computations.",
               "creator": "Webagentur varheight",
               "keywords": "GNSS, GNSS time calculator, GNSS calculator, time calculator, calculator"
@@ -131,19 +137,14 @@ function MyApp({ Component, pageProps }) {
 
         <meta property="og:locale" content="en_US" />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="GNSS Time Calculator | Calculator" />
         <meta
           property="og:description"
           content="GNSS Calculator is a tool to perform time conversions between different scales and several time computations."
         />
         <meta property="og:image" content="https://gnsscalc.com/img/icon.png" />
-        <meta property="og:url" content="https://gnsscalc.com" />
+        <meta property="og:url" content={canonicalUrl} />
 
         <meta property="twitter:card" content="summary" />
-        <meta
-          property="twitter:title"
-          content="GNSS Time Calculator | Calculator"
-        />
         <meta
           property="twitter:description"
           content="GNSS Calculator is a tool to perform time conversions between different scales and several time computations."
@@ -152,7 +153,7 @@ function MyApp({ Component, pageProps }) {
           property="twitter:image"
           content="https://gnsscalc.com/img/icon.png"
         />
-        <meta property="twitter:url" content="https://gnsscalc.com" />
+        <meta property="twitter:url" content={canonicalUrl} />
         {/* GTM */}
         <script
           dangerouslySetInnerHTML={{
