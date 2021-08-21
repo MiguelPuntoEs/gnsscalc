@@ -1,5 +1,18 @@
-import IndexPage from "../components/pages/Index";
+import Head from 'next/head';
+
+import IndexPage from '../components/pages/Index';
 
 export default function Index() {
-  return <IndexPage />;
+  const title = 'GNSS Calculator | Time Calculator';
+
+  return (
+    <>
+      <Head>
+        <title>{title}</title>
+        <meta property="og:title" content={title} />
+        <meta property="twitter:title" content={title} />
+      </Head>
+      <IndexPage />
+    </>
+  );
 }
