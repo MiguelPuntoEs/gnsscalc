@@ -1,8 +1,8 @@
-import { useState } from "react";
-import GNSSForm from "../../GNSSForm";
-import GNSSTimeDifference from "../../GNSSTimeDifference";
-import styles from "./index.module.scss";
-import { getTimeDifference } from "../../../hooks/calculator";
+import { useState } from 'react';
+import { getTimeDifference } from '../../../util/dates';
+import GNSSForm from '../../GNSSForm';
+import GNSSTimeDifference from '../../GNSSTimeDifference';
+import styles from './index.module.scss';
 
 export default function Index() {
   const [startDate, setStartDate] = useState(new Date());

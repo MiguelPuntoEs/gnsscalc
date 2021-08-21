@@ -1,17 +1,17 @@
-import { useCallback } from "react";
-import {
-  getTimeDifferenceFromObject,
-  getTimeDifferenceObject,
-} from "../../hooks/calculator";
-import LabelInput from "../LabelInput";
-import styles from "./gnsstimedifference.module.scss";
+import { useCallback } from 'react';
+import useTimeDifferenceCalculator from '../../hooks/timeDifference';
+import { getTimeDifferenceFromObject } from '../../util/dates';
+import Button from '../Button';
+import CalculatorForm from '../CalculatorForm';
+import LabelInput from '../LabelInput';
+import styles from './gnsstimedifference.module.scss';
 
 export default function GNSSTimeDifference({
   timeDifference = 0,
   onTimeDifferenceChange,
 }) {
   const { seconds, minutes, hours, days } =
-    getTimeDifferenceObject(timeDifference);
+    useTimeDifferenceCalculator(timeDifference);
 
   const computationHandle = (timeDifferenceObject) => {
     const resultTimeDifference =
@@ -29,12 +29,9 @@ export default function GNSSTimeDifference({
 
   return (
     <>
-      <form
-        id="time_difference"
-        className={`${styles.container} ${styles.timeDifference}`}
-      >
-        <label></label>
-        <label>Difference</label>
+      <CalculatorForm className={styles.timeDifference}>
+        <div />
+        <span>Difference</span>
 
         <LabelInput
           key={getKey()}
@@ -72,16 +69,16 @@ export default function GNSSTimeDifference({
             computationHandle({ seconds: value, minutes, hours, days })
           }
         />
-        <label></label>
-        <button
+        <div />
+        <Button
           type="button"
           onClick={() => {
             onTimeDifferenceChange(0);
           }}
         >
           Reset
-        </button>
-      </form>
+        </Button>
+      </CalculatorForm>
     </>
   );
 }

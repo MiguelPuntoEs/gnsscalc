@@ -1,9 +1,10 @@
-import "../styles/global.css";
+/* eslint-disable react/no-danger */
+import '../styles/global.css';
 
-import Head from "next/head";
+import Head from 'next/head';
 
-import Footer from "../components/Footer";
-import Consent from "../components/Consent";
+import Footer from '../components/Footer';
+import Consent from '../components/Consent';
 
 function MyApp({ Component, pageProps }) {
   return (
@@ -174,11 +175,12 @@ function MyApp({ Component, pageProps }) {
       {/* GTM */}
       <noscript>
         <iframe
+          title="tag-manager"
           src="https://www.googletagmanager.com/ns.html?id=GTM-WS84WCL"
           height="0"
           width="0"
-          style={{ display: "none", visibility: "hidden" }}
-        ></iframe>
+          style={{ display: 'none', visibility: 'hidden' }}
+        />
       </noscript>
 
       <div className="content">
