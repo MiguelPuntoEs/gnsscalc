@@ -1,0 +1,31 @@
+.button {
+  margin: 0;
+  border-radius: 3px;
+  padding: 3px 5px;
+  border: 1px solid;
+  background-color: #337ab7;
+  border-color: #2e6da4;
+  color: white;
+  font-weight: 400;
+  font-size: 12px;
+
+  &:hover {
+    background-color: #286090;
+    border-color: #204d74;
+  }
+  &:active {
+    background-color: #204d74;
+    border-color: #122b40;
+  }
+  &.secondary {
+    background-color: #f0f0f0;
+    border: none;
+    color: #333;
+  }
+  &.secondary:hover {
+    background-color: #e0dfdf;
+  }
+  &.secondary:active {
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
+  }
+}

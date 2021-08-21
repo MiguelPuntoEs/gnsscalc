@@ -1,78 +1,87 @@
-const WGS84_SEMI_MAJOR_AXIS = 6378137;
-const WGS84_ECCENTRICITY_SQUARED = 0.006694379990197;
+import { deg2hms, rad2deg } from '../util/units';
+import { car2geo, getAer, getEnuDifference } from '../util/positioning';
 
-export function geo2car(lat, lon, h) {
-  const N =
-    WGS84_SEMI_MAJOR_AXIS /
-    Math.sqrt(1 - WGS84_ECCENTRICITY_SQUARED * Math.pow(Math.sin(lat), 2));
-
-  const x = (N + h) * Math.cos(lat) * Math.cos(lon);
-  const y = (N + h) * Math.cos(lat) * Math.sin(lon);
-  const z = ((1 - WGS84_ECCENTRICITY_SQUARED) * N + h) * Math.sin(lat);
-
-  return [x, y, z];
-}
-
-export function car2geo(x, y, z) {
-  const MAX_ITER = 30;
-  const MAX_DELTA_ITER = 1e-15;
-  const lon = Math.atan2(y, x);
-  const p = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
-  let lati = Math.atan(z / p / (1 - WGS84_ECCENTRICITY_SQUARED));
-  let iter = 0;
-
-  let lati_, Ni, hi;
-
-  while (True) {
-    lati_ = lati;
-    Ni =
-      WGS84_SEMI_MAJOR_AXIS /
-      Math.sqrt(1 - WGS84_ECCENTRICITY_SQUARED * Math.pow(Math.sin(lati_), 2));
-    hi = p / Math.cos(lati_) - Ni;
-    lati = Math.atan(
-      z / p / (1 - (Ni / (Ni + hi)) * WGS84_ECCENTRICITY_SQUARED)
-    );
-    if (Math.abs(lati - lati_) < MAX_DELTA_ITER) {
-      break;
-    }
-    iter += 1;
-    if (iter > MAX_ITER) {
-      break;
-    }
-  }
-
-  return [lati, lon, hi];
-}
-
-export function getEnuDifference(x, y, z, xRef, yRef, zRef) {
-  const [latRef, lonRef] = car2geo(xRef, yRef, zRef);
-
-  const deltaX = x - xRef;
-  const deltaY = y - yRef;
-  const deltaZ = z - zRef;
-
-  const deltaE = -Math.sin(lonRef) * deltaX + Math.cos(lonRef) * deltaY;
-  const deltaN =
-    -Math.cos(lonRef) * Math.sin(latRef) * deltaX -
-    Math.sin(lonRef) * Math.sin(latRef) * deltaY +
-    Math.cos(latRef) * deltaZ;
-  const deltaU =
-    Math.cos(lonRef) * Math.cos(latRef) * deltaX +
-    Math.sin(lonRef) * Math.cos(latRef) * deltaY +
-    Math.sin(latRef) * deltaZ;
-
-  return [deltaE, deltaN, deltaU];
-}
-
-export function getAer(x, y, z, xRef, yRef, zRef) {
-  const slant = Math.sqrt(
-    Math.pow(x - xRef, 2) + Math.pow(y - yRef, 2) + Math.pow(z - zRef, 2)
+export function usePositionCalculator(position) {
+  const [latitude, longitude, height] = car2geo(
+    position[0],
+    position[1],
+    position[2]
   );
 
-  const [deltaE, deltaN, deltaU] = getEnuDifference(x, y, z, xRef, yRef, zRef);
+  if (!position) return undefined;
 
-  const elevation = Math.asin(deltaU / slant);
-  const azimuth = Math.atan2(deltaE, deltaN);
+  if (position[0] === 0 && position[1] === 0) {
+    return undefined;
+  }
 
-  return [elevation, azimuth, slant];
+  const latitudeDeg = rad2deg(latitude);
+  const longitudeDeg = rad2deg(longitude);
+
+  const [latitudeDegrees, latitudeMinutes, latitudeSeconds] = deg2hms(
+    Math.abs(latitudeDeg)
+  );
+  const [longitudeDegrees, longitudeMinutes, longitudeSeconds] = deg2hms(
+    Math.abs(longitudeDeg)
+  );
+  const latitudeDirection = latitude >= 0 ? 'N' : 'S';
+  const longitudeDirection = longitude >= 0 ? 'E' : 'W';
+
+  return {
+    latitude: {
+      value: latitudeDeg,
+      degrees: latitudeDegrees,
+      minutes: latitudeMinutes,
+      seconds: latitudeSeconds,
+      direction: latitudeDirection,
+    },
+    longitude: {
+      value: longitudeDeg,
+      degrees: longitudeDegrees,
+      minutes: longitudeMinutes,
+      seconds: longitudeSeconds,
+      direction: longitudeDirection,
+    },
+    height,
+  };
+}
+
+export function useAerCalculator(position, refPosition) {
+  if (!position || !refPosition) return undefined;
+
+  const [elevation, azimuth, slant] = getAer(
+    position[0],
+    position[1],
+    position[2],
+    refPosition[0],
+    refPosition[1],
+    refPosition[2]
+  );
+
+  const elevationDeg = rad2deg(elevation);
+  const azimuthDeg = rad2deg(azimuth);
+
+  return {
+    elevationDeg,
+    azimuthDeg,
+    slant,
+  };
+}
+
+export function useENUCalculator(position, refPosition) {
+  if (!position || !refPosition) return undefined;
+
+  const [deltaE, deltaN, deltaU] = getEnuDifference(
+    position[0],
+    position[1],
+    position[2],
+    refPosition[0],
+    refPosition[1],
+    refPosition[2]
+  );
+
+  return {
+    deltaE,
+    deltaN,
+    deltaU,
+  };
 }

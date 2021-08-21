@@ -1,6 +1,10 @@
-import styles from "./gnssform.module.scss";
-import LabelInput from "../LabelInput";
-import useCalculator, {
+import { useCallback } from 'react';
+import LabelInput from '../LabelInput';
+import useCalculator from '../../hooks/time';
+import { formatNumWithDecimals } from '../../util/formats';
+import CalculatorForm from '../CalculatorForm';
+import Button from '../Button';
+import {
   getDateFromBdsTime,
   getDateFromDayOfWeek,
   getDateFromDayOfYear,
@@ -17,9 +21,7 @@ import useCalculator, {
   getDateFromUnixTime,
   getDateFromUTC,
   getDateFromWeekOfYear,
-} from "../../hooks/calculator";
-import { useCallback, useEffect, useState } from "react";
-import { formatNumWithDecimals } from "../../util/formats";
+} from '../../util/dates';
 
 export default function GNSSForm({ title, date = new Date(), onDateChange }) {
   const result = useCalculator(date); // Echte Ergebnisse
@@ -65,9 +67,9 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
   );
 
   return (
-    <form className={styles.container}>
-      <label />
-      <label>{title}</label>
+    <CalculatorForm>
+      <div />
+      <span>{title}</span>
 
       <LabelInput
         key={getKey()}
@@ -236,23 +238,23 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       <LabelInput
         label="RINEX"
         value={rinex}
-        className={styles.rinex}
         onCompute={(value) => computationHandle(() => getDateFromRINEX(value))}
       />
 
-      <label />
-      <button
+      <div />
+      <Button
         type="button"
         onClick={() => {
           onDateChange(new Date());
         }}
       >
         Now
-      </button>
-      <label />
-      <button type="button" className={styles.rnx}>
+      </Button>
+
+      <div />
+      <Button type="button" secondary>
         Copy RINEX
-      </button>
-    </form>
+      </Button>
+    </CalculatorForm>
   );
 }

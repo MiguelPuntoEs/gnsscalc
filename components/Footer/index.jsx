@@ -1,6 +1,6 @@
-import styles from "./footer.module.scss";
-import Link from "next/link";
-import Image from "next/image";
+import Image from 'next/image';
+import styles from './footer.module.scss';
+import Link from '../Link';
 
 export default function Footer() {
   return (
@@ -82,9 +82,7 @@ export default function Footer() {
           </ul>
         </li>
         <li>
-          <Link href="/privacy">
-            <a>Privacy Policy</a>
-          </Link>
+          <Link href="/privacy">Privacy Policy</Link>
         </li>
       </ul>
     </footer>

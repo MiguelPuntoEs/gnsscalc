@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from '../components/Link';
 
 const PrivacyPage = () => (
   <>
@@ -32,9 +32,7 @@ const PrivacyPage = () => (
 
     <p>
       Back to
-      <Link href="/">
-        <a> Home</a>
-      </Link>
+      <Link href="/">Home</Link>
     </p>
   </>
 );

@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-export const useCookie = (cookieName) => {
+const useCookie = (cookieName) => {
   const getCookie = () => {
-    if (typeof window === "undefined") {
-      return "";
+    if (typeof window === 'undefined') {
+      return '';
     }
 
-    return document.cookie.split(";").reduce((r, v) => {
-      const parts = v.split("=");
+    return document.cookie.split(';').reduce((r, v) => {
+      const parts = v.split('=');
       return parts[0].trim() === cookieName ? decodeURIComponent(parts[1]) : r;
-    }, "");
+    }, '');
   };
 
   const setCookie = (value) => {
@@ -32,3 +32,5 @@ export const useCookie = (cookieName) => {
     },
   ];
 };
+
+export default useCookie;

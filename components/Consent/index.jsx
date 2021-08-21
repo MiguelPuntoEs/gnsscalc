@@ -1,9 +1,10 @@
-import clsx from "clsx";
-import { useEffect, useState } from "react";
-import { useCookie } from "../../hooks/cookie";
-import styles from "./consent.module.scss";
+import clsx from 'clsx';
+import { useEffect, useState } from 'react';
+import useCookie from '../../hooks/cookie';
+import styles from './consent.module.scss';
+import Button from '../Button';
 
-const COOKIE_NAME = "accepts-cookies";
+const COOKIE_NAME = 'accepts-cookies';
 
 export default function Consent() {
   const [cookie, setCookie] = useCookie(COOKIE_NAME);
@@ -21,23 +22,24 @@ export default function Consent() {
         service. By accessing further pages of our website, you are agreeing to
         our use of cookies.
       </p>
-      <button
+
+      <Button
         onClick={() => {
-          setCookie("false");
+          setCookie('false');
           setShouldShow(false);
         }}
         className={styles.deny}
       >
         Deny
-      </button>
-      <button
+      </Button>
+      <Button
         onClick={() => {
-          setCookie("true");
+          setCookie('true');
           setShouldShow(false);
         }}
       >
         Allow
-      </button>
+      </Button>
     </div>
   );
 }
