@@ -4,6 +4,7 @@ import PositionForm from '../../PositionForm';
 import AERForm from '../../AERForm';
 import ENUForm from '../../ENUForm';
 import { getPositionFromGeodetic } from '../../../util/positioning';
+import MapSnippet from '../../MapSnippet';
 
 export default function Positioning() {
   const [position, setPosition] = useState([
@@ -48,6 +49,9 @@ export default function Positioning() {
           refPosition={refPosition}
         />
       </section>
+
+      <MapSnippet position={position} setPosition={setPosition} />
+
       <section className={styles.glossary}>
         <aside>
           <h2>Glossary</h2>
