@@ -9,12 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@material-ui/core": "^4.12.3",
+    "@material-ui/icons": "^4.11.2",
     "clsx": "^1.1.1",
     "moment": "^2.29.1",
     "next": "11.0.0",
     "plotly.js": "^2.5.1",
     "react": "17.0.2",
     "react-dom": "17.0.2",
+    "react-dropzone": "^11.4.2",
     "react-input-mask": "^2.0.4",
     "react-plotly.js": "^2.5.1",
     "sass": "^1.37.5"
