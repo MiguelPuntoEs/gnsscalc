@@ -5,7 +5,14 @@ import styles from './antex.module.scss';
 
 import data from './test.json';
 import Dropzone from '../../Dropzone';
-import { FormControl, InputLabel, MenuItem, Select } from '@material-ui/core';
+import {
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  CircularProgress,
+  Backdrop,
+} from '@mui/material';
 
 const Plot = dynamic(
   {
@@ -50,6 +57,7 @@ export default function ANTEX() {
   const [antennaIdx, setAntennaIdx] = useState(0);
   const [freqIdx, setFreqIdx] = useState(0);
   const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const [antexData, setAntexData] = useState(data.antennas);
 
@@ -66,10 +74,20 @@ export default function ANTEX() {
   };
 
   const handleSubmit = async () => {
+    setLoading(true);
+
     const newData = await uploadANTEX(file);
 
-    // console.log('newData',newData)
+    console.log('newData', newData);
+
+    // console.log(antexData[0].frequencies[0].pcvValues);
+    // // const max = Math.max(...antexData[0].frequencies[0].pcvValuesRaveled);
+    // console.log(Math.max(...antexData[0].frequencies[0].pcvValuesRaveled));
+    // console.log(Math.min(...antexData[0].frequencies[0].pcvValuesRaveled));
+
     if (newData.antennas !== undefined) setAntexData(newData.antennas);
+
+    setLoading(false);
   };
 
   useEffect(() => handleSubmit(), [file]);
@@ -89,6 +107,13 @@ export default function ANTEX() {
         />
         <input type="submit" value="upload" />
       </form> */}
+
+      <Backdrop
+        open={loading}
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
 
       <Dropzone
         onDrop={(files) => {
@@ -116,7 +141,8 @@ export default function ANTEX() {
             );
           })}
         </Select>
-
+      </FormControl>
+      <FormControl>
         <InputLabel id="frequency-select-label">Frequency</InputLabel>
         <Select
           labelId="frequency-select-label"
@@ -136,6 +162,32 @@ export default function ANTEX() {
           })}
         </Select>
       </FormControl>
+
+      <Plot
+        data={antexData[antennaIdx].frequencies
+          .filter((freqData) => freqData.frequency[0] === 'G')
+          .map((freqData) => {
+            return {
+              x: antexData[antennaIdx].elevs,
+              y: freqData.pcvMean,
+              type: 'scatter',
+              mode: 'lines',
+              name: freqData.frequency,
+            };
+          })}
+        layout={{
+          width: 800,
+          height: 500,
+          xaxis: { title: 'Elevation [°]' },
+          yaxis: { title: 'Mean PCV [mm]' },
+        }}
+      />
+
+      <div
+        dangerouslySetInnerHTML={{
+          __html: antexData[antennaIdx].frequencies[freqIdx].svg,
+        }}
+      />
 
       <Plot
         data={[
