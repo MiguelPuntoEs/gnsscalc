@@ -2,6 +2,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import getArrayFromObject from '../../../util/arrays';
 import styles from './antex.module.scss';
+import LoadingIndicator from '../../LoadingIndicator';
 
 import data from './test.json';
 import Dropzone from '../../Dropzone';
@@ -12,7 +13,12 @@ import {
   Select,
   CircularProgress,
   Backdrop,
+  Grid,
+  CardContent,
+  Card,
+  CardHeader,
 } from '@mui/material';
+import { Box } from '@mui/system';
 
 const Plot = dynamic(
   {
@@ -93,75 +99,124 @@ export default function ANTEX() {
   useEffect(() => handleSubmit(), [file]);
 
   return (
-    <>
-      <p>Hello</p>
+    <Grid container spacing={2}>
+      <LoadingIndicator open={loading} />
+      <Grid item xs={12} xl={4}>
+        <Card>
+          <CardContent
+            sx={{
+              "& > * + *": {
+                marginTop: ({ spacing }) => spacing(2)
+              }
+            }}
+          >
+            <Dropzone
+              onDrop={(files) => {
+                setFile(files[0]);
+              }}
+            />
 
-      {/* <form onSubmit={handleFormSubmit}>
-        <input
-          type="file"
-          name="file"
-          id="file"
-          onChange={({ target }) => {
-            setFile(target.files[0]);
-          }}
-        />
-        <input type="submit" value="upload" />
-      </form> */}
+            <Box display="flex" gap={2}>
+              <FormControl>
+                <InputLabel id="antenna-select-label">Antenna</InputLabel>
+                <Select
+                  labelId="antenna-select-label"
+                  id="antenna-select"
+                  value={antennaIdx}
+                  label="Antenna"
+                  onChange={(e) => {
+                    console.log(e.target.value);
+                    setAntennaIdx(e.target.value);
+                  }}
+                >
+                  {antexData.map((val, index) => {
+                    return (
+                      <MenuItem key={index} value={index}>
+                        {val.antennaType}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
 
-      <Backdrop
-        open={loading}
-        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 1 }}
-      >
-        <CircularProgress color="inherit" />
-      </Backdrop>
-
-      <Dropzone
-        onDrop={(files) => {
-          setFile(files[0]);
-        }}
-      />
-
-      <FormControl>
-        <InputLabel id="antenna-select-label">Antenna</InputLabel>
-        <Select
-          labelId="antenna-select-label"
-          id="antenna-select"
-          value={antennaIdx}
-          label="Antenna"
-          onChange={(e) => {
-            console.log(e.target.value);
-            setAntennaIdx(e.target.value);
-          }}
-        >
-          {antexData.map((val, index) => {
-            return (
-              <MenuItem key={index} value={index}>
-                {val.antennaType}
-              </MenuItem>
-            );
-          })}
-        </Select>
-      </FormControl>
-      <FormControl>
-        <InputLabel id="frequency-select-label">Frequency</InputLabel>
-        <Select
-          labelId="frequency-select-label"
-          id="frequency-select"
-          value={freqIdx}
-          label="Frequency"
-          onChange={(e) => {
-            setFreqIdx(e.target.value);
-          }}
-        >
-          {antexData[antennaIdx].frequencies.map((val, index) => {
-            return (
-              <MenuItem key={index} value={index}>
-                {val.frequency}
-              </MenuItem>
-            );
-          })}
-        </Select>
-      </FormControl>
+              <FormControl>
+                <InputLabel id="frequency-select-label">Frequency</InputLabel>
+                <Select
+                  labelId="frequency-select-label"
+                  id="frequency-select"
+                  value={freqIdx}
+                  label="Frequency"
+                  onChange={(e) => {
+                    setFreqIdx(e.target.value);
+                  }}
+                >
+                  {antexData[antennaIdx].frequencies.map((val, index) => {
+                    return (
+                      <MenuItem key={index} value={index}>
+                        {val.frequency}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} xl={8} >
+        <Card>
+          <CardContent>
+            <Plot
+              data={[
+                {
+                  x: antexData[antennaIdx].elevs,
+                  y: antexData[antennaIdx].azs,
+                  z: antexData[antennaIdx].frequencies[freqIdx].pcvValues,
+                  type: 'surface',
+                  contours: {
+                    z: {
+                      show: true,
+                      usecolormap: true,
+                      highlightcolor: '#42f462',
+                      project: { z: true },
+                    },
+                    x: {
+                      show: true,
+                      usecolormap: true,
+                    },
+                  },
+                  // hidesurface: true,
+                  // showscale:false,
+                  // visible: false,
+                  // contours: {
+                  //     // visible: true,
+                  //     // x: { show: true },
+                  //     // y: { show: true },
+                  //     // z: { show: true },
+                  //     // line: {color: 'blue'}
+                  //   },
+                },
+              ]}
+              layout={{
+                autosize: true,
+                title: `${antennaType}; Freq: ${frequencyName}<br>PCO N/E/U: ${pcoN}, ${pcoE}, ${pcoU} [mm]`,
+                scene: {
+                  xaxis: { title: 'Elevation [deg]' },
+                  yaxis: { title: 'Azimuth [deg]' },
+                  zaxis: { title: 'PCV [mm]' },
+                },
+              }}
+              config={config}
+            />
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} xl={6}>
+        3
+      </Grid>
+      <Grid item xs={12} xl={6}>
+        4
+      </Grid>
 
       <Plot
         data={antexData[antennaIdx].frequencies
@@ -188,50 +243,6 @@ export default function ANTEX() {
           __html: antexData[antennaIdx].frequencies[freqIdx].svg,
         }}
       />
-
-      <Plot
-        data={[
-          {
-            x: antexData[antennaIdx].elevs,
-            y: antexData[antennaIdx].azs,
-            z: antexData[antennaIdx].frequencies[freqIdx].pcvValues,
-            type: 'surface',
-            contours: {
-              z: {
-                show: true,
-                usecolormap: true,
-                highlightcolor: '#42f462',
-                project: { z: true },
-              },
-              x: {
-                show: true,
-                usecolormap: true,
-              },
-            },
-            // hidesurface: true,
-            // showscale:false,
-            // visible: false,
-            // contours: {
-            //     // visible: true,
-            //     // x: { show: true },
-            //     // y: { show: true },
-            //     // z: { show: true },
-            //     // line: {color: 'blue'}
-            //   },
-          },
-        ]}
-        layout={{
-          width: 1080,
-          height: 1000,
-          title: `${antennaType}; Freq: ${frequencyName}<br>PCO N/E/U: ${pcoN}, ${pcoE}, ${pcoU} [mm]`,
-          scene: {
-            xaxis: { title: 'Elevation [deg]' },
-            yaxis: { title: 'Azimuth [deg]' },
-            zaxis: { title: 'PCV [mm]' },
-          },
-        }}
-        config={config}
-      />
-    </>
+    </Grid>
   );
 }
