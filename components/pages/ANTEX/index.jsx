@@ -1,24 +1,21 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import getArrayFromObject from '../../../util/arrays';
-import styles from './antex.module.scss';
-import LoadingIndicator from '../../LoadingIndicator';
-
-import data from './test.json';
-import Dropzone from '../../Dropzone';
 import {
   FormControl,
   InputLabel,
   MenuItem,
   Select,
-  CircularProgress,
-  Backdrop,
   Grid,
+  Box,
   CardContent,
   Card,
-  CardHeader,
 } from '@mui/material';
-import { Box } from '@mui/system';
+
+import { makeStyles } from '@mui/styles';
+import LoadingIndicator from '../../LoadingIndicator';
+
+import data from './test.json';
+import Dropzone from '../../Dropzone';
 
 const Plot = dynamic(
   {
@@ -43,6 +40,12 @@ const config = {
   displaylogo: false,
 };
 
+const useStyles = makeStyles(() => ({
+  gridItem: {
+    height: '100%',
+  },
+}));
+
 // const antennaData = data.antennas[0];
 
 async function uploadANTEX(file) {
@@ -51,15 +54,16 @@ async function uploadANTEX(file) {
   const formData = new FormData();
   formData.append('file', file);
 
-  const data = await fetch('http://localhost:3000/api/upload-antex', {
+  const result = await fetch('http://localhost:3000/api/upload-antex', {
     method: 'POST',
     body: formData,
   }).then((r) => r.json());
 
-  return data;
+  return result;
 }
 
 export default function ANTEX() {
+  const classes = useStyles();
   const [antennaIdx, setAntennaIdx] = useState(0);
   const [freqIdx, setFreqIdx] = useState(0);
   const [file, setFile] = useState(null);
@@ -67,29 +71,14 @@ export default function ANTEX() {
 
   const [antexData, setAntexData] = useState(data.antennas);
 
-  const antennaType = antexData[antennaIdx].antennaType;
-  const frequencyName = antexData[antennaIdx].frequencies[freqIdx].frequency;
-  const pcoE = antexData[antennaIdx].frequencies[freqIdx].pcoE;
-  const pcoN = antexData[antennaIdx].frequencies[freqIdx].pcoN;
-  const pcoU = antexData[antennaIdx].frequencies[freqIdx].pcoU;
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-
-    handleSubmit();
-  };
+  const { antennaType, frequencies, elevs, azs } = antexData[antennaIdx];
+  const frequencyName = frequencies[freqIdx].frequency;
+  const { pcoE, pcoU, pcoN } = frequencies[freqIdx];
 
   const handleSubmit = async () => {
     setLoading(true);
 
     const newData = await uploadANTEX(file);
-
-    console.log('newData', newData);
-
-    // console.log(antexData[0].frequencies[0].pcvValues);
-    // // const max = Math.max(...antexData[0].frequencies[0].pcvValuesRaveled);
-    // console.log(Math.max(...antexData[0].frequencies[0].pcvValuesRaveled));
-    // console.log(Math.min(...antexData[0].frequencies[0].pcvValuesRaveled));
 
     if (newData.antennas !== undefined) setAntexData(newData.antennas);
 
@@ -101,13 +90,13 @@ export default function ANTEX() {
   return (
     <Grid container spacing={2}>
       <LoadingIndicator open={loading} />
-      <Grid item xs={12} xl={4}>
-        <Card>
+      <Grid item xs={12} xl={6}>
+        <Card className={classes.gridItem}>
           <CardContent
             sx={{
-              "& > * + *": {
-                marginTop: ({ spacing }) => spacing(2)
-              }
+              '& > * + *': {
+                marginTop: ({ spacing }) => spacing(2),
+              },
             }}
           >
             <Dropzone
@@ -125,17 +114,14 @@ export default function ANTEX() {
                   value={antennaIdx}
                   label="Antenna"
                   onChange={(e) => {
-                    console.log(e.target.value);
                     setAntennaIdx(e.target.value);
                   }}
                 >
-                  {antexData.map((val, index) => {
-                    return (
-                      <MenuItem key={index} value={index}>
-                        {val.antennaType}
-                      </MenuItem>
-                    );
-                  })}
+                  {antexData.map((val, index) => (
+                    <MenuItem key={val.antennaType} value={index}>
+                      {val.antennaType}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
 
@@ -150,28 +136,26 @@ export default function ANTEX() {
                     setFreqIdx(e.target.value);
                   }}
                 >
-                  {antexData[antennaIdx].frequencies.map((val, index) => {
-                    return (
-                      <MenuItem key={index} value={index}>
-                        {val.frequency}
-                      </MenuItem>
-                    );
-                  })}
+                  {antexData[antennaIdx].frequencies.map((val, index) => (
+                    <MenuItem key={val.frequency} value={index}>
+                      {val.frequency}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Box>
           </CardContent>
         </Card>
       </Grid>
-      <Grid item xs={12} xl={8} >
-        <Card>
+      <Grid item xs={12} xl={6}>
+        <Card className={classes.gridItem}>
           <CardContent>
             <Plot
               data={[
                 {
-                  x: antexData[antennaIdx].elevs,
-                  y: antexData[antennaIdx].azs,
-                  z: antexData[antennaIdx].frequencies[freqIdx].pcvValues,
+                  x: elevs,
+                  y: azs,
+                  z: frequencies[freqIdx].pcvValues,
                   type: 'surface',
                   contours: {
                     z: {
@@ -212,37 +196,39 @@ export default function ANTEX() {
         </Card>
       </Grid>
       <Grid item xs={12} xl={6}>
-        3
+        <Card className={classes.gridItem}>
+          <CardContent>
+            <div
+              // eslint-disable-next-line react/no-danger
+              dangerouslySetInnerHTML={{
+                __html: antexData[antennaIdx].frequencies[freqIdx].svg,
+              }}
+            />
+          </CardContent>
+        </Card>
       </Grid>
       <Grid item xs={12} xl={6}>
-        4
+        <Card className={classes.gridItem}>
+          <CardContent>
+            <Plot
+              data={frequencies
+                .filter((freqData) => freqData.frequency[0] === 'G')
+                .map((freqData) => ({
+                  x: elevs,
+                  y: freqData.pcvMean,
+                  type: 'scatter',
+                  mode: 'lines',
+                  name: freqData.frequency,
+                }))}
+              layout={{
+                autosize: true,
+                xaxis: { title: 'Elevation [°]' },
+                yaxis: { title: 'Mean PCV [mm]' },
+              }}
+            />
+          </CardContent>
+        </Card>
       </Grid>
-
-      <Plot
-        data={antexData[antennaIdx].frequencies
-          .filter((freqData) => freqData.frequency[0] === 'G')
-          .map((freqData) => {
-            return {
-              x: antexData[antennaIdx].elevs,
-              y: freqData.pcvMean,
-              type: 'scatter',
-              mode: 'lines',
-              name: freqData.frequency,
-            };
-          })}
-        layout={{
-          width: 800,
-          height: 500,
-          xaxis: { title: 'Elevation [°]' },
-          yaxis: { title: 'Mean PCV [mm]' },
-        }}
-      />
-
-      <div
-        dangerouslySetInnerHTML={{
-          __html: antexData[antennaIdx].frequencies[freqIdx].svg,
-        }}
-      />
     </Grid>
   );
 }
