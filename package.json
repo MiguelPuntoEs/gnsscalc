@@ -12,6 +12,7 @@
     "@emotion/react": "latest",
     "@emotion/server": "latest",
     "@emotion/styled": "latest",
+    "@mui/icons-material": "^5.2.1",
     "@mui/material": "latest",
     "clsx": "latest",
     "imask": "^6.2.2",

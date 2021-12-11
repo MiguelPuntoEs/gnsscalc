@@ -21,14 +21,27 @@ const PositioningPage: NextPage = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         ({ coords: { latitude, longitude, altitude } }) =>
-          setRefPosition(getPositionFromGeodetic(latitude, longitude, altitude || 0) as Position)
+          setRefPosition(
+            getPositionFromGeodetic(
+              latitude,
+              longitude,
+              altitude || 0
+            ) as Position
+          )
       );
     }
   }, []);
 
   return (
     <Page title="Positioning">
-      <Stack sx={{ gap: 2, "& > *": { m: "0 auto", flexBasis: "max(20%, 320px)" }, mb: 2 }} horizontal>
+      <Stack
+        sx={{
+          gap: 2,
+          "& > *": { m: "0 auto", flexBasis: "max(20%, 325px)" },
+          mb: 2,
+        }}
+        horizontal
+      >
         <PositionForm
           title="Position"
           position={position}
@@ -39,17 +52,11 @@ const PositioningPage: NextPage = () => {
           position={refPosition}
           onPositionChange={setRefPosition}
         />
-        <AERForm
-          position={position}
-          refPosition={refPosition}
-        />
-        <ENUForm
-          position={position}
-          refPosition={refPosition}
-        />
+        <AERForm position={position} refPosition={refPosition} />
+        <ENUForm position={position} refPosition={refPosition} />
       </Stack>
       <PositionGlossary />
-    </Page >
+    </Page>
   );
 };
 
