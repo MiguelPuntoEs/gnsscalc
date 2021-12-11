@@ -1,4 +1,6 @@
 /* eslint-disable @next/next/next-script-for-ga */
+import "../styles/global.css";
+
 import * as React from "react";
 import Head from "next/head";
 import { AppProps } from "next/app";
