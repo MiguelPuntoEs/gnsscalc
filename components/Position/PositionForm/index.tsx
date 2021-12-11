@@ -28,8 +28,6 @@ const PositionForm = ({ title, position, onPositionChange }: Props) => {
   const latitudeString = formatLatitudeDegMinSecs(latitude);
   const longitudeString = formatLongitudeDegMinSecs(longitude);
 
-  console.log({ longitudeString })
-
   const computationHandle = (func: () => readonly [number, number, number] | undefined) => {
     const resultPosition = func();
     if (resultPosition) {
