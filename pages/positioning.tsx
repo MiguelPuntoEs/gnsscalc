@@ -1,6 +1,7 @@
 import Page from "components/Page";
 import AERForm from "components/Position/AERForm";
 import ENUForm from "components/Position/ENUForm";
+import PositionGlossary from "components/Position/Glossary";
 import PositionForm from "components/Position/PositionForm";
 import Stack from "components/Stack";
 import { NextPage } from "next";
@@ -47,6 +48,7 @@ const PositioningPage: NextPage = () => {
           refPosition={refPosition}
         />
       </Stack>
+      <PositionGlossary />
     </Page >
   );
 };
