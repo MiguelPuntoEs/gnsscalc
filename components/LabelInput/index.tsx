@@ -1,9 +1,7 @@
-import { Input, TextField, Theme, Typography } from "@mui/material";
-import { ReactNode, useEffect, useMemo, useState, forwardRef } from "react";
+import { TextField, Theme, Typography } from "@mui/material";
+import { ReactNode, useEffect, useState } from "react";
 import { Box, SxProps } from "@mui/system";
-import { IMaskInput, useIMask } from "react-imask";
-
-
+import { useIMask } from "react-imask";
 
 type LabelInputProps = {
   label: ReactNode;
@@ -15,7 +13,7 @@ type LabelInputProps = {
   maskOptions?: {
     mask: string;
     definitions: any;
-  }
+  };
   onCompute?: (value: string) => boolean;
 };
 
@@ -39,7 +37,11 @@ const LabelInput = ({
   const [id, setId] = useState("");
   const [_value, setValue] = useState(value);
   const [error, setError] = useState(false);
-  const { ref } = useIMask(maskOptions || { mask: "" })
+  const { ref } = useIMask(
+    maskOptions
+      ? { ...maskOptions, lazy: false, placeholder: "_" }
+      : { mask: "" }
+  );
 
   useEffect(() => {
     setId(Math.random().toString());
@@ -77,11 +79,17 @@ const LabelInput = ({
       </label>
       {maskOptions && (
         <TextField
+          id={id}
           value={_value}
           onChange={handleChange}
+          onKeyDown={({ key }) => {
+            if (key === "Enter") {
+              handleValidate();
+            }
+          }}
           onBlur={handleValidate}
           disabled={disabled}
-          id={id}
+          sx={defaultTextFieldStyle}
           inputRef={ref}
           variant="outlined"
           size="small"
