@@ -67,7 +67,7 @@ export default function Index() {
             <em>Important note:</em> No leap seconds are considered in the
             computations except for TAI and TT
           </p>
-          <p>Leap seconds to be updated Dec. 2021</p>
+          <p>Leap seconds to be updated July 2022</p>
         </div>
       </section>
     </>

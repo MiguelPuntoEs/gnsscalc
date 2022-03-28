@@ -3,7 +3,7 @@ import Head from 'next/head';
 import IndexPage from '../components/pages/Index';
 
 export default function Index() {
-  const title = 'GNSS Calculator | Time Calculator';
+  const title = 'GNSS Calculator | GPS Time Calculator';
 
   return (
     <>
