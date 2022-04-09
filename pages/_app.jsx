@@ -2,10 +2,13 @@
 import '../styles/global.css';
 
 import Head from 'next/head';
+import Script from 'next/script';
 
 import { useRouter } from 'next/router';
 import Footer from '../components/Footer';
 import Consent from '../components/Consent';
+
+const googleAnalyticsCode = process.env.NEXT_PUBLIC_GA_CODE;
 
 function MyApp({ Component, pageProps }) {
   const baseUrl = 'https://gnsscalc.com';
@@ -154,35 +157,21 @@ function MyApp({ Component, pageProps }) {
           content="https://gnsscalc.com/img/icon.png"
         />
         <meta property="twitter:url" content={canonicalUrl} />
-        {/* GTM */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-            (function (w, d, s, l, i) {
-              w[l] = w[l] || []; w[l].push({
-                'gtm.start': new Date().getTime(),
-                event: 'gtm.js'
-              });
-              var f = d.getElementsByTagName(s)[0],
-              j = d.createElement(s),
-              dl = l != 'dataLayer' ? '&l=' + l : '';
-              j.async = true; j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
-              f.parentNode.insertBefore(j, f);
-            })(window, document, 'script', 'dataLayer', 'GTM-WS84WCL');`,
-          }}
-        />
       </Head>
 
-      {/* GTM */}
-      <noscript>
-        <iframe
-          title="tag-manager"
-          src="https://www.googletagmanager.com/ns.html?id=GTM-WS84WCL"
-          height="0"
-          width="0"
-          style={{ display: 'none', visibility: 'hidden' }}
-        />
-      </noscript>
+      <Script
+        src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsCode}`}
+        strategy="afterInteractive"
+      />
+      <Script id="google-analytics" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){window.dataLayer.push(arguments);}
+          gtag('js', new Date());
+
+          gtag('config', '${googleAnalyticsCode}');
+        `}
+      </Script>
 
       <div className="content">
         <Component {...pageProps} />
