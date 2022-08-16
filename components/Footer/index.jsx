@@ -12,6 +12,7 @@ export default function Footer() {
             href="https://www.varheight.ch"
             className={styles.company}
             target="_blank"
+            rel="noreferrer noopener"
           >
             <em>var</em>height
           </a>
