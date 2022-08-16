@@ -9,10 +9,9 @@ export default function Footer() {
         <li>
           <span>Made with ❤️ @</span>
           <a
-            href="https://www.varheight.com"
+            href="https://www.varheight.ch"
             className={styles.company}
             target="_blank"
-            rel="noopener noreferrer"
           >
             <em>var</em>height
           </a>
