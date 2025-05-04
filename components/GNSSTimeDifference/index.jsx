@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
+import { getTimeDifferenceFromObject } from 'gnss-js';
 import useTimeDifferenceCalculator from '../../hooks/timeDifference';
-import { getTimeDifferenceFromObject } from '../../util/dates';
 import Button from '../Button';
 import CalculatorForm from '../CalculatorForm';
 import LabelInput from '../LabelInput';

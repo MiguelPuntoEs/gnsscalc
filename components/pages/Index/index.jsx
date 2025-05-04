@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getTimeDifference } from '../../../util/dates';
+import { getTimeDifference } from 'gnss-js';
 import GNSSForm from '../../GNSSForm';
 import GNSSTimeDifference from '../../GNSSTimeDifference';
 import styles from './index.module.scss';

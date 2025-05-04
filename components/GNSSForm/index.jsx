@@ -1,9 +1,4 @@
 import { useCallback } from 'react';
-import LabelInput from '../LabelInput';
-import useCalculator from '../../hooks/time';
-import { formatNumWithDecimals } from '../../util/formats';
-import CalculatorForm from '../CalculatorForm';
-import Button from '../Button';
 import {
   getDateFromBdsTime,
   getDateFromDayOfWeek,
@@ -19,9 +14,16 @@ import {
   getDateFromRINEX,
   getDateFromTimeOfDay,
   getDateFromUnixTime,
-  getDateFromUTC,
-  getDateFromWeekOfYear,
-} from '../../util/dates';
+} from 'gnss-js';
+import LabelInput from '../LabelInput';
+import useCalculator from '../../hooks/time';
+import { formatNumWithDecimals } from '../../util/formats';
+import CalculatorForm from '../CalculatorForm';
+import Button from '../Button';
+
+
+
+import { getDateFromUTC, getDateFromWeekOfYear } from '../../util/time';
 
 export default function GNSSForm({ title, date = new Date(), onDateChange }) {
   const result = useCalculator(date); // Echte Ergebnisse
@@ -151,7 +153,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         label="Day of Year"
         value={dayOfYear}
         onCompute={(value) =>
-          computationHandle(() => getDateFromDayOfYear(value, dateUTC, timeUTC))
+          computationHandle(() => getDateFromDayOfYear(value, date))
         }
         type="number"
       />
@@ -170,7 +172,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         label="Time of Day"
         value={timeOfDay}
         onCompute={(value) =>
-          computationHandle(() => getDateFromTimeOfDay(value, dateUTC))
+          computationHandle(() => getDateFromTimeOfDay(value, date))
         }
         type="number"
       />
@@ -179,7 +181,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         label="Day of Week"
         value={dayOfWeek}
         onCompute={(value) =>
-          computationHandle(() => getDateFromDayOfWeek(value, dateUTC, timeUTC))
+          computationHandle(() => getDateFromDayOfWeek(value, date))
         }
         type="number"
       />
@@ -188,7 +190,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         label="Hour Code"
         value={hourCode}
         onCompute={(value) =>
-          computationHandle(() => getDateFromHourCode(value, dateUTC, timeUTC))
+          computationHandle(() => getDateFromHourCode(value, date))
         }
       />
       <LabelInput
@@ -252,7 +254,17 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       </Button>
 
       <div />
-      <Button type="button" secondary>
+      <Button
+        type="button"
+        secondary
+        onClick={() => {
+          navigator.clipboard
+            .writeText(rinex)
+            .catch((err) => {
+              console.error('Failed to copy: ', err);
+            });
+        }}
+      >
         Copy RINEX
       </Button>
     </CalculatorForm>

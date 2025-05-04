@@ -1,26 +1,24 @@
 import moment from 'moment';
 import { useMemo } from 'react';
-import {
-  ALPHABET,
-  MILLISECONDS_IN_DAY,
-  MILLISECONDS_IN_SECOND,
-  SECONDS_TT_TAI,
-  START_JULIAN_CALENDAR_UNIX_SECONDS,
-  START_LEAP_SECS_GPS,
-  START_MJD_UNIX_SECONDS,
-} from '../constants/time';
+
 import {
   getBdsTime,
   getGalTime,
   getGloN4,
   getGloNA,
   getGpsTime,
+  getJulianDate,
   getLeapSeconds,
+  getMJD,
   getTimeOfDay,
   getTimeOfWeek,
   getUnixTime,
   getWeekNumber,
-} from '../util/dates';
+  getHourCode,
+  MILLISECONDS_IN_SECOND,
+  SECONDS_TT_TAI,
+  START_LEAP_SECS_GPS,
+} from 'gnss-js';
 
 export default function useCalculator(date) {
   const result = useMemo(
@@ -33,16 +31,11 @@ export default function useCalculator(date) {
       weekOfYear: moment(date).utc().weeks(),
       timeOfDay: getTimeOfDay(date),
       dayOfWeek: date.getUTCDay(),
-      hourCode: ALPHABET[date.getUTCHours()],
-      julianDate: (
-        date.getTime() / MILLISECONDS_IN_DAY +
-        START_JULIAN_CALENDAR_UNIX_SECONDS
-      ).toFixed(6),
-      mjd: date.getTime() / MILLISECONDS_IN_DAY + START_MJD_UNIX_SECONDS,
+      hourCode: getHourCode(date),
+      julianDate: getJulianDate(date).toFixed(6),
+      mjd: getMJD(date).toFixed(3),
       mjd2000: (
-        date.getTime() / MILLISECONDS_IN_DAY +
-        START_MJD_UNIX_SECONDS -
-        51544
+        getMJD(date) - 51544.0
       ).toFixed(3),
       leapSec: `${getLeapSeconds(date)} [TAI], ${
         getLeapSeconds(date) - START_LEAP_SECS_GPS

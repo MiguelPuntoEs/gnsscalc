@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "clsx": "^1.1.1",
+    "gnss-js": "^0.0.1",
     "moment": "^2.29.1",
     "next": "11.0.0",
     "react": "17.0.2",
