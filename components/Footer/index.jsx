@@ -7,21 +7,21 @@ export default function Footer() {
     <footer className={styles.footer}>
       <ul>
         <li>
-          <span>Made with ❤️ @</span>
+          <span>Made with ❤️ by </span>
           <a
-            href="https://www.varheight.ch"
+            href="https://www.miguel.es"
             className={styles.company}
             target="_blank"
             rel="noreferrer noopener"
           >
-            <em>var</em>height
+            Miguel González
           </a>
         </li>
         <li>
           <ul>
             <li>
               <a
-                href="https://www.linkedin.com/company/varheight/about/"
+                href="https://www.linkedin.com/in/mgcalvo/"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -36,43 +36,13 @@ export default function Footer() {
             </li>
             <li>
               <a
-                href="https://twitter.com/varheight"
+                href="https://github.com/MiguelPuntoEs/gnsscalc/"
                 target="_blank"
                 rel="noreferrer"
               >
                 <Image
-                  src="/icons/twitter.svg"
-                  alt="twitter"
-                  className={styles.footerIcon}
-                  height="30"
-                  width="30"
-                />
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://www.facebook.com/varheight"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Image
-                  src="/icons/facebook.svg"
-                  alt="facebook"
-                  className={styles.footerIcon}
-                  height="30"
-                  width="30"
-                />
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://www.instagram.com/varheight/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Image
-                  src="/icons/instagram.svg"
-                  alt="Instagram"
+                  src="/icons/github.svg"
+                  alt="GitHub"
                   className={styles.footerIcon}
                   height="30"
                   width="30"

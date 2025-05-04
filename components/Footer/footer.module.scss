@@ -18,22 +18,19 @@
     justify-content: space-between;
   }
 
+  li ul {
+    gap: .6rem
+  }
+
   a {
     text-decoration: none;
     color: inherit;
   }
 
-  .company em {
-    font-style: normal;
-    font-weight: bold;
-    color: #2996b8;
-  }
 
   .company {
-    text-transform: uppercase;
     font-weight: bold;
     letter-spacing: 0.05em;
-    font-family: "Poppins", sans-serif;
     color: #323139;
   }
 
