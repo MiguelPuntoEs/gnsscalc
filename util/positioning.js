@@ -29,7 +29,6 @@ export function car2geo(x, y, z) {
   let Ni;
   let hi;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     latiPrev = lati;
     Ni =
