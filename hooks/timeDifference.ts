@@ -13,10 +13,8 @@ export default function useTimeDifferenceCalculator(
   const timeDifferenceAbsolute = Math.abs(timeDifference);
 
   const seconds =
-    timeDifferenceSign *
-    Math.floor(
-      (timeDifferenceAbsolute % MILLISECONDS_IN_MINUTE) / MILLISECONDS_IN_SECOND
-    );
+    timeDifferenceSign * (timeDifferenceAbsolute % MILLISECONDS_IN_MINUTE) / MILLISECONDS_IN_SECOND
+
   const minutes =
     timeDifferenceSign *
     Math.floor(
