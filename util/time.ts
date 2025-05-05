@@ -5,7 +5,6 @@ export default function isValidDate(d: Date): boolean {
 }
 
 export function parseDate(dateStr: string, timeStr: string): Date {
-
   const timestamp = Date.parse(`${dateStr}T${timeStr}`);
   if (!timestamp) {
     console.error('Invalid date or time string');
@@ -15,7 +14,11 @@ export function parseDate(dateStr: string, timeStr: string): Date {
   return new Date(timestamp);
 }
 
-export function getDateFromWeekOfYear(weekOfYear: string, dateStr: string, timeStr: string): Date | undefined {
+export function getDateFromWeekOfYear(
+  weekOfYear: string,
+  dateStr: string,
+  timeStr: string
+): Date | undefined {
   const weekOfYearParsed = Number.parseInt(weekOfYear, 10);
 
   if (Number.isNaN(weekOfYearParsed)) return undefined;

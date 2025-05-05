@@ -1,7 +1,7 @@
-import clsx from "clsx";
-import { useEffect, useState } from "react";
-import InputMask from "react-input-mask";
-import styles from "./labelinput.module.scss";
+import clsx from 'clsx';
+import { useEffect, useState } from 'react';
+import InputMask from 'react-input-mask';
+import styles from './labelinput.module.scss';
 
 type LabelInputProps = {
   label: string;
@@ -26,13 +26,13 @@ export default function LabelInput({
   onCompute,
   disabled = false,
   className,
-  type = "text",
+  type = 'text',
   step,
   maskOptions,
   readOnly,
 }: LabelInputProps) {
   // Normale Hook calls
-  const [id, setId] = useState("");
+  const [id, setId] = useState('');
   const [_value, setValue] = useState(value);
   const [error, setError] = useState(false);
 
@@ -64,7 +64,7 @@ export default function LabelInput({
       value={_value}
       onChange={handleChange}
       onKeyDown={({ key }) => {
-        if (key === "Enter") {
+        if (key === 'Enter') {
           handleValidate();
         }
       }}
@@ -83,7 +83,7 @@ export default function LabelInput({
       value={_value}
       onChange={handleChange}
       onKeyDown={({ key }) => {
-        if (key === "Enter") {
+        if (key === 'Enter') {
           handleValidate();
         }
       }}

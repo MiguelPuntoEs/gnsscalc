@@ -6,7 +6,11 @@ import {
 } from '../constants/geoid';
 import { deg2rad } from './units';
 
-export function geo2car(lat: number, lon: number, h: number): [number, number, number] {
+export function geo2car(
+  lat: number,
+  lon: number,
+  h: number
+): [number, number, number] {
   const N =
     WGS84_SEMI_MAJOR_AXIS /
     Math.sqrt(1 - WGS84_ECCENTRICITY_SQUARED * Math.sin(lat) ** 2);
@@ -18,7 +22,11 @@ export function geo2car(lat: number, lon: number, h: number): [number, number, n
   return [x, y, z];
 }
 
-export function car2geo(x: number, y: number, z: number): [number, number, number] {
+export function car2geo(
+  x: number,
+  y: number,
+  z: number
+): [number, number, number] {
   const MAX_ITER = 50;
   const MAX_DELTA_ITER = 1e-15;
   const lon = Math.atan2(y, x);
@@ -51,7 +59,11 @@ export function car2geo(x: number, y: number, z: number): [number, number, numbe
   return [lati, lon, hi];
 }
 
-export function getPositionFromCartesian(x: string, y: string, z: string): [number, number, number] | undefined {
+export function getPositionFromCartesian(
+  x: string,
+  y: string,
+  z: string
+): [number, number, number] | undefined {
   const xParsed = Number.parseFloat(x);
   const yParsed = Number.parseFloat(y);
   const zParsed = Number.parseFloat(z);
@@ -64,14 +76,25 @@ export function getPositionFromCartesian(x: string, y: string, z: string): [numb
   return [xParsed, yParsed, zParsed];
 }
 
-export function getPositionFromGeodetic(latitude: number, longitude: number, height: number): Position {
+export function getPositionFromGeodetic(
+  latitude: number,
+  longitude: number,
+  height: number
+): Position {
   const latitudeRad = deg2rad(latitude);
   const longitudeRad = deg2rad(longitude);
 
   return geo2car(latitudeRad, longitudeRad, height);
 }
 
-export function getEnuDifference(x: number, y: number, z: number, xRef: number, yRef: number, zRef: number): [number, number, number] {
+export function getEnuDifference(
+  x: number,
+  y: number,
+  z: number,
+  xRef: number,
+  yRef: number,
+  zRef: number
+): [number, number, number] {
   const [latRef, lonRef] = car2geo(xRef, yRef, zRef);
 
   const deltaX = x - xRef;
@@ -112,7 +135,7 @@ export function getPositionFromGeodeticString(
   const heightParsed = Number.parseFloat(height);
 
   if (Number.isNaN(heightParsed)) return undefined;
-  
+
   const latitudeDegrees = Number.parseInt(latitudeString.slice(0, 2), 10);
   const latitudeMinutes = Number.parseInt(latitudeString.slice(4, 6), 10);
   const latitudeSeconds = Number.parseFloat(latitudeString.slice(8, 14));

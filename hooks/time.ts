@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo } from 'react';
 
 import {
   getBdsTime,
@@ -24,10 +24,8 @@ import {
   getWeekOfYear,
   getDayOfYear,
   getUtcDate,
-} from 'gnss-js'
-import { TimeResult } from '@/types/time'
-
-
+} from 'gnss-js';
+import { TimeResult } from '@/types/time';
 
 export default function useCalculator(date: Date): TimeResult {
   const result = useMemo(
@@ -60,7 +58,7 @@ export default function useCalculator(date: Date): TimeResult {
       rinex: getRINEX(date),
     }),
     [date]
-  )
+  );
 
-  return result
+  return result;
 }

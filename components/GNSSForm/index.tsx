@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback } from 'react';
 import {
   getDateFromBdsTime,
   getDateFromDayOfWeek,
@@ -19,26 +19,29 @@ import {
   getGpsLeap,
   getLeap,
   MILLISECONDS_IN_SECOND,
-} from 'gnss-js'
-import LabelInput from '@/components/LabelInput'
-import useCalculator from '@/hooks/time'
-import CalculatorForm from '@/components/CalculatorForm'
-import Button from '@/components/Button'
+} from 'gnss-js';
+import LabelInput from '@/components/LabelInput';
+import useCalculator from '@/hooks/time';
+import CalculatorForm from '@/components/CalculatorForm';
+import Button from '@/components/Button';
 
-import { getDateFromWeekOfYear, parseDate } from '../../util/time'
+import { getDateFromWeekOfYear, parseDate } from '../../util/time';
 
 export default function GNSSForm({ title, date = new Date(), onDateChange }) {
-  const result = useCalculator(date)
+  const result = useCalculator(date);
 
   const computationHandle = (func) => {
-    const resultDate = func()
+    const resultDate = func();
     if (resultDate) {
-      onDateChange(resultDate)
+      onDateChange(resultDate);
     }
-    return resultDate
-  }
+    return resultDate;
+  };
 
-  const getKey = useCallback(() => JSON.stringify(date) + Math.random(), [date])
+  const getKey = useCallback(
+    () => JSON.stringify(date) + Math.random(),
+    [date]
+  );
 
   const fields = [
     {
@@ -155,13 +158,15 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
     {
       label: 'MJD',
       value: result.mjd,
-      onCompute: (value) => computationHandle(() => getDateFromMJD(Number.parseFloat(value))),
+      onCompute: (value) =>
+        computationHandle(() => getDateFromMJD(Number.parseFloat(value))),
       type: 'number',
     },
     {
       label: 'MJD2000',
       value: result.mjd2000,
-      onCompute: (value) => computationHandle(() => getDateFromMJD2000(Number.parseFloat(value))),
+      onCompute: (value) =>
+        computationHandle(() => getDateFromMJD2000(Number.parseFloat(value))),
       type: 'number',
     },
     {
@@ -227,7 +232,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       value: result.rinex,
       onCompute: (value) => computationHandle(() => getDateFromRINEX(value)),
     },
-  ]
+  ];
 
   return (
     <CalculatorForm className="">
@@ -242,9 +247,11 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       <Button
         type="button"
         onClick={() => {
-          const date: Date = new Date()
-          const gps_leap_seconds: number = getGpsLeap(date)
-          onDateChange(new Date(date.getTime() + gps_leap_seconds * MILLISECONDS_IN_SECOND))
+          const date: Date = new Date();
+          const gps_leap_seconds: number = getGpsLeap(date);
+          onDateChange(
+            new Date(date.getTime() + gps_leap_seconds * MILLISECONDS_IN_SECOND)
+          );
         }}
       >
         Now
@@ -256,12 +263,12 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         secondary
         onClick={() => {
           navigator.clipboard.writeText(result.rinex).catch((err) => {
-            console.error('Failed to copy: ', err)
-          })
+            console.error('Failed to copy: ', err);
+          });
         }}
       >
         Copy RINEX
       </Button>
     </CalculatorForm>
-  )
+  );
 }

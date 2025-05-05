@@ -1,5 +1,5 @@
-import clsx from "clsx";
-import styles from "./calculatorform.module.scss";
+import clsx from 'clsx';
+import styles from './calculatorform.module.scss';
 
 export default function CalculatorForm({ children, className }) {
   return (

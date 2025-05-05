@@ -17,7 +17,6 @@ import {
 import CalculatorForm from '@/components/CalculatorForm';
 import LabelInput from '@/components/LabelInput';
 
-
 export default function PositionForm({
   position = [4263871.9243, 722591.1075, 4672988.8878],
   onPositionChange,
@@ -27,7 +26,6 @@ export default function PositionForm({
   onPositionChange: (position: Position) => void;
   title?: string;
 }) {
-
   const { latitude, longitude, height } = usePositionCalculator(position);
 
   const x = position[0].toFixed(DECIMAL_PLACES_FOR_CARTESIAN);
@@ -56,7 +54,9 @@ export default function PositionForm({
         type="number"
         value={x}
         onCompute={(value) =>
-          computationHandle(() => getPositionFromCartesian(value.toString(), y, z))
+          computationHandle(() =>
+            getPositionFromCartesian(value.toString(), y, z)
+          )
         }
       />
       <LabelInput
@@ -64,7 +64,9 @@ export default function PositionForm({
         type="number"
         value={y}
         onCompute={(value) =>
-          computationHandle(() => getPositionFromCartesian(x, value.toString(), z))
+          computationHandle(() =>
+            getPositionFromCartesian(x, value.toString(), z)
+          )
         }
       />
       <LabelInput
@@ -72,7 +74,9 @@ export default function PositionForm({
         type="number"
         value={z}
         onCompute={(value) =>
-          computationHandle(() => getPositionFromCartesian(x, y, value.toString()))
+          computationHandle(() =>
+            getPositionFromCartesian(x, y, value.toString())
+          )
         }
       />
 
@@ -82,7 +86,11 @@ export default function PositionForm({
         value={latitude.value.toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
         onCompute={(value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(Number.parseFloat(value.toString()), longitude.value, height)
+            getPositionFromGeodetic(
+              Number.parseFloat(value.toString()),
+              longitude.value,
+              height
+            )
           )
         }
       />
@@ -92,7 +100,11 @@ export default function PositionForm({
         value={longitude.value.toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
         onCompute={(value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(latitude.value, Number.parseFloat(value.toString()), height)
+            getPositionFromGeodetic(
+              latitude.value,
+              Number.parseFloat(value.toString()),
+              height
+            )
           )
         }
       />
@@ -101,8 +113,12 @@ export default function PositionForm({
         type="number"
         value={height.toFixed(DECIMAL_PLACES_FOR_HEIGHT)}
         onCompute={(value) =>
-          computationHandle(() => 
-            getPositionFromGeodetic(latitude.value, longitude.value, Number.parseFloat(value.toString()))
+          computationHandle(() =>
+            getPositionFromGeodetic(
+              latitude.value,
+              longitude.value,
+              Number.parseFloat(value.toString())
+            )
           )
         }
       />
@@ -117,7 +133,11 @@ export default function PositionForm({
         }}
         onCompute={(value) =>
           computationHandle(() =>
-            getPositionFromGeodeticString(value.toString(), longitudeString, heightString)
+            getPositionFromGeodeticString(
+              value.toString(),
+              longitudeString,
+              heightString
+            )
           )
         }
       />
@@ -132,7 +152,11 @@ export default function PositionForm({
         }}
         onCompute={(value) =>
           computationHandle(() =>
-            getPositionFromGeodeticString(latitudeString, value.toString(), heightString)
+            getPositionFromGeodeticString(
+              latitudeString,
+              value.toString(),
+              heightString
+            )
           )
         }
       />

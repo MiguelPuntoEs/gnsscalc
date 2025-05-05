@@ -12,17 +12,16 @@ export type PositionResult = {
   height: number;
 };
 
-
 export type AERResult = {
   elevationDeg: number;
   azimuthDeg: number;
-  slant: number
+  slant: number;
 };
 
 export type ENUResult = {
   deltaE: number;
   deltaN: number;
-  deltaU: number
+  deltaU: number;
 };
 
 export type Position = [number, number, number];

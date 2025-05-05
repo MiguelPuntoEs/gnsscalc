@@ -8,7 +8,11 @@ export default function AERForm({
   title = '',
   position = [1, 0, 0],
   refPosition = [1, 0, 0],
-}: {title: string; position: Position; refPosition: Position}) {
+}: {
+  title: string;
+  position: Position;
+  refPosition: Position;
+}) {
   const aerPosition = useAerCalculator(position, refPosition);
 
   const elevationDeg = aerPosition.elevationDeg.toFixed(5);

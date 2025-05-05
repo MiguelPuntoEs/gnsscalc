@@ -1,4 +1,4 @@
-import { Coordinate } from "@/types/position";
+import { Coordinate } from '@/types/position';
 
 export function formatLatitudeDegMinSecs({
   degrees,

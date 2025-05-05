@@ -2,7 +2,9 @@ import { deg2hms, rad2deg } from '../util/units';
 import { car2geo, getAer, getEnuDifference } from '@/util/positioning';
 import { PositionResult, AERResult, ENUResult } from '@/types/position';
 
-export function usePositionCalculator(position: [number, number, number]): PositionResult {
+export function usePositionCalculator(
+  position: [number, number, number]
+): PositionResult {
   const [latitude, longitude, height] = car2geo(
     position[0],
     position[1],
@@ -45,8 +47,10 @@ export function usePositionCalculator(position: [number, number, number]): Posit
   };
 }
 
-export function useAerCalculator(position: [number, number, number], refPosition: [number, number, number]): AERResult {
-
+export function useAerCalculator(
+  position: [number, number, number],
+  refPosition: [number, number, number]
+): AERResult {
   const [elevation, azimuth, slant] = getAer(
     position[0],
     position[1],
@@ -66,8 +70,10 @@ export function useAerCalculator(position: [number, number, number], refPosition
   };
 }
 
-export function useENUCalculator(position: [number, number, number], refPosition: [number, number, number]): ENUResult {
-
+export function useENUCalculator(
+  position: [number, number, number],
+  refPosition: [number, number, number]
+): ENUResult {
   const [deltaE, deltaN, deltaU] = getEnuDifference(
     position[0],
     position[1],

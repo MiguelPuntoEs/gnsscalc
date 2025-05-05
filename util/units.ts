@@ -8,7 +8,6 @@ export function deg2rad(degrees: number): number {
   return (degrees * Math.PI) / 180.0;
 }
 export function deg2hms(deg: number): [number, number, number] {
-
   let h: number = Math.floor(deg);
   let m: number = Math.floor(deg * MINUTES_IN_DEGREE) % MINUTES_IN_DEGREE;
   let s: number = (deg * SECONDS_IN_DEGREE) % SECONDS_IN_MINUTE;

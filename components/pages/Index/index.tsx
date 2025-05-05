@@ -67,8 +67,29 @@ export default function Index() {
             <em>Important note:</em> No leap seconds are considered in the
             computations except for TAI and TT
           </p>
-          <p>Leap second information is obtained from  <a href="https://data.iana.org/time-zones/data/leap-seconds.list" target="_blank" rel="noopener noreferrer">IANA</a>.</p>
-          <p>Leap seconds to be updated December 2025. For latest leap second information check <a href="https://datacenter.iers.org/data/latestVersion/bulletinC.txt" target="_blank" rel="noopener noreferrer">IERS Bulletin C</a>.</p>
+          <p>
+            Leap second information is obtained from{' '}
+            <a
+              href="https://data.iana.org/time-zones/data/leap-seconds.list"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              IANA
+            </a>
+            .
+          </p>
+          <p>
+            Leap seconds to be updated December 2025. For latest leap second
+            information check{' '}
+            <a
+              href="https://datacenter.iers.org/data/latestVersion/bulletinC.txt"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              IERS Bulletin C
+            </a>
+            .
+          </p>
         </div>
       </section>
     </>

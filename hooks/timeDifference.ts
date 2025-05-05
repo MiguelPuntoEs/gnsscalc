@@ -6,9 +6,9 @@ import {
   MILLISECONDS_IN_SECOND,
 } from '../constants/time';
 
-
-
-export default function useTimeDifferenceCalculator(timeDifference: number): TimeDifference {
+export default function useTimeDifferenceCalculator(
+  timeDifference: number
+): TimeDifference {
   const timeDifferenceSign = Math.sign(timeDifference);
   const timeDifferenceAbsolute = Math.abs(timeDifference);
 

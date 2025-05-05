@@ -7,7 +7,11 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   secondary?: boolean;
 };
 
-export default function Button({ className, secondary = false, ...props }: ButtonProps) {
+export default function Button({
+  className,
+  secondary = false,
+  ...props
+}: ButtonProps) {
   return (
     <button
       type="button"
