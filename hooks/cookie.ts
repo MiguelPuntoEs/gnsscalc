@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const useCookie = (cookieName) => {
+const useCookie = (cookieName: string): [string, (v: string) => void] => {
   const getCookie = () => {
     if (typeof window === 'undefined') {
       return '';

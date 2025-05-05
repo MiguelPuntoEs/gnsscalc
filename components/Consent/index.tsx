@@ -1,19 +1,20 @@
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
-import useCookie from '../../hooks/cookie';
+import useCookie from '@/hooks/cookie';
 import styles from './consent.module.scss';
 import Button from '../Button';
 
-const COOKIE_NAME = 'accepts-cookies';
+const COOKIE_NAME: string = 'accepts-cookies';
+
+type CookieSetter = (value: string) => void;
 
 export default function Consent() {
-  const [cookie, setCookie] = useCookie(COOKIE_NAME);
+  const [cookie, setCookie]: [string, CookieSetter] = useCookie(COOKIE_NAME);
   const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
     setShouldShow(cookie.length === 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cookie.length]);
 
   return (
     <div className={clsx(styles.consentBanner, { [styles.show]: shouldShow })}>
@@ -37,6 +38,7 @@ export default function Consent() {
           setCookie('true');
           setShouldShow(false);
         }}
+        className={styles.allow}
       >
         Allow
       </Button>

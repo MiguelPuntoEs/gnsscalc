@@ -1,3 +1,4 @@
+import { Position } from '@/types/position';
 import { MINUTES_IN_DEGREE, SECONDS_IN_DEGREE } from '../constants/angles';
 import {
   WGS84_ECCENTRICITY_SQUARED,
@@ -5,7 +6,7 @@ import {
 } from '../constants/geoid';
 import { deg2rad } from './units';
 
-export function geo2car(lat, lon, h) {
+export function geo2car(lat: number, lon: number, h: number): [number, number, number] {
   const N =
     WGS84_SEMI_MAJOR_AXIS /
     Math.sqrt(1 - WGS84_ECCENTRICITY_SQUARED * Math.sin(lat) ** 2);
@@ -17,7 +18,7 @@ export function geo2car(lat, lon, h) {
   return [x, y, z];
 }
 
-export function car2geo(x, y, z) {
+export function car2geo(x: number, y: number, z: number): [number, number, number] {
   const MAX_ITER = 50;
   const MAX_DELTA_ITER = 1e-15;
   const lon = Math.atan2(y, x);
@@ -50,7 +51,7 @@ export function car2geo(x, y, z) {
   return [lati, lon, hi];
 }
 
-export function getPositionFromCartesian(x, y, z) {
+export function getPositionFromCartesian(x: string, y: string, z: string): [number, number, number] | undefined {
   const xParsed = Number.parseFloat(x);
   const yParsed = Number.parseFloat(y);
   const zParsed = Number.parseFloat(z);
@@ -63,26 +64,14 @@ export function getPositionFromCartesian(x, y, z) {
   return [xParsed, yParsed, zParsed];
 }
 
-export function getPositionFromGeodetic(latitude, longitude, height) {
-  const latitudeParsed = Number.parseFloat(latitude);
-  const longitudeParsed = Number.parseFloat(longitude);
-  const heightParsed = Number.parseFloat(height);
+export function getPositionFromGeodetic(latitude: number, longitude: number, height: number): Position {
+  const latitudeRad = deg2rad(latitude);
+  const longitudeRad = deg2rad(longitude);
 
-  if (
-    Number.isNaN(latitudeParsed) ||
-    Number.isNaN(longitudeParsed) ||
-    Number.isNaN(heightParsed)
-  ) {
-    return undefined;
-  }
-
-  const latitudeRad = deg2rad(latitudeParsed);
-  const longitudeRad = deg2rad(longitudeParsed);
-
-  return geo2car(latitudeRad, longitudeRad, heightParsed);
+  return geo2car(latitudeRad, longitudeRad, height);
 }
 
-export function getEnuDifference(x, y, z, xRef, yRef, zRef) {
+export function getEnuDifference(x: number, y: number, z: number, xRef: number, yRef: number, zRef: number): [number, number, number] {
   const [latRef, lonRef] = car2geo(xRef, yRef, zRef);
 
   const deltaX = x - xRef;
@@ -121,17 +110,17 @@ export function getAer(x, y, z, xRef, yRef, zRef) {
 }
 
 export function getPositionFromGeodeticString(
-  latitudeString,
-  longitudeString,
-  height
-) {
+  latitudeString: string,
+  longitudeString: string,
+  height: string
+): [number, number, number] | undefined {
   const heightParsed = Number.parseFloat(height);
 
   if (Number.isNaN(heightParsed)) return undefined;
-
-  const latitudeDegrees = Number.parseInt(latitudeString.substr(0, 2), 10);
-  const latitudeMinutes = Number.parseInt(latitudeString.substr(4, 2), 10);
-  const latitudeSeconds = Number.parseFloat(latitudeString.substr(8, 6), 10);
+  
+  const latitudeDegrees = Number.parseInt(latitudeString.slice(0, 2), 10);
+  const latitudeMinutes = Number.parseInt(latitudeString.slice(4, 6), 10);
+  const latitudeSeconds = Number.parseFloat(latitudeString.slice(8, 14));
 
   if (
     Number.isNaN(latitudeDegrees) ||
@@ -151,16 +140,9 @@ export function getPositionFromGeodeticString(
         latitudeSeconds / SECONDS_IN_DEGREE)
   );
 
-  const longitudeDegrees = Number.parseInt(longitudeString.substr(0, 3), 10);
-  const longitudeMinutes = Number.parseInt(longitudeString.substr(5, 2), 10);
-  const longitudeSeconds = Number.parseFloat(longitudeString.substr(9, 6), 10);
-
-  // console.log(`latitudeDegrees`, latitudeDegrees);
-  // console.log(`latitudeMinutes`, latitudeMinutes);
-  // console.log(`latitudeSeconds`, latitudeSeconds);
-  // console.log(`longitudeDegrees`, longitudeDegrees);
-  // console.log(`longitudeMinutes`, longitudeMinutes);
-  // console.log(`longitudeSeconds`, longitudeSeconds);
+  const longitudeDegrees = Number.parseInt(longitudeString.slice(0, 3), 10);
+  const longitudeMinutes = Number.parseInt(longitudeString.slice(5, 7), 10);
+  const longitudeSeconds = Number.parseFloat(longitudeString.slice(9, 15));
 
   if (
     Number.isNaN(longitudeDegrees) ||

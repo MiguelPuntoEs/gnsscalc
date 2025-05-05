@@ -1,30 +1,12 @@
-export function formatNumWithDecimals(num, limit) {
-  let val = num;
-  if (typeof num === 'number') {
-    val = num.toString();
-  } else {
-    val = val.replace(/,/g, '.');
-  }
-
-  const decimals = val.split('.');
-
-  if (decimals.length === 1) {
-    return val;
-  }
-
-  if (decimals[1].length <= limit) {
-    return val;
-  }
-
-  return Number(val).toFixed(limit);
-}
+import { Coordinate } from "@/types/position";
 
 export function formatLatitudeDegMinSecs({
   degrees,
   minutes,
   seconds,
   direction,
-}) {
+}: Coordinate): string {
+  // TODO
   return `${degrees.toString().padStart(2, '0')}º ${minutes
     .toString()
     .padStart(2, '0')}' ${seconds.toFixed(3).padStart(6, '0')}" ${direction}`;
@@ -35,7 +17,7 @@ export function formatLongitudeDegMinSecs({
   minutes,
   seconds,
   direction,
-}) {
+}: Coordinate): string {
   return `${degrees.toString().padStart(3, '0')}º ${minutes
     .toString()
     .padStart(2, '0')}' ${seconds.toFixed(3).padStart(6, '0')}" ${direction}`;

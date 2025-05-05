@@ -1,18 +1,18 @@
 import { deg2hms, rad2deg } from '../util/units';
-import { car2geo, getAer, getEnuDifference } from '../util/positioning';
+import { car2geo, getAer, getEnuDifference } from '@/util/positioning';
+import { PositionResult, AERResult, ENUResult } from '@/types/position';
 
-export function usePositionCalculator(position) {
+export function usePositionCalculator(position: [number, number, number]): PositionResult {
   const [latitude, longitude, height] = car2geo(
     position[0],
     position[1],
     position[2]
   );
 
-  if (!position) return undefined;
-
-  if (position[0] === 0 && position[1] === 0) {
-    return undefined;
-  }
+  // TODO: Handle the case when the position is (0, 0, 0)
+  // if (position[0] === 0 && position[1] === 0) {
+  //   return undefined;
+  // }
 
   const latitudeDeg = rad2deg(latitude);
   const longitudeDeg = rad2deg(longitude);
@@ -45,8 +45,7 @@ export function usePositionCalculator(position) {
   };
 }
 
-export function useAerCalculator(position, refPosition) {
-  if (!position || !refPosition) return undefined;
+export function useAerCalculator(position: [number, number, number], refPosition: [number, number, number]): AERResult {
 
   const [elevation, azimuth, slant] = getAer(
     position[0],
@@ -67,8 +66,7 @@ export function useAerCalculator(position, refPosition) {
   };
 }
 
-export function useENUCalculator(position, refPosition) {
-  if (!position || !refPosition) return undefined;
+export function useENUCalculator(position: [number, number, number], refPosition: [number, number, number]): ENUResult {
 
   const [deltaE, deltaN, deltaU] = getEnuDifference(
     position[0],

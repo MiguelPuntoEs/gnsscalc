@@ -1,3 +1,4 @@
+import { TimeDifference } from 'gnss-js';
 import {
   MILLISECONDS_IN_DAY,
   MILLISECONDS_IN_HOUR,
@@ -5,9 +6,9 @@ import {
   MILLISECONDS_IN_SECOND,
 } from '../constants/time';
 
-export default function useTimeDifferenceCalculator(timeDifference) {
-  if (Number.isNaN(timeDifference)) return undefined;
 
+
+export default function useTimeDifferenceCalculator(timeDifference: number): TimeDifference {
   const timeDifferenceSign = Math.sign(timeDifference);
   const timeDifferenceAbsolute = Math.abs(timeDifference);
 

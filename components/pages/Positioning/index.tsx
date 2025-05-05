@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import styles from './positioning.module.scss';
-import PositionForm from '../../PositionForm';
-import AERForm from '../../AERForm';
-import ENUForm from '../../ENUForm';
-import { getPositionFromGeodetic } from '../../../util/positioning';
+import PositionForm from '@/components/PositionForm';
+import AERForm from '@/components/AERForm';
+import ENUForm from '@/components/ENUForm';
+import { getPositionFromGeodetic } from '@/util/positioning';
+import { Position } from '@/types/position';
 
 export default function Positioning() {
-  const [position, setPosition] = useState([
+  const [position, setPosition]: [Position, (_: Position) => void] = useState([
     4263871.9243, 722591.1075, 4672986.8878,
   ]);
-  const [refPosition, setRefPosition] = useState([
+  const [refPosition, setRefPosition]: [Position, (_: Position) => void] = useState([
     4253871.9243, 712591.1075, 4072986.8878,
   ]);
 
-  // useEffect vor dem ersten Return
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(

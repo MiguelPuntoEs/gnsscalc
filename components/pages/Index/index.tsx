@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getTimeDifference } from 'gnss-js';
-import GNSSForm from '../../GNSSForm';
-import GNSSTimeDifference from '../../GNSSTimeDifference';
+import GNSSForm from '@/components/GNSSForm';
+import GNSSTimeDifference from '@/components/GNSSTimeDifference';
 import styles from './index.module.scss';
 
 export default function Index() {

@@ -1,0 +1,4 @@
+export const WGS84_SEMI_MAJOR_AXIS: number = 6378137.0;
+export const WGS84_ECCENTRICITY_SQUARED: number = 0.006694379990197;
+export const WGS84_SEMI_MINOR_AXIS: number = 6356752.314245;
+export const WGS84_FLATTENING: number = 298.257223563;

@@ -20,7 +20,37 @@ import {
   START_LEAP_SECS_GPS,
 } from 'gnss-js';
 
-export default function useCalculator(date) {
+type HourCode = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x';
+
+type TimeResult = {
+  weekNumber: number;
+  timeOfWeek: number;
+  dateUTC: string;
+  timeUTC: string;
+  dayOfYear: number;
+  weekOfYear: number;
+  timeOfDay: number;
+  dayOfWeek: number;
+  hourCode: string
+  julianDate: string;
+  mjd: string;
+  mjd2000: string;
+  leapSec: string;
+  gpsTime: number;
+  galTime: number;
+  bdsTime: number;
+  unixTime: number;
+  gloN4: number;
+  gloNa: number;
+  dateTai: string;
+  timeTai: string;
+  dateTT: string;
+  timeTT: string;
+  rinex: string;
+};
+
+
+export default function useCalculator(date: Date): TimeResult {
   const result = useMemo(
     () => ({
       weekNumber: getWeekNumber(date),

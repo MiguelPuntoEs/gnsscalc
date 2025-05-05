@@ -50,4 +50,7 @@ export default defineConfig([globalIgnores(["**/.next", "**/dist", "**/node_modu
             version: "detect",
         },
     },
+    rules: {
+        "no-unused-vars": "off",
+    }
 }]);

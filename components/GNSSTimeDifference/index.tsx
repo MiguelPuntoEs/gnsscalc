@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { getTimeDifferenceFromObject } from 'gnss-js';
+import { getTimeDifferenceFromObject, TimeDifference } from 'gnss-js';
 import useTimeDifferenceCalculator from '../../hooks/timeDifference';
 import Button from '../Button';
 import CalculatorForm from '../CalculatorForm';
@@ -10,7 +10,7 @@ export default function GNSSTimeDifference({
   timeDifference = 0,
   onTimeDifferenceChange,
 }) {
-  const { seconds, minutes, hours, days } =
+  const { seconds, minutes, hours, days }: TimeDifference =
     useTimeDifferenceCalculator(timeDifference);
 
   const computationHandle = (timeDifferenceObject) => {

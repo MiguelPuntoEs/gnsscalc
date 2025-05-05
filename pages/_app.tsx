@@ -1,4 +1,3 @@
-/* eslint-disable react/no-danger */
 import '../styles/global.css';
 
 import Head from 'next/head';

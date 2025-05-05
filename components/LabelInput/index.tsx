@@ -3,17 +3,34 @@ import { useEffect, useState } from "react";
 import InputMask from "react-input-mask";
 import styles from "./labelinput.module.scss";
 
+type LabelInputProps = {
+  label: string;
+  value: string | number;
+  onCompute?: (value: string | number) => any;
+  disabled?: boolean;
+  className?: string;
+  type?: string;
+  step?: string;
+  maskOptions?: {
+    mask: string;
+    formatChars: {
+      [key: string]: string;
+    };
+  };
+  readOnly?: boolean;
+};
+
 export default function LabelInput({
   label,
   value,
-  onCompute = () => true,
+  onCompute,
   disabled = false,
   className,
   type = "text",
   step,
   maskOptions,
   readOnly,
-}) {
+}: LabelInputProps) {
   // Normale Hook calls
   const [id, setId] = useState("");
   const [_value, setValue] = useState(value);
@@ -33,7 +50,7 @@ export default function LabelInput({
 
   // Allerletz useEffect
   useEffect(() => {
-    setId(Math.random());
+    setId(Math.random().toString());
   }, []);
 
   useEffect(() => {
