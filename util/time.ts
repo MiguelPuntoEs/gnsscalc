@@ -24,7 +24,7 @@ export function getDateFromWeekOfYear(
   if (Number.isNaN(weekOfYearParsed)) return undefined;
 
   const date = moment
-    .utc(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm:ss')
+    .utc(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm:ss.SSS')
     .weeks(weekOfYearParsed)
     .toDate();
 

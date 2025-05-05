@@ -124,7 +124,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       value: result.weekOfYear,
       onCompute: (value) =>
         computationHandle(() =>
-          getDateFromWeekOfYear(value, result.dateUtc, result.timeUtc)
+          getDateFromWeekOfYear(value, result.dateGps, result.timeGps)
         ),
       type: 'number',
     },
