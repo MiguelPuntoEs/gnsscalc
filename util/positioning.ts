@@ -98,11 +98,6 @@ export function getAer(x, y, z, xRef, yRef, zRef) {
 
   const [deltaE, deltaN, deltaU] = getEnuDifference(x, y, z, xRef, yRef, zRef);
 
-  // console.log(`slant`, slant);
-  // console.log(`deltaE`, deltaE);
-  // console.log(`deltaN`, deltaN);
-  // console.log(`deltaU`, deltaU);
-
   const elevation = Math.asin(deltaU / slant);
   const azimuth = Math.atan2(deltaE, deltaN);
 

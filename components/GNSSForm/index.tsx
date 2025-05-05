@@ -12,15 +12,20 @@ import {
   getDateFromMJD,
   getDateFromMJD2000,
   getDateFromRINEX,
+  getDateFromTAI,
   getDateFromTimeOfDay,
+  getDateFromTT,
   getDateFromUnixTime,
+  getGpsLeap,
+  getLeap,
+  MILLISECONDS_IN_SECOND,
 } from 'gnss-js'
 import LabelInput from '@/components/LabelInput'
 import useCalculator from '@/hooks/time'
 import CalculatorForm from '@/components/CalculatorForm'
 import Button from '@/components/Button'
 
-import { getDateFromUTC, getDateFromWeekOfYear } from '../../util/time'
+import { getDateFromWeekOfYear, parseDate } from '../../util/time'
 
 export default function GNSSForm({ title, date = new Date(), onDateChange }) {
   const result = useCalculator(date)
@@ -53,25 +58,37 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
     {
       label: 'GPS Time',
       value: result.gpsTime,
-      onCompute: (value) => computationHandle(() => getDateFromGpsTime(value)),
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromGpsTime(value * MILLISECONDS_IN_SECOND)
+        ),
       type: 'number',
     },
     {
       label: 'GAL Time',
       value: result.galTime,
-      onCompute: (value) => computationHandle(() => getDateFromGalTime(value)),
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromGalTime(value * MILLISECONDS_IN_SECOND)
+        ),
       type: 'number',
     },
     {
       label: 'BDS Time',
       value: result.bdsTime,
-      onCompute: (value) => computationHandle(() => getDateFromBdsTime(value)),
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromBdsTime(value * MILLISECONDS_IN_SECOND)
+        ),
       type: 'number',
     },
     {
       label: 'UNIX Time',
       value: result.unixTime,
-      onCompute: (value) => computationHandle(() => getDateFromUnixTime(value)),
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromUnixTime(value * MILLISECONDS_IN_SECOND)
+        ),
       type: 'number',
     },
     {
@@ -104,7 +121,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       value: result.weekOfYear,
       onCompute: (value) =>
         computationHandle(() =>
-          getDateFromWeekOfYear(value, result.dateUTC, result.timeUTC)
+          getDateFromWeekOfYear(value, result.dateUtc, result.timeUtc)
         ),
       type: 'number',
     },
@@ -138,13 +155,13 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
     {
       label: 'MJD',
       value: result.mjd,
-      onCompute: (value) => computationHandle(() => getDateFromMJD(value)),
+      onCompute: (value) => computationHandle(() => getDateFromMJD(Number.parseFloat(value))),
       type: 'number',
     },
     {
       label: 'MJD2000',
       value: result.mjd2000,
-      onCompute: (value) => computationHandle(() => getDateFromMJD2000(value)),
+      onCompute: (value) => computationHandle(() => getDateFromMJD2000(Number.parseFloat(value))),
       type: 'number',
     },
     {
@@ -156,38 +173,54 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
     {
       label: 'Date [TAI]',
       value: result.dateTai,
-      disabled: true,
-      readOnly: true,
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromTAI(parseDate(value, result.timeTai))
+        ),
     },
     {
       label: 'Time [TAI]',
       value: result.timeTai,
-      disabled: true,
-      readOnly: true,
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromTAI(parseDate(result.dateTai, value))
+        ),
     },
     {
       label: 'Date [TT]',
       value: result.dateTT,
-      disabled: true,
-      readOnly: true,
+      onCompute: (value) =>
+        computationHandle(() => getDateFromTT(parseDate(value, result.timeTT))),
     },
     {
       label: 'Time [TT]',
       value: result.timeTT,
+      onCompute: (value) =>
+        computationHandle(() => getDateFromTT(parseDate(result.dateTT, value))),
+    },
+    {
+      label: 'Date [UTC]',
+      value: result.dateUtc,
       disabled: true,
       readOnly: true,
     },
     {
-      label: 'Date [UTC]',
-      value: result.dateUTC,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromUTC(value, result.timeUTC)),
+      label: 'Time [UTC]',
+      value: result.timeUtc,
+      disabled: true,
+      readOnly: true,
     },
     {
-      label: 'Time [UTC]',
-      value: result.timeUTC,
+      label: 'Date [GPS]',
+      value: result.dateGps,
       onCompute: (value) =>
-        computationHandle(() => getDateFromUTC(result.dateUTC, value)),
+        computationHandle(() => parseDate(value, result.timeGps)),
+    },
+    {
+      label: 'Time [GPS]',
+      value: result.timeGps,
+      onCompute: (value) =>
+        computationHandle(() => parseDate(result.dateGps, value)),
     },
     {
       label: 'RINEX',
@@ -209,7 +242,9 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       <Button
         type="button"
         onClick={() => {
-          onDateChange(new Date())
+          const date: Date = new Date()
+          const gps_leap_seconds: number = getGpsLeap(date)
+          onDateChange(new Date(date.getTime() + gps_leap_seconds * MILLISECONDS_IN_SECOND))
         }}
       >
         Now

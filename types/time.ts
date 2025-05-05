@@ -1,0 +1,30 @@
+import { HourCode } from "gnss-js"
+
+export type TimeResult = {
+    weekNumber: number
+    timeOfWeek: number
+    gpsTime: number
+    galTime: number
+    bdsTime: number
+    unixTime: number
+    dayOfYear: number
+    weekOfYear: number
+    timeOfDay: number
+    dayOfWeek: number
+    hourCode: HourCode
+    julianDate: string
+    mjd: string
+    mjd2000: string
+    leapSec: string
+    gloN4: number
+    gloNa: number
+    dateTai: string
+    timeTai: string
+    dateTT: string
+    timeTT: string
+    dateUtc: string
+    timeUtc: string
+    dateGps: string
+    timeGps: string
+    rinex: string
+  }
