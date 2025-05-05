@@ -21,39 +21,10 @@ import { formatNumWithDecimals } from '../../util/formats';
 import CalculatorForm from '../CalculatorForm';
 import Button from '../Button';
 
-
-
 import { getDateFromUTC, getDateFromWeekOfYear } from '../../util/time';
 
 export default function GNSSForm({ title, date = new Date(), onDateChange }) {
-  const result = useCalculator(date); // Echte Ergebnisse
-
-  const {
-    bdsTime,
-    dateUTC,
-    dateTai,
-    dateTT,
-    dayOfWeek,
-    dayOfYear,
-    galTime,
-    gloN4,
-    gloNa,
-    gpsTime,
-    hourCode,
-    julianDate,
-    leapSec,
-    mjd,
-    mjd2000,
-    rinex,
-    timeUTC,
-    timeOfDay,
-    timeOfWeek,
-    timeTai,
-    timeTT,
-    unixTime,
-    weekNumber,
-    weekOfYear,
-  } = result;
+  const result = useCalculator(date);
 
   const computationHandle = (func) => {
     const resultDate = func();
@@ -68,180 +39,165 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
     [date]
   );
 
+  const fields = [
+    {
+      label: 'Week no.',
+      value: result.weekNumber,
+      onCompute: (value) => computationHandle(() => getDateFromGpsData(value, result.timeOfWeek)),
+      type: 'number',
+    },
+    {
+      label: 'Time of week',
+      value: result.timeOfWeek,
+      onCompute: (value) => computationHandle(() => getDateFromGpsData(result.weekNumber, value)),
+      type: 'number',
+    },
+    {
+      label: 'GPS Time',
+      value: result.gpsTime,
+      onCompute: (value) => computationHandle(() => getDateFromGpsTime(value)),
+      type: 'number',
+    },
+    {
+      label: 'GAL Time',
+      value: result.galTime,
+      onCompute: (value) => computationHandle(() => getDateFromGalTime(value)),
+      type: 'number',
+    },
+    {
+      label: 'BDS Time',
+      value: result.bdsTime,
+      onCompute: (value) => computationHandle(() => getDateFromBdsTime(value)),
+      type: 'number',
+    },
+    {
+      label: 'UNIX Time',
+      value: result.unixTime,
+      onCompute: (value) => computationHandle(() => getDateFromUnixTime(value)),
+      type: 'number',
+    },
+    {
+      label: (
+        <span>
+          GLO N<sub>4</sub>
+        </span>
+      ),
+      value: result.gloN4,
+      onCompute: (value) => computationHandle(() => getDateFromGloN(value, result.gloNa, result.timeOfDay)),
+      type: 'number',
+    },
+    {
+      label: (
+        <span>
+          GLO N<sup>A</sup>
+        </span>
+      ),
+      value: result.gloNa,
+      onCompute: (value) => computationHandle(() => getDateFromGloN(result.gloN4, value, result.timeOfDay)),
+      type: 'number',
+    },
+    {
+      label: 'Day of Year',
+      value: result.dayOfYear,
+      onCompute: (value) => computationHandle(() => getDateFromDayOfYear(value, date)),
+      type: 'number',
+    },
+    {
+      label: 'Week of Year',
+      value: result.weekOfYear,
+      onCompute: (value) => computationHandle(() => getDateFromWeekOfYear(value, result.dateUTC, result.timeUTC)),
+      type: 'number',
+    },
+    {
+      label: 'Time of Day',
+      value: result.timeOfDay,
+      onCompute: (value) => computationHandle(() => getDateFromTimeOfDay(value, date)),
+      type: 'number',
+    },
+    {
+      label: 'Day of Week',
+      value: result.dayOfWeek,
+      onCompute: (value) => computationHandle(() => getDateFromDayOfWeek(value, date)),
+      type: 'number',
+    },
+    {
+      label: 'Hour Code',
+      value: result.hourCode,
+      onCompute: (value) => computationHandle(() => getDateFromHourCode(value, date)),
+    },
+    {
+      label: 'Julian Date',
+      value: result.julianDate,
+      onCompute: (value) => computationHandle(() => getDateFromJulianDate(value)),
+      type: 'number',
+    },
+    {
+      label: 'MJD',
+      value: formatNumWithDecimals(result.mjd, 3),
+      onCompute: (value) => computationHandle(() => getDateFromMJD(value)),
+      type: 'number',
+    },
+    {
+      label: 'MJD2000',
+      value: result.mjd2000,
+      onCompute: (value) => computationHandle(() => getDateFromMJD2000(value)),
+      type: 'number',
+    },
+    {
+      label: 'Leap Sec.',
+      value: result.leapSec,
+      disabled: true,
+      readOnly: true,
+    },
+    {
+      label: 'Date [TAI]',
+      value: result.dateTai,
+      disabled: true,
+      readOnly: true,
+    },
+    {
+      label: 'Time [TAI]',
+      value: result.timeTai,
+      disabled: true,
+      readOnly: true,
+    },
+    {
+      label: 'Date [TT]',
+      value: result.dateTT,
+      disabled: true,
+      readOnly: true,
+    },
+    {
+      label: 'Time [TT]',
+      value: result.timeTT,
+      disabled: true,
+      readOnly: true,
+    },
+    {
+      label: 'Date [UTC]',
+      value: result.dateUTC,
+      onCompute: (value) => computationHandle(() => getDateFromUTC(value, result.timeUTC)),
+    },
+    {
+      label: 'Time [UTC]',
+      value: result.timeUTC,
+      onCompute: (value) => computationHandle(() => getDateFromUTC(result.dateUTC, value)),
+    },
+    {
+      label: 'RINEX',
+      value: result.rinex,
+      onCompute: (value) => computationHandle(() => getDateFromRINEX(value)),
+    },
+  ];
+
   return (
     <CalculatorForm>
       <div />
       <span>{title}</span>
 
-      <LabelInput
-        key={getKey()}
-        label="Week no."
-        value={weekNumber}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromGpsData(value, timeOfWeek))
-        }
-        type="number"
-      />
-      <LabelInput
-        label="Time of week"
-        value={timeOfWeek}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromGpsData(weekNumber, value))
-        }
-        type="number"
-      />
-      <LabelInput
-        label="GPS Time"
-        value={gpsTime}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromGpsTime(value))
-        }
-        type="number"
-      />
-      <LabelInput
-        label="GAL Time"
-        value={galTime}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromGalTime(value))
-        }
-        type="number"
-      />
-      <LabelInput
-        label="BDS Time"
-        value={bdsTime}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromBdsTime(value))
-        }
-        type="number"
-      />
-      <LabelInput
-        label="UNIX Time"
-        value={unixTime}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromUnixTime(value))
-        }
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label={
-          <span>
-            GLO N<sub>4</sub>
-          </span>
-        }
-        value={gloN4}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromGloN(value, gloNa, timeOfDay))
-        }
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label={
-          <span>
-            GLO N<sup>A</sup>
-          </span>
-        }
-        value={gloNa}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromGloN(gloN4, value, timeOfDay))
-        }
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label="Day of Year"
-        value={dayOfYear}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromDayOfYear(value, date))
-        }
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label="Week of Year"
-        value={weekOfYear}
-        onCompute={(value) =>
-          computationHandle(() =>
-            getDateFromWeekOfYear(value, dateUTC, timeUTC)
-          )
-        }
-        type="number"
-      />
-      <LabelInput
-        label="Time of Day"
-        value={timeOfDay}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromTimeOfDay(value, date))
-        }
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label="Day of Week"
-        value={dayOfWeek}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromDayOfWeek(value, date))
-        }
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label="Hour Code"
-        value={hourCode}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromHourCode(value, date))
-        }
-      />
-      <LabelInput
-        label="Julian Date"
-        value={julianDate}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromJulianDate(value))
-        }
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label="MJD"
-        value={formatNumWithDecimals(mjd, 3)}
-        onCompute={(value) => computationHandle(() => getDateFromMJD(value))}
-        type="number"
-      />
-      <LabelInput
-        key={getKey()}
-        label="MJD2000"
-        value={mjd2000}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromMJD2000(value))
-        }
-        type="number"
-      />
-      <LabelInput label="Leap Sec." value={leapSec} disabled readOnly />
-      <LabelInput label="Date [TAI]" value={dateTai} disabled readOnly />
-      <LabelInput label="Time [TAI]" value={timeTai} disabled readOnly />
-      <LabelInput label="Date [TT]" value={dateTT} disabled readOnly />
-      <LabelInput label="Time [TT]" value={timeTT} disabled readOnly />
-      <LabelInput
-        key={getKey()}
-        label="Date [UTC]"
-        value={dateUTC}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromUTC(value, timeUTC))
-        }
-      />
-      <LabelInput
-        label="Time [UTC]"
-        value={timeUTC}
-        onCompute={(value) =>
-          computationHandle(() => getDateFromUTC(dateUTC, value))
-        }
-      />
-      <LabelInput
-        label="RINEX"
-        value={rinex}
-        onCompute={(value) => computationHandle(() => getDateFromRINEX(value))}
-      />
+      {fields.map((field, index) => (
+        <LabelInput key={getKey()} {...field} />
+      ))}
 
       <div />
       <Button
@@ -259,7 +215,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         secondary
         onClick={() => {
           navigator.clipboard
-            .writeText(rinex)
+            .writeText(result.rinex)
             .catch((err) => {
               console.error('Failed to copy: ', err);
             });
