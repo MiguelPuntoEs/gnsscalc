@@ -64,7 +64,8 @@ export default function Index() {
             of days since January 1, 2000, 00:00:00
           </p>
           <p>
-            <em>Important note:</em> leap seconds are only considered for UTC computation.
+            <em>Important note:</em> leap seconds are only considered for UTC
+            computation.
           </p>
           <p>
             Leap second information is obtained from{' '}

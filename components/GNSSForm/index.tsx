@@ -12,12 +12,12 @@ import {
   getDateFromMJD,
   getDateFromMJD2000,
   getDateFromRINEX,
-  getDateFromTAI,
+  getDateFromTai,
   getDateFromTimeOfDay,
-  getDateFromTT,
+  getDateFromTt,
   getDateFromUnixTime,
+  getDateFromUtc,
   getGpsLeap,
-  getLeap,
   MILLISECONDS_IN_SECOND,
 } from 'gnss-js';
 import LabelInput from '@/components/LabelInput';
@@ -180,7 +180,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       value: result.dateTai,
       onCompute: (value) =>
         computationHandle(() =>
-          getDateFromTAI(parseDate(value, result.timeTai))
+          getDateFromTai(parseDate(value, result.timeTai))
         ),
     },
     {
@@ -188,32 +188,36 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       value: result.timeTai,
       onCompute: (value) =>
         computationHandle(() =>
-          getDateFromTAI(parseDate(result.dateTai, value))
+          getDateFromTai(parseDate(result.dateTai, value))
         ),
     },
     {
       label: 'Date [TT]',
       value: result.dateTT,
       onCompute: (value) =>
-        computationHandle(() => getDateFromTT(parseDate(value, result.timeTT))),
+        computationHandle(() => getDateFromTt(parseDate(value, result.timeTT))),
     },
     {
       label: 'Time [TT]',
       value: result.timeTT,
       onCompute: (value) =>
-        computationHandle(() => getDateFromTT(parseDate(result.dateTT, value))),
+        computationHandle(() => getDateFromTt(parseDate(result.dateTT, value))),
     },
     {
       label: 'Date [UTC]',
       value: result.dateUtc,
-      disabled: true,
-      readOnly: true,
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromUtc(parseDate(value, result.timeUtc))
+        ),
     },
     {
       label: 'Time [UTC]',
       value: result.timeUtc,
-      disabled: true,
-      readOnly: true,
+      onCompute: (value) =>
+        computationHandle(() =>
+          getDateFromUtc(parseDate(result.dateUtc, value))
+        ),
     },
     {
       label: 'Date [GPS]',

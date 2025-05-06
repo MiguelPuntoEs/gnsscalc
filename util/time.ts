@@ -6,7 +6,8 @@ export default function isValidDate(d: Date): boolean {
 
 export function parseDate(dateStr: string, timeStr: string): Date {
   const timestamp = Date.parse(`${dateStr}T${timeStr}`);
-  if (!timestamp) {
+
+  if (timestamp == undefined || Number.isNaN(timestamp)) {
     console.error('Invalid date or time string');
     return new Date();
   }

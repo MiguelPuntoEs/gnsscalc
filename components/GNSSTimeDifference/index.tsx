@@ -15,7 +15,7 @@ export default function GNSSTimeDifference({
 
   const computationHandle = (timeDifferenceObject) => {
     const resultTimeDifference =
-    getTimeDifferenceFromObject(timeDifferenceObject);
+      getTimeDifferenceFromObject(timeDifferenceObject);
     onTimeDifferenceChange(resultTimeDifference);
     return resultTimeDifference;
   };
