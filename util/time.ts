@@ -1,18 +1,16 @@
-import moment from 'moment';
+import { DateTime } from 'luxon';
 
 export default function isValidDate(d: Date): boolean {
   return d instanceof Date && !Number.isNaN(d);
 }
 
 export function parseDate(dateStr: string, timeStr: string): Date {
-  const timestamp = Date.parse(`${dateStr}T${timeStr}`);
+  const dt_string: string =
+    dateStr.replace(/[.,;\s]+/g, '-') + 'T' + timeStr.replace(/[,;\s]+/g, ':');
+  console.log('parseDate', dt_string);
+  const dt = DateTime.fromISO(dt_string, { zone: 'utc' });
 
-  if (timestamp == undefined || Number.isNaN(timestamp)) {
-    console.error('Invalid date or time string');
-    return new Date();
-  }
-
-  return new Date(timestamp);
+  return dt.isValid ? dt.toJSDate() : new Date();
 }
 
 export function getDateFromWeekOfYear(
@@ -24,12 +22,22 @@ export function getDateFromWeekOfYear(
 
   if (Number.isNaN(weekOfYearParsed)) return undefined;
 
-  const date = moment
-    .utc(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm:ss.SSS')
-    .weeks(weekOfYearParsed)
-    .toDate();
+  const baseDate = DateTime.fromJSDate(parseDate(dateStr, timeStr), {
+    zone: 'utc',
+  });
 
-  if (!isValidDate(date)) return undefined;
+  const dt = DateTime.fromObject(
+    {
+      weekYear: baseDate.weekYear,
+      weekNumber: weekOfYearParsed,
+      weekday: baseDate.weekday,
+      hour: baseDate.hour,
+      minute: baseDate.minute,
+      second: baseDate.second,
+      millisecond: baseDate.millisecond,
+    },
+    { zone: 'utc' }
+  );
 
-  return date;
+  return dt.isValid ? dt.toJSDate() : new Date();
 }
