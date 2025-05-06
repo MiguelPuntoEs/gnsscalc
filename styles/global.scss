@@ -1,0 +1,70 @@
+@use '@/styles/variables' as *;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  font-family: "Inter", sans-serif;
+  background-color: $black;
+  color: $white
+}
+
+h1 {
+  margin-top: 24px;
+  margin-bottom: 20px;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+h2 {
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.content {
+  margin: 0 10%;
+}
+
+p {
+  margin-bottom: 12px;
+  line-height: 1.5
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+
+  &:hover {
+    color: #fff;
+  }
+}
+
+section {
+  margin-bottom: 20px;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+input {
+  background-color: $dark;
+  border: 0;
+  border-radius: 3px;
+  text-align: right;
+  font-weight: 500;
+}

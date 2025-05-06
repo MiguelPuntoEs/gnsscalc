@@ -1,14 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap');
+@use '@/styles/variables' as *;
 
 .footer {
   display: block;
   padding: 1.25rem 10%;
-  background-color: #f5f5f5;
-  /* w*.8/.8 */
   margin: auto 0 0;
+  margin-top: 48px;
 
-  border-top: 0.0625rem solid #ddd;
-  border-bottom: 0.0625rem solid #ddd;
+  border-top: 0.0625rem solid $white;
   font-size: 0.875rem;
 
   ul {
@@ -22,15 +20,8 @@
     gap: 0.6rem;
   }
 
-  a {
-    text-decoration: none;
-    color: inherit;
-  }
-
   .company {
     font-weight: bold;
-    letter-spacing: 0.05em;
-    color: #323139;
   }
 
   .footerIcon {

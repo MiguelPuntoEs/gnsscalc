@@ -7,7 +7,7 @@ export default function Footer() {
     <footer className={styles.footer}>
       <ul>
         <li>
-          <span>Made with ❤️ by </span>
+          <span>Made by </span>
           <a
             href="https://www.miguel.es"
             className={styles.company}

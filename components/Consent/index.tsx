@@ -24,24 +24,25 @@ export default function Consent() {
         our use of cookies.
       </p>
 
-      <Button
-        onClick={() => {
-          setCookie('false');
-          setShouldShow(false);
-        }}
-        className={styles.deny}
-      >
-        Deny
-      </Button>
-      <Button
-        onClick={() => {
-          setCookie('true');
-          setShouldShow(false);
-        }}
-        className={styles.allow}
-      >
-        Allow
-      </Button>
+      <div className="buttons">
+        <Button
+          onClick={() => {
+            setCookie('false');
+            setShouldShow(false);
+          }}
+          secondary
+        >
+          Deny
+        </Button>
+        <Button
+          onClick={() => {
+            setCookie('true');
+            setShouldShow(false);
+          }}
+        >
+          Allow
+        </Button>
+      </div>
     </div>
   );
 }

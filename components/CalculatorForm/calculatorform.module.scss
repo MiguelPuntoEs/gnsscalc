@@ -1,23 +1,24 @@
 .containerForm {
-  margin-top: 1px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 16px;
-  row-gap: 3px;
+  row-gap: 4px;
   margin-bottom: 30px;
 
   input {
-    width: 150px;
+    width: 10rem;
     font-size: 14px;
-    padding: 2px 1ch;
+    padding: 4px 1ch;
   }
 
   button {
-    width: 150px;
+    width: 10rem;
     height: 25px;
   }
 
   label {
+    width: 96px;
     display: inline-block;
     font-weight: 700;
     font-size: 14px;
@@ -27,4 +28,14 @@
     font-weight: 700;
     font-size: 14px;
   }
+
+  @media (max-width: 600px){
+    button, input {height: 2rem};
+
+    input { font-size: 1rem;}
+    button { font-size: .8rem;}
+
+  }
+
+  
 }

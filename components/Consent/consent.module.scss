@@ -1,3 +1,5 @@
+@use '@/styles/variables' as *;
+
 .consentBanner {
   display: none;
   position: fixed;
@@ -5,34 +7,21 @@
   left: 0;
   right: 0;
   width: auto;
-
-  background-color: #eee;
   padding: 20px;
+  border-top: 1px solid $white;
 
   &.show {
     display: block;
   }
 
-  button {
-    padding: 7px 20px;
-
-    margin: 0;
-    border-radius: 3px;
-    border: 1px solid;
-    background-color: #337ab7;
-    border-color: #2e6da4;
-    color: white;
-    font-weight: 400;
-    font-size: 12px;
+  .buttons {
+    display: flex;
+    gap: 50px;
   }
 
-  .deny {
-    background: none;
-    border: none;
-    color: #337ab7;
-
-    &:hover {
-      color: #286090;
-    }
+  button {
+    padding: 7px 20px;
+    margin: 0;
+    margin-right: 8px
   }
 }
