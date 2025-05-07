@@ -19,6 +19,7 @@ import {
   getDateFromUtc,
   getGpsLeap,
   MILLISECONDS_IN_SECOND,
+  Scale,
 } from 'gnss-js';
 import LabelInput from '@/components/LabelInput';
 import useCalculator from '@/hooks/time';
@@ -26,6 +27,7 @@ import CalculatorForm from '@/components/CalculatorForm';
 import Button from '@/components/Button';
 
 import { getDateFromWeekOfYear, parseDate } from '../../util/time';
+import { SCALE } from '@/constants/time';
 
 export default function GNSSForm({ title, date = new Date(), onDateChange }) {
   const result = useCalculator(date);
@@ -152,21 +154,21 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       label: 'Julian Date',
       value: result.julianDate,
       onCompute: (value) =>
-        computationHandle(() => getDateFromJulianDate(value)),
+        computationHandle(() => getDateFromJulianDate(value, SCALE)),
       type: 'number',
     },
     {
       label: 'MJD',
       value: result.mjd,
       onCompute: (value) =>
-        computationHandle(() => getDateFromMJD(Number.parseFloat(value))),
+        computationHandle(() => getDateFromMJD(Number.parseFloat(value), SCALE)),
       type: 'number',
     },
     {
       label: 'MJD2000',
       value: result.mjd2000,
       onCompute: (value) =>
-        computationHandle(() => getDateFromMJD2000(Number.parseFloat(value))),
+        computationHandle(() => getDateFromMJD2000(Number.parseFloat(value), SCALE)),
       type: 'number',
     },
     {

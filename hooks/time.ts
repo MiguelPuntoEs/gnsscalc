@@ -24,8 +24,10 @@ import {
   getWeekOfYear,
   getDayOfYear,
   getUtcDate,
+  Scale
 } from 'gnss-js';
 import { TimeResult } from '@/types/time';
+import { SCALE } from '@/constants/time';
 
 export default function useCalculator(date: Date): TimeResult {
   const result = useMemo(
@@ -37,9 +39,9 @@ export default function useCalculator(date: Date): TimeResult {
       timeOfDay: getTimeOfDay(date),
       dayOfWeek: getDayOfWeek(date),
       hourCode: getHourCode(date),
-      julianDate: getJulianDate(date).toFixed(6),
-      mjd: getMJD(date).toFixed(3),
-      mjd2000: getMJD2000(date).toFixed(3),
+      julianDate: getJulianDate(date, SCALE).toFixed(6),
+      mjd: getMJD(date, SCALE).toFixed(6),
+      mjd2000: getMJD2000(date, SCALE).toFixed(6),
       leapSec: `${getLeap(date)} [TAI], ${getGpsLeap(date)} [GPS]`,
       gpsTime: getGpsTime(date) / MILLISECONDS_IN_SECOND,
       galTime: getGalTime(date) / MILLISECONDS_IN_SECOND,

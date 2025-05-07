@@ -1,3 +1,5 @@
+import { Scale } from "gnss-js";
+
 export const SECONDS_IN_WEEK: number = 604800;
 export const SECONDS_IN_DAY: number = 86400;
 export const SECONDS_IN_HOUR: number = 3600;
@@ -18,3 +20,4 @@ export const ALPHABET: string[] = 'abcdefghijklmnopqrstuvwxyz'.split('');
 export const START_GLO_LEAP: Date = new Date(Date.UTC(1996, 0, 1, 0, 0, 0, 0));
 export const START_JULIAN_CALENDAR_UNIX_SECONDS = 2440587.5;
 export const START_MJD_UNIX_SECONDS: number = 40587.0;
+export const SCALE: Scale = Scale.TT;
