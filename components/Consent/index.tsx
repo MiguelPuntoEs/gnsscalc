@@ -2,7 +2,6 @@ import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import useCookie from '@/hooks/cookie';
 import styles from './consent.module.scss';
-import Button from '../Button';
 
 const COOKIE_NAME: string = 'accepts-cookies';
 
@@ -25,23 +24,24 @@ export default function Consent() {
       </p>
 
       <div className="buttons">
-        <Button
+        <button
+          className='button button--secondary'
           onClick={() => {
             setCookie('false');
             setShouldShow(false);
           }}
-          secondary
         >
           Deny
-        </Button>
-        <Button
+        </button>
+        <button
+          className='button'
           onClick={() => {
             setCookie('true');
             setShouldShow(false);
           }}
         >
           Allow
-        </Button>
+        </button>
       </div>
     </div>
   );

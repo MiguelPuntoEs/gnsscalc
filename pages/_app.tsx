@@ -6,6 +6,7 @@ import Script from 'next/script';
 import { useRouter } from 'next/router';
 import Footer from '../components/Footer';
 import Consent from '../components/Consent';
+import Header from '@/components/Header';
 
 const googleAnalyticsCode = process.env.NEXT_PUBLIC_GA_CODE;
 
@@ -172,6 +173,7 @@ function MyApp({ Component, pageProps }) {
         `}
       </Script>
 
+      <Header />
       <div className="content">
         <Component {...pageProps} />
       </div>

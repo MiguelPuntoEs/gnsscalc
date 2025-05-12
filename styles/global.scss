@@ -6,9 +6,9 @@
   padding: 0;
   margin: 0;
   box-sizing: border-box;
-  font-family: "Inter", sans-serif;
+  font-family: 'Inter', sans-serif;
   background-color: $black;
-  color: $white
+  color: $white;
 }
 
 h1 {
@@ -27,13 +27,52 @@ button {
   cursor: pointer;
 }
 
+.button {
+  margin: 0;
+  border-radius: 3px;
+  padding: 3px 5px;
+  border: 1px solid $white;
+  border: none;
+  background-color: $white;
+  color: $black;
+  font-weight: 700;
+  font-size: 12px;
+  box-sizing: border-box;
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: transparent;
+      color: $white;
+    }
+    &--secondary:hover {
+      background-color: $white;
+      color: $black;
+    }
+  }
+  &:active {
+    // box-shadow: inset 0 3px 5px rgba(0, 0, 0, .125);
+    background-color: #444;
+    transform: scale(0.95);
+  }
+  &--secondary {
+    background-color: transparent;
+    border: 1px solid $white;
+    color: $white;
+  }
+
+  &--secondary:active {
+    background-color: #bbb;
+    transform: scale(0.95);
+  }
+}
+
 .content {
   margin: 0 10%;
 }
 
 p {
   margin-bottom: 12px;
-  line-height: 1.5
+  line-height: 1.5;
 }
 
 a {
@@ -61,10 +100,18 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
-input {
+input,
+textarea {
   background-color: $dark;
   border: 0;
   border-radius: 3px;
   text-align: right;
   font-weight: 500;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 10%;
 }

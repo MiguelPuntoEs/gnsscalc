@@ -24,7 +24,6 @@ import {
 import LabelInput from '@/components/LabelInput';
 import useCalculator from '@/hooks/time';
 import CalculatorForm from '@/components/CalculatorForm';
-import Button from '@/components/Button';
 
 import { getDateFromWeekOfYear, parseDate } from '../../util/time';
 import { SCALE } from '@/constants/time';
@@ -250,7 +249,8 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       ))}
 
       <div />
-      <Button
+      <button
+        className='button'
         type="button"
         onClick={() => {
           const date: Date = new Date();
@@ -261,12 +261,11 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         }}
       >
         Now
-      </Button>
+      </button>
 
       <div />
-      <Button
-        type="button"
-        secondary
+      <button
+        className='button button--secondary'
         onClick={() => {
           navigator.clipboard.writeText(result.rinex).catch((err) => {
             console.error('Failed to copy: ', err);
@@ -274,7 +273,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
         }}
       >
         Copy RINEX
-      </Button>
+      </button>
     </CalculatorForm>
   );
 }

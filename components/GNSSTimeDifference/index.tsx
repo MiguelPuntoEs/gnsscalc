@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { getTimeDifferenceFromObject, TimeDifference } from 'gnss-js';
 import useTimeDifferenceCalculator from '../../hooks/timeDifference';
-import Button from '../Button';
 import CalculatorForm from '../CalculatorForm';
 import LabelInput from '../LabelInput';
 import styles from './gnsstimedifference.module.scss';
@@ -68,14 +67,15 @@ export default function GNSSTimeDifference({
           }
         />
         <div />
-        <Button
+        <button
+          className="button"
           type="button"
           onClick={() => {
             onTimeDifferenceChange(0);
           }}
         >
           Reset
-        </Button>
+        </button>
       </CalculatorForm>
     </>
   );

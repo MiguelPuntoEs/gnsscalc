@@ -10,8 +10,7 @@ export default function Index() {
 
   return (
     <>
-      <h1>gnsscalc</h1>
-
+      <h1>Time Calculator</h1>
       <section className={styles.calculator}>
         <GNSSForm
           title="Initial Time"

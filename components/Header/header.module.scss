@@ -1,0 +1,14 @@
+@use '@/styles/variables' as *;
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.header {
+  border-bottom: 0.0625rem solid $white;
+}
+
+.link {
+    font-weight: 500
+}
