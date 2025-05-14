@@ -25,7 +25,7 @@ export default function Consent() {
 
       <div className="buttons">
         <button
-          className='button button--secondary'
+          className="button button--secondary"
           onClick={() => {
             setCookie('false');
             setShouldShow(false);
@@ -34,7 +34,7 @@ export default function Consent() {
           Deny
         </button>
         <button
-          className='button'
+          className="button"
           onClick={() => {
             setCookie('true');
             setShouldShow(false);

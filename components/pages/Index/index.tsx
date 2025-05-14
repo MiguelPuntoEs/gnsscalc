@@ -49,7 +49,8 @@ export default function Index() {
         <p>
           <strong>Julian Date</strong> is the number of days since January 1,
           4713 B.C., 12:00:00; defines the number of mean solar days elapsed
-          since the epoch January 1.5d, 4713 before Christ (Hoffman-Wellenhof, 1994). All Julian dates are expressed in TT scale.
+          since the epoch January 1.5d, 4713 before Christ (Hoffman-Wellenhof,
+          1994). All Julian dates are expressed in TT scale.
         </p>
         <p>
           <strong>MJD</strong> (Modified Julian Date) is the number of days
@@ -61,8 +62,8 @@ export default function Index() {
           days since January 1, 2000, 00:00:00
         </p>
         <p>
-          <strong>Important note:</strong> leap seconds are only considered for UTC
-          computation.
+          <strong>Important note:</strong> leap seconds are only considered for
+          UTC computation.
         </p>
         <p>
           Leap second information is obtained from{' '}

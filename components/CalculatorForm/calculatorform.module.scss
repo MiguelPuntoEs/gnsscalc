@@ -29,13 +29,17 @@
     font-size: 14px;
   }
 
-  @media (max-width: 600px){
-    button, input {height: 2rem};
+  @media (max-width: 600px) {
+    button,
+    input {
+      height: 2rem;
+    }
 
-    input { font-size: 1rem;}
-    button { font-size: .8rem;}
-
+    input {
+      font-size: 1rem;
+    }
+    button {
+      font-size: 0.8rem;
+    }
   }
-
-  
 }

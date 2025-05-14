@@ -1,4 +1,4 @@
-import { Scale } from "gnss-js";
+import { Scale } from 'gnss-js';
 
 export const SECONDS_IN_WEEK: number = 604800;
 export const SECONDS_IN_DAY: number = 86400;

@@ -11,10 +11,10 @@ function ContactForm() {
   return (
     <form onSubmit={handleSubmit} className={styles.form}>
       <label htmlFor="email">Email Address</label>
-      <input id="email" type="email" name="email" required/>
+      <input id="email" type="email" name="email" required />
       <ValidationError prefix="Email" field="email" errors={state.errors} />
       <label htmlFor="message">Message</label>
-      <textarea id="message" name="message" required/>
+      <textarea id="message" name="message" required />
       <ValidationError prefix="Message" field="message" errors={state.errors} />
 
       <button className="button" type="submit" disabled={state.submitting}>

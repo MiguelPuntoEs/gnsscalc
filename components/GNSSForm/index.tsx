@@ -160,14 +160,18 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
       label: 'MJD',
       value: result.mjd,
       onCompute: (value) =>
-        computationHandle(() => getDateFromMJD(Number.parseFloat(value), SCALE)),
+        computationHandle(() =>
+          getDateFromMJD(Number.parseFloat(value), SCALE)
+        ),
       type: 'number',
     },
     {
       label: 'MJD2000',
       value: result.mjd2000,
       onCompute: (value) =>
-        computationHandle(() => getDateFromMJD2000(Number.parseFloat(value), SCALE)),
+        computationHandle(() =>
+          getDateFromMJD2000(Number.parseFloat(value), SCALE)
+        ),
       type: 'number',
     },
     {
@@ -250,7 +254,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
 
       <div />
       <button
-        className='button'
+        className="button"
         type="button"
         onClick={() => {
           const date: Date = new Date();
@@ -265,7 +269,7 @@ export default function GNSSForm({ title, date = new Date(), onDateChange }) {
 
       <div />
       <button
-        className='button button--secondary'
+        className="button button--secondary"
         onClick={() => {
           navigator.clipboard.writeText(result.rinex).catch((err) => {
             console.error('Failed to copy: ', err);

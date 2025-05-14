@@ -24,7 +24,7 @@ import {
   getWeekOfYear,
   getDayOfYear,
   getUtcDate,
-  Scale
+  Scale,
 } from 'gnss-js';
 import { TimeResult } from '@/types/time';
 import { SCALE } from '@/constants/time';

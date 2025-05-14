@@ -8,27 +8,32 @@
   max-width: 600px;
   gap: 1rem;
 
-  input, textarea {
+  input,
+  textarea {
     font-size: 14px;
     padding: 4px 1ch;
     text-align: left;
-
   }
   textarea {
-    height: 200px
+    height: 200px;
   }
 
-   button {
+  button {
     // width: 10rem;
     height: 2rem;
   }
 
-  @media (max-width: 600px){
-    button, input {height: 2rem};
+  @media (max-width: 600px) {
+    button,
+    input {
+      height: 2rem;
+    }
 
-    input { font-size: 1rem;}
-    button { font-size: .8rem;}
-
+    input {
+      font-size: 1rem;
+    }
+    button {
+      font-size: 0.8rem;
+    }
   }
-
 }
