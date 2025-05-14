@@ -28,7 +28,15 @@ import CalculatorForm from '@/components/CalculatorForm';
 import { getDateFromWeekOfYear, parseDate } from '../../util/time';
 import { SCALE } from '@/constants/time';
 
-export default function GNSSForm({ title, date = new Date(), onDateChange }) {
+export default function GNSSForm({
+  title,
+  date = new Date(),
+  onDateChange,
+}: {
+  title: string;
+  date: Date;
+  onDateChange: (date: Date) => void;
+}) {
   const result = useCalculator(date);
 
   const computationHandle = (func) => {

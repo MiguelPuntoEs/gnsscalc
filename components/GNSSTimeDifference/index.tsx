@@ -8,6 +8,9 @@ import styles from './gnsstimedifference.module.scss';
 export default function GNSSTimeDifference({
   timeDifference = 0,
   onTimeDifferenceChange,
+}: {
+  timeDifference: number;
+  onTimeDifferenceChange: (timeDifference: number) => void;
 }) {
   const { seconds, minutes, hours, days }: TimeDifference =
     useTimeDifferenceCalculator(timeDifference);

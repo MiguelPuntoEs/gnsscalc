@@ -18,13 +18,13 @@ import CalculatorForm from '@/components/CalculatorForm';
 import LabelInput from '@/components/LabelInput';
 
 export default function PositionForm({
+  title = '',
   position = [4263871.9243, 722591.1075, 4672988.8878],
   onPositionChange,
-  title = '',
 }: {
+  title?: string;
   position: Position;
   onPositionChange: (position: Position) => void;
-  title?: string;
 }) {
   const { latitude, longitude, height } = usePositionCalculator(position);
 

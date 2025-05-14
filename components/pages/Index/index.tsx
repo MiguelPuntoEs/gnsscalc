@@ -5,8 +5,8 @@ import GNSSTimeDifference from '@/components/GNSSTimeDifference';
 import styles from './index.module.scss';
 
 export default function Index() {
-  const [startDate, setStartDate] = useState(new Date());
-  const [finalDate, setFinalDate] = useState(new Date());
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [finalDate, setFinalDate] = useState<Date>(new Date());
 
   return (
     <>

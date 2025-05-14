@@ -7,11 +7,12 @@ import { getPositionFromGeodetic } from '@/util/positioning';
 import { Position } from '@/types/position';
 
 export default function Positioning() {
-  const [position, setPosition]: [Position, (_: Position) => void] = useState([
+  const [position, setPosition] = useState<Position>([
     4263871.9243, 722591.1075, 4672986.8878,
   ]);
-  const [refPosition, setRefPosition]: [Position, (_: Position) => void] =
-    useState([4253871.9243, 712591.1075, 4072986.8878]);
+  const [refPosition, setRefPosition] = useState<Position>([
+    4253871.9243, 712591.1075, 4072986.8878,
+  ]);
 
   useEffect(() => {
     if (navigator.geolocation) {
