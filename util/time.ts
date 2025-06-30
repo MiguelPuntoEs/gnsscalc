@@ -14,14 +14,10 @@ export function parseDate(dateStr: string, timeStr: string): Date {
 }
 
 export function getDateFromWeekOfYear(
-  weekOfYear: string,
+  weekOfYear: number,
   dateStr: string,
   timeStr: string
 ): Date | undefined {
-  const weekOfYearParsed = Number.parseInt(weekOfYear, 10);
-
-  if (Number.isNaN(weekOfYearParsed)) return undefined;
-
   const baseDate = DateTime.fromJSDate(parseDate(dateStr, timeStr), {
     zone: 'utc',
   });
@@ -29,7 +25,7 @@ export function getDateFromWeekOfYear(
   const dt = DateTime.fromObject(
     {
       weekYear: baseDate.weekYear,
-      weekNumber: weekOfYearParsed,
+      weekNumber: weekOfYear,
       weekday: baseDate.weekday,
       hour: baseDate.hour,
       minute: baseDate.minute,

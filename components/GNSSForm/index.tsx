@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import {
   getDateFromBdsTime,
   getDateFromDayOfWeek,
@@ -18,6 +18,7 @@ import {
   getDateFromUnixTime,
   getDateFromUtc,
   getGpsLeap,
+  HourCode,
   MILLISECONDS_IN_SECOND,
   Scale,
 } from 'gnss-js';
@@ -27,6 +28,22 @@ import CalculatorForm from '@/components/CalculatorForm';
 
 import { getDateFromWeekOfYear, parseDate } from '../../util/time';
 import { SCALE } from '@/constants/time';
+import { createIntegerHandler, createFloatHandler } from '../../util/formats';
+
+type FieldConfig = {
+  label: string;
+  value: string;
+  onCompute?: (value: string) => Date | undefined;
+  type?: string;
+  disabled?: boolean;
+  readOnly?: boolean;
+  maskOptions?: {
+    mask: string;
+    formatChars: {
+      [key: string]: string;
+    };
+  };
+};
 
 export default function GNSSForm({
   title,
@@ -39,7 +56,9 @@ export default function GNSSForm({
 }) {
   const result = useCalculator(date);
 
-  const computationHandle = (func) => {
+  const computationHandle = (
+    func: () => Date | undefined
+  ): Date | undefined => {
     const resultDate = func();
     if (resultDate) {
       onDateChange(resultDate);
@@ -52,134 +71,145 @@ export default function GNSSForm({
     [date]
   );
 
-  const fields = [
+  const fields: FieldConfig[] = [
     {
       label: 'Week no.',
-      value: result.weekNumber,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromGpsData(value, result.timeOfWeek)),
+      value: result.weekNumber.toString(),
+      onCompute: createIntegerHandler((value) =>
+        computationHandle(() => getDateFromGpsData(value, result.timeOfWeek))
+      ),
       type: 'number',
     },
     {
       label: 'Time of week',
-      value: result.timeOfWeek,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromGpsData(result.weekNumber, value)),
+      value: result.timeOfWeek.toString(),
+      onCompute: createIntegerHandler((value) =>
+        computationHandle(() => getDateFromGpsData(result.weekNumber, value))
+      ),
       type: 'number',
     },
     {
       label: 'GPS Time',
-      value: result.gpsTime,
-      onCompute: (value) =>
+      value: result.gpsTime.toString(),
+      onCompute: createFloatHandler((value) =>
         computationHandle(() =>
           getDateFromGpsTime(value * MILLISECONDS_IN_SECOND)
-        ),
+        )
+      ),
       type: 'number',
     },
     {
       label: 'GAL Time',
-      value: result.galTime,
-      onCompute: (value) =>
+      value: result.galTime.toString(),
+      onCompute: createFloatHandler((value) =>
         computationHandle(() =>
           getDateFromGalTime(value * MILLISECONDS_IN_SECOND)
-        ),
+        )
+      ),
       type: 'number',
     },
     {
       label: 'BDS Time',
-      value: result.bdsTime,
-      onCompute: (value) =>
+      value: result.bdsTime.toString(),
+      onCompute: createFloatHandler((value) =>
         computationHandle(() =>
           getDateFromBdsTime(value * MILLISECONDS_IN_SECOND)
-        ),
+        )
+      ),
       type: 'number',
     },
     {
       label: 'UNIX Time',
-      value: result.unixTime,
-      onCompute: (value) =>
+      value: result.unixTime.toString(),
+      onCompute: createFloatHandler((value) =>
         computationHandle(() =>
           getDateFromUnixTime(value * MILLISECONDS_IN_SECOND)
-        ),
+        )
+      ),
       type: 'number',
     },
     {
       label: 'GLO N4',
-      value: result.gloN4,
-      onCompute: (value) =>
+      value: result.gloN4.toString(),
+      onCompute: createIntegerHandler((value) =>
         computationHandle(() =>
           getDateFromGloN(value, result.gloNa, result.timeOfDay)
-        ),
+        )
+      ),
       type: 'number',
     },
     {
       label: 'GLO NA',
-      value: result.gloNa,
-      onCompute: (value) =>
+      value: result.gloNa.toString(),
+      onCompute: createIntegerHandler((value) =>
         computationHandle(() =>
           getDateFromGloN(result.gloN4, value, result.timeOfDay)
-        ),
+        )
+      ),
       type: 'number',
     },
     {
       label: 'Day of Year',
-      value: result.dayOfYear,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromDayOfYear(value, date)),
+      value: result.dayOfYear.toString(),
+      onCompute: createIntegerHandler((value) =>
+        computationHandle(() => getDateFromDayOfYear(value, date))
+      ),
       type: 'number',
     },
     {
       label: 'Week of Year',
-      value: result.weekOfYear,
-      onCompute: (value) =>
+      value: result.weekOfYear.toString(),
+      onCompute: createIntegerHandler((value) =>
         computationHandle(() =>
           getDateFromWeekOfYear(value, result.dateGps, result.timeGps)
-        ),
+        )
+      ),
       type: 'number',
     },
     {
       label: 'Time of Day',
-      value: result.timeOfDay,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromTimeOfDay(value, date)),
+      value: result.timeOfDay.toString(),
+      onCompute: createFloatHandler((value) =>
+        computationHandle(() => getDateFromTimeOfDay(value, date))
+      ),
       type: 'number',
     },
     {
       label: 'Day of Week',
-      value: result.dayOfWeek,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromDayOfWeek(value, date)),
+      value: result.dayOfWeek.toString(),
+      onCompute: createIntegerHandler((value) =>
+        computationHandle(() => getDateFromDayOfWeek(value, date))
+      ),
       type: 'number',
     },
     {
       label: 'Hour Code',
       value: result.hourCode,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromHourCode(value, date)),
+      onCompute: (value: string) =>
+        computationHandle(() => getDateFromHourCode(value as HourCode, date)),
     },
     {
       label: 'Julian Date',
-      value: result.julianDate,
-      onCompute: (value) =>
-        computationHandle(() => getDateFromJulianDate(value, SCALE)),
+      value: result.julianDate.toString(),
+      onCompute: createFloatHandler((value) =>
+        computationHandle(() => getDateFromJulianDate(value, SCALE))
+      ),
       type: 'number',
     },
     {
       label: 'MJD',
-      value: result.mjd,
-      onCompute: (value) =>
-        computationHandle(() =>
-          getDateFromMJD(Number.parseFloat(value), SCALE)
-        ),
+      value: result.mjd.toString(),
+      onCompute: createFloatHandler((value) =>
+        computationHandle(() => getDateFromMJD(value, SCALE))
+      ),
       type: 'number',
     },
     {
       label: 'MJD2000',
-      value: result.mjd2000,
-      onCompute: (value) =>
-        computationHandle(() =>
-          getDateFromMJD2000(Number.parseFloat(value), SCALE)
-        ),
+      value: result.mjd2000.toString(),
+      onCompute: createFloatHandler((value) =>
+        computationHandle(() => getDateFromMJD2000(value, SCALE))
+      ),
       type: 'number',
     },
     {
@@ -191,7 +221,7 @@ export default function GNSSForm({
     {
       label: 'Date [TAI]',
       value: result.dateTai,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() =>
           getDateFromTai(parseDate(value, result.timeTai))
         ),
@@ -199,7 +229,7 @@ export default function GNSSForm({
     {
       label: 'Time [TAI]',
       value: result.timeTai,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() =>
           getDateFromTai(parseDate(result.dateTai, value))
         ),
@@ -207,19 +237,19 @@ export default function GNSSForm({
     {
       label: 'Date [TT]',
       value: result.dateTT,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() => getDateFromTt(parseDate(value, result.timeTT))),
     },
     {
       label: 'Time [TT]',
       value: result.timeTT,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() => getDateFromTt(parseDate(result.dateTT, value))),
     },
     {
       label: 'Date [UTC]',
       value: result.dateUtc,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() =>
           getDateFromUtc(parseDate(value, result.timeUtc))
         ),
@@ -227,7 +257,7 @@ export default function GNSSForm({
     {
       label: 'Time [UTC]',
       value: result.timeUtc,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() =>
           getDateFromUtc(parseDate(result.dateUtc, value))
         ),
@@ -235,19 +265,20 @@ export default function GNSSForm({
     {
       label: 'Date [GPS]',
       value: result.dateGps,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() => parseDate(value, result.timeGps)),
     },
     {
       label: 'Time [GPS]',
       value: result.timeGps,
-      onCompute: (value) =>
+      onCompute: (value: string) =>
         computationHandle(() => parseDate(result.dateGps, value)),
     },
     {
       label: 'RINEX',
       value: result.rinex,
-      onCompute: (value) => computationHandle(() => getDateFromRINEX(value)),
+      onCompute: (value: string) =>
+        computationHandle(() => getDateFromRINEX(value)),
     },
   ];
 

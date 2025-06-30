@@ -5,8 +5,8 @@ import styles from './labelinput.module.scss';
 
 type LabelInputProps = {
   label: string;
-  value: string | number;
-  onCompute?: (value: string | number) => any;
+  value: string;
+  onCompute?: (value: string) => any;
   disabled?: boolean;
   className?: string;
   type?: string;
@@ -33,7 +33,7 @@ export default function LabelInput({
 }: LabelInputProps) {
   const id = useId();
   const [error, setError] = useState(false);
-  const [inputValue, setInputValue] = useState(value);
+  const [inputValue, setInputValue] = useState<string>(value);
 
   // Update internal value when prop changes
   useEffect(() => {
@@ -43,16 +43,22 @@ export default function LabelInput({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    
+
     // Clear error when user starts typing
     if (error) setError(false);
   };
 
   const handleValidate = () => {
     if (!onCompute) return;
-    
+
     const result = onCompute(inputValue);
     setError(result === undefined);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleValidate();
+    }
   };
 
   const input = maskOptions ? (
@@ -60,7 +66,7 @@ export default function LabelInput({
       id={id}
       value={inputValue}
       onChange={handleChange}
-      onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
+      onKeyDown={handleKeyDown}
       onBlur={handleValidate}
       disabled={disabled}
       className={clsx(className, { [styles.error]: error })}
@@ -73,7 +79,7 @@ export default function LabelInput({
       type={type}
       value={inputValue}
       onChange={handleChange}
-      onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
+      onKeyDown={handleKeyDown}
       onBlur={handleValidate}
       disabled={disabled}
       className={clsx(className, { [styles.error]: error })}
