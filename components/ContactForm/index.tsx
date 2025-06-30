@@ -1,9 +1,14 @@
-import React from 'react';
 import { useForm, ValidationError } from '@formspree/react';
 import styles from './contactform.module.scss';
 
 function ContactForm() {
-  const [state, handleSubmit] = useForm(process.env.NEXT_PUBLIC_FORM);
+  const formId = process.env.NEXT_PUBLIC_FORM || '';
+  const [state, handleSubmit] = useForm(formId);
+  
+  if (!formId) {
+    return <p>Contact form is not configured. Please set NEXT_PUBLIC_FORM environment variable.</p>;
+  }
+
   if (state.succeeded) {
     return <p>Thanks for contacting!</p>;
   }
@@ -24,8 +29,4 @@ function ContactForm() {
   );
 }
 
-function App() {
-  return <ContactForm />;
-}
-
-export default App;
+export default ContactForm;
