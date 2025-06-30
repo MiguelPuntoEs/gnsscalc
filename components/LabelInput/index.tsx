@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
+import { useId, useState, useEffect } from 'react';
 import InputMask from 'react-input-mask';
 import styles from './labelinput.module.scss';
 
@@ -31,48 +31,39 @@ export default function LabelInput({
   maskOptions,
   readOnly,
 }: LabelInputProps) {
-  // Normale Hook calls
-  const [id, setId] = useState('');
-  const [_value, setValue] = useState(value);
+  const id = useId();
   const [error, setError] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
 
-  // Handler const handleChange ...
-  const handleChange = ({ target }) => {
-    setValue(target.value);
+  // Update internal value when prop changes
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setInputValue(newValue);
+    
+    // Clear error when user starts typing
+    if (error) setError(false);
   };
 
   const handleValidate = () => {
-    const result = onCompute(_value);
-
-    // TODO useValidationResult
+    if (!onCompute) return;
+    
+    const result = onCompute(inputValue);
     setError(result === undefined);
   };
-
-  // Allerletz useEffect
-  useEffect(() => {
-    setId(Math.random().toString());
-  }, []);
-
-  useEffect(() => {
-    setValue(value);
-    setError(false);
-  }, [value]);
 
   const input = maskOptions ? (
     <InputMask
       id={id}
-      value={_value}
+      value={inputValue}
       onChange={handleChange}
-      onKeyDown={({ key }) => {
-        if (key === 'Enter') {
-          handleValidate();
-        }
-      }}
+      onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
       onBlur={handleValidate}
       disabled={disabled}
-      className={clsx(className, {
-        [styles.error]: error,
-      })}
+      className={clsx(className, { [styles.error]: error })}
       mask={maskOptions.mask}
       formatChars={maskOptions.formatChars}
     />
@@ -80,18 +71,12 @@ export default function LabelInput({
     <input
       id={id}
       type={type}
-      value={_value}
+      value={inputValue}
       onChange={handleChange}
-      onKeyDown={({ key }) => {
-        if (key === 'Enter') {
-          handleValidate();
-        }
-      }}
+      onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
       onBlur={handleValidate}
       disabled={disabled}
-      className={clsx(className, {
-        [styles.error]: error,
-      })}
+      className={clsx(className, { [styles.error]: error })}
       step={step}
       readOnly={readOnly}
     />
