@@ -1,4 +1,4 @@
-import { DateTime } from 'luxon';
+import { DateTime, WeekdayNumbers } from 'luxon';
 
 export default function isValidDate(d: Date): boolean {
   return d instanceof Date && !Number.isNaN(d);
@@ -26,7 +26,7 @@ export function getDateFromWeekOfYear(
     {
       weekYear: baseDate.weekYear,
       weekNumber: weekOfYear,
-      weekday: baseDate.weekday,
+      weekday: baseDate.weekday as WeekdayNumbers,
       hour: baseDate.hour,
       minute: baseDate.minute,
       second: baseDate.second,

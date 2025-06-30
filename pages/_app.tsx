@@ -1,16 +1,17 @@
 import '../styles/global.scss';
 
+import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import Script from 'next/script';
 
-import { useRouter } from 'next/router';
-import Footer from '../components/Footer';
-import Consent from '../components/Consent';
 import Header from '@/components/Header';
+import { useRouter } from 'next/router';
+import Consent from '../components/Consent';
+import Footer from '../components/Footer';
 
 const googleAnalyticsCode = process.env.NEXT_PUBLIC_GA_CODE;
 
-function MyApp({ Component, pageProps }) {
+function MyApp({ Component, pageProps }: AppProps) {
   const baseUrl = 'https://gnsscalc.com';
 
   const { pathname } = useRouter();

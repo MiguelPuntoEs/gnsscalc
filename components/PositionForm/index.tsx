@@ -1,10 +1,12 @@
-import { Position } from '@/types/position';
+import CalculatorForm from '@/components/CalculatorForm';
+import LabelInput from '@/components/LabelInput';
 import {
   DECIMAL_PLACES_FOR_CARTESIAN,
   DECIMAL_PLACES_FOR_HEIGHT,
   DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE,
 } from '@/constants/position';
 import { usePositionCalculator } from '@/hooks/positioning';
+import { Position } from '@/types/position';
 import {
   formatLatitudeDegMinSecs,
   formatLongitudeDegMinSecs,
@@ -14,8 +16,6 @@ import {
   getPositionFromGeodetic,
   getPositionFromGeodeticString,
 } from '@/util/positioning';
-import CalculatorForm from '@/components/CalculatorForm';
-import LabelInput from '@/components/LabelInput';
 import { createFloatHandler } from '../../util/formats';
 
 export default function PositionForm({
@@ -37,7 +37,7 @@ export default function PositionForm({
   const longitudeString = formatLongitudeDegMinSecs(longitude);
   const heightString = height.toFixed(DECIMAL_PLACES_FOR_HEIGHT);
 
-  const computationHandle = (func) => {
+  const computationHandle = (func: () => Position | undefined) => {
     const resultPosition = func();
     if (resultPosition) {
       onPositionChange(resultPosition);
@@ -78,20 +78,20 @@ export default function PositionForm({
       <LabelInput
         label="Latitude"
         type="number"
-        value={latitude.value.toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
+        value={(latitude.value ?? 0).toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
         onCompute={createFloatHandler((value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(value, longitude.value, height)
+            getPositionFromGeodetic(value, longitude.value ?? 0, height)
           )
         )}
       />
       <LabelInput
         label="Longitude"
         type="number"
-        value={longitude.value.toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
+        value={(longitude.value ?? 0).toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
         onCompute={createFloatHandler((value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(latitude.value, value, height)
+            getPositionFromGeodetic(latitude.value ?? 0, value, height)
           )
         )}
       />
@@ -101,7 +101,7 @@ export default function PositionForm({
         value={height.toFixed(DECIMAL_PLACES_FOR_HEIGHT)}
         onCompute={createFloatHandler((value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(latitude.value, longitude.value, value)
+            getPositionFromGeodetic(latitude.value ?? 0, longitude.value ?? 0, value)
           )
         )}
       />

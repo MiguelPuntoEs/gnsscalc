@@ -69,9 +69,8 @@ export default function LabelInput({
       onKeyDown={handleKeyDown}
       onBlur={handleValidate}
       disabled={disabled}
-      className={clsx(className, { [styles.error]: error })}
+      className={clsx(className, error ? styles.error : undefined)}
       mask={maskOptions.mask}
-      formatChars={maskOptions.formatChars}
     />
   ) : (
     <input
@@ -82,7 +81,7 @@ export default function LabelInput({
       onKeyDown={handleKeyDown}
       onBlur={handleValidate}
       disabled={disabled}
-      className={clsx(className, { [styles.error]: error })}
+      className={clsx(className, error ? styles.error : undefined)}
       step={step}
       readOnly={readOnly}
     />

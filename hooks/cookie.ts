@@ -8,11 +8,11 @@ const useCookie = (cookieName: string): [string, (v: string) => void] => {
 
     return document.cookie.split(';').reduce((r, v) => {
       const parts = v.split('=');
-      return parts[0].trim() === cookieName ? decodeURIComponent(parts[1]) : r;
+      return parts[0]?.trim() === cookieName && parts[1] ? decodeURIComponent(parts[1]) : r;
     }, '');
   };
 
-  const setCookie = (value) => {
+  const setCookie = (value: string) => {
     const expires = new Date(
       Date.now() + 15330 * 864e5 // ~42 years
     ).toUTCString();

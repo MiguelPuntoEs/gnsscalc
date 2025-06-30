@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import PositioningPage from '../components/pages/Positioning';
 
-export default function Index() {
+export default function PositioningPageWrapper() {
   const title = 'GNSS Calculator | Positioning Calculator';
 
   return (
