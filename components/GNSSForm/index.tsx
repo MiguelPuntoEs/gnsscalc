@@ -1,4 +1,6 @@
-import { useCallback, useState, useEffect } from 'react';
+import CalculatorForm from '@/components/CalculatorForm';
+import LabelInput from '@/components/LabelInput';
+import useCalculator from '@/hooks/time';
 import {
   getDateFromBdsTime,
   getDateFromDayOfWeek,
@@ -19,16 +21,13 @@ import {
   getDateFromUtc,
   getGpsLeap,
   HourCode,
-  MILLISECONDS_IN_SECOND,
-  Scale,
+  MILLISECONDS_IN_SECOND
 } from 'gnss-js';
-import LabelInput from '@/components/LabelInput';
-import useCalculator from '@/hooks/time';
-import CalculatorForm from '@/components/CalculatorForm';
+import { useCallback } from 'react';
 
-import { getDateFromWeekOfYear, parseDate } from '../../util/time';
 import { SCALE } from '@/constants/time';
-import { createIntegerHandler, createFloatHandler } from '../../util/formats';
+import { createFloatHandler, createIntegerHandler } from '../../util/formats';
+import { getDateFromWeekOfYear, parseDate } from '../../util/time';
 
 type FieldConfig = {
   label: string;
@@ -287,7 +286,7 @@ export default function GNSSForm({
       <div />
       <span>{title}</span>
 
-      {fields.map((field, index) => (
+      {fields.map((field) => (
         <LabelInput key={getKey()} {...field} />
       ))}
 

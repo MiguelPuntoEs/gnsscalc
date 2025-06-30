@@ -1,33 +1,32 @@
 import { useMemo } from 'react';
 
+import { SCALE } from '@/constants/time';
+import { TimeResult } from '@/types/time';
 import {
   getBdsTime,
+  getDayOfWeek,
+  getDayOfYear,
   getGalTime,
   getGloN4,
   getGloNA,
+  getGpsLeap,
   getGpsTime,
+  getHourCode,
   getJulianDate,
   getLeap,
-  getGpsLeap,
   getMJD,
+  getMJD2000,
+  getRINEX,
+  getTaiDate,
   getTimeOfDay,
   getTimeOfWeek,
-  getUnixTime,
-  getWeekNumber,
-  getHourCode,
-  MILLISECONDS_IN_SECOND,
-  getMJD2000,
-  getTaiDate,
   getTtDate,
-  getRINEX,
-  getDayOfWeek,
-  getWeekOfYear,
-  getDayOfYear,
+  getUnixTime,
   getUtcDate,
-  Scale,
+  getWeekNumber,
+  getWeekOfYear,
+  MILLISECONDS_IN_SECOND
 } from 'gnss-js';
-import { TimeResult } from '@/types/time';
-import { SCALE } from '@/constants/time';
 
 export default function useCalculator(date: Date): TimeResult {
   const result = useMemo(

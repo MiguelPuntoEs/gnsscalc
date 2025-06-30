@@ -1,10 +1,10 @@
-import { useCallback, useState, useEffect } from 'react';
 import { getTimeDifferenceFromObject, TimeDifference } from 'gnss-js';
+import { useCallback } from 'react';
 import useTimeDifferenceCalculator from '../../hooks/timeDifference';
+import { createIntegerHandler } from '../../util/formats';
 import CalculatorForm from '../CalculatorForm';
 import LabelInput from '../LabelInput';
 import styles from './gnsstimedifference.module.scss';
-import { createIntegerHandler } from '../../util/formats';
 
 export default function GNSSTimeDifference({
   timeDifference = 0,

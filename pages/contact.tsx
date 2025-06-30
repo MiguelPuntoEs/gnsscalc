@@ -1,6 +1,5 @@
 import ContactForm from '@/components/ContactForm';
 import Head from 'next/head';
-import Link from 'next/link';
 
 export default function PrivacyPage() {
   const title = 'GNSS Calculator | Contact';

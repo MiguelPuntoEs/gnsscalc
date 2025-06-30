@@ -1,12 +1,12 @@
 import clsx from 'clsx';
-import { useId, useState, useEffect } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import InputMask from 'react-input-mask';
 import styles from './labelinput.module.scss';
 
 type LabelInputProps = {
   label: string;
   value: string;
-  onCompute?: (value: string) => any;
+  onCompute?: (value: string) => unknown;
   disabled?: boolean;
   className?: string;
   type?: string;
