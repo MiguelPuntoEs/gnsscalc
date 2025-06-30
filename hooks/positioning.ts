@@ -1,6 +1,6 @@
-import { deg2hms, rad2deg } from '../util/units';
+import { AERResult, ENUResult, PositionResult } from '@/types/position';
 import { car2geo, getAer, getEnuDifference } from '@/util/positioning';
-import { PositionResult, AERResult, ENUResult } from '@/types/position';
+import { deg2hms, rad2deg } from '../util/units';
 
 export function usePositionCalculator(
   position: [number, number, number]
@@ -60,13 +60,13 @@ export function useAerCalculator(
     refPosition[2]
   );
 
-  const elevationDeg = rad2deg(elevation);
-  const azimuthDeg = rad2deg(azimuth);
+  const elevationDeg = rad2deg(elevation ?? 0);
+  const azimuthDeg = rad2deg(azimuth ?? 0);
 
   return {
     elevationDeg,
     azimuthDeg,
-    slant,
+    slant: slant ?? 0,
   };
 }
 

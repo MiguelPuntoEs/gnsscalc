@@ -1,10 +1,12 @@
-import { Position } from '@/types/position';
+import CalculatorForm from '@/components/CalculatorForm';
+import LabelInput from '@/components/LabelInput';
 import {
   DECIMAL_PLACES_FOR_CARTESIAN,
   DECIMAL_PLACES_FOR_HEIGHT,
   DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE,
 } from '@/constants/position';
 import { usePositionCalculator } from '@/hooks/positioning';
+import { Position } from '@/types/position';
 import {
   formatLatitudeDegMinSecs,
   formatLongitudeDegMinSecs,
@@ -14,8 +16,7 @@ import {
   getPositionFromGeodetic,
   getPositionFromGeodeticString,
 } from '@/util/positioning';
-import CalculatorForm from '@/components/CalculatorForm';
-import LabelInput from '@/components/LabelInput';
+import { createFloatHandler } from '../../util/formats';
 
 export default function PositionForm({
   title = '',
@@ -36,7 +37,7 @@ export default function PositionForm({
   const longitudeString = formatLongitudeDegMinSecs(longitude);
   const heightString = height.toFixed(DECIMAL_PLACES_FOR_HEIGHT);
 
-  const computationHandle = (func) => {
+  const computationHandle = (func: () => Position | undefined) => {
     const resultPosition = func();
     if (resultPosition) {
       onPositionChange(resultPosition);
@@ -53,74 +54,64 @@ export default function PositionForm({
         label="X"
         type="number"
         value={x}
-        onCompute={(value) =>
-          computationHandle(() =>
-            getPositionFromCartesian(value.toString(), y, z)
-          )
+        onCompute={(value: string) =>
+          computationHandle(() => getPositionFromCartesian(value, y, z))
         }
       />
       <LabelInput
         label="Y"
         type="number"
         value={y}
-        onCompute={(value) =>
-          computationHandle(() =>
-            getPositionFromCartesian(x, value.toString(), z)
-          )
+        onCompute={(value: string) =>
+          computationHandle(() => getPositionFromCartesian(x, value, z))
         }
       />
       <LabelInput
         label="Z"
         type="number"
         value={z}
-        onCompute={(value) =>
-          computationHandle(() =>
-            getPositionFromCartesian(x, y, value.toString())
-          )
+        onCompute={(value: string) =>
+          computationHandle(() => getPositionFromCartesian(x, y, value))
         }
       />
 
       <LabelInput
         label="Latitude"
         type="number"
-        value={latitude.value.toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
-        onCompute={(value) =>
+        value={(latitude.value ?? 0).toFixed(
+          DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE
+        )}
+        onCompute={createFloatHandler((value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(
-              Number.parseFloat(value.toString()),
-              longitude.value,
-              height
-            )
+            getPositionFromGeodetic(value, longitude.value ?? 0, height)
           )
-        }
+        )}
       />
       <LabelInput
         label="Longitude"
         type="number"
-        value={longitude.value.toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
-        onCompute={(value) =>
+        value={(longitude.value ?? 0).toFixed(
+          DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE
+        )}
+        onCompute={createFloatHandler((value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(
-              latitude.value,
-              Number.parseFloat(value.toString()),
-              height
-            )
+            getPositionFromGeodetic(latitude.value ?? 0, value, height)
           )
-        }
+        )}
       />
       <LabelInput
         label="Height"
         type="number"
         value={height.toFixed(DECIMAL_PLACES_FOR_HEIGHT)}
-        onCompute={(value) =>
+        onCompute={createFloatHandler((value) =>
           computationHandle(() =>
             getPositionFromGeodetic(
-              latitude.value,
-              longitude.value,
-              Number.parseFloat(value.toString())
+              latitude.value ?? 0,
+              longitude.value ?? 0,
+              value
             )
           )
-        }
+        )}
       />
 
       <LabelInput
@@ -131,13 +122,9 @@ export default function PositionForm({
           mask: '99º 99\' 99.999" N',
           formatChars: { 9: '[0-9]', N: '[N,S]' },
         }}
-        onCompute={(value) =>
+        onCompute={(value: string) =>
           computationHandle(() =>
-            getPositionFromGeodeticString(
-              value.toString(),
-              longitudeString,
-              heightString
-            )
+            getPositionFromGeodeticString(value, longitudeString, heightString)
           )
         }
       />
@@ -150,13 +137,9 @@ export default function PositionForm({
           mask: '199º 99\' 99.999" E',
           formatChars: { 1: '[0-1]', 9: '[0-9]', E: '[E,W]' },
         }}
-        onCompute={(value) =>
+        onCompute={(value: string) =>
           computationHandle(() =>
-            getPositionFromGeodeticString(
-              latitudeString,
-              value.toString(),
-              heightString
-            )
+            getPositionFromGeodeticString(latitudeString, value, heightString)
           )
         }
       />

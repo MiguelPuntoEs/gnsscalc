@@ -1,6 +1,7 @@
-import { useCallback } from 'react';
 import { getTimeDifferenceFromObject, TimeDifference } from 'gnss-js';
+import { useCallback } from 'react';
 import useTimeDifferenceCalculator from '../../hooks/timeDifference';
+import { createIntegerHandler } from '../../util/formats';
 import CalculatorForm from '../CalculatorForm';
 import LabelInput from '../LabelInput';
 import styles from './gnsstimedifference.module.scss';
@@ -15,7 +16,7 @@ export default function GNSSTimeDifference({
   const { seconds, minutes, hours, days }: TimeDifference =
     useTimeDifferenceCalculator(timeDifference);
 
-  const computationHandle = (timeDifferenceObject) => {
+  const computationHandle = (timeDifferenceObject: TimeDifference) => {
     const resultTimeDifference =
       getTimeDifferenceFromObject(timeDifferenceObject);
     onTimeDifferenceChange(resultTimeDifference);
@@ -37,37 +38,37 @@ export default function GNSSTimeDifference({
           key={getKey()}
           label="Days"
           type="number"
-          value={days}
-          onCompute={(value) =>
+          value={days.toString()}
+          onCompute={createIntegerHandler((value) =>
             computationHandle({ seconds, minutes, hours, days: value })
-          }
+          )}
         />
         <LabelInput
           key={getKey()}
           label="Hours"
           type="number"
-          value={hours}
-          onCompute={(value) =>
+          value={hours.toString()}
+          onCompute={createIntegerHandler((value) =>
             computationHandle({ seconds, minutes, hours: value, days })
-          }
+          )}
         />
         <LabelInput
           key={getKey()}
           label="Minutes"
           type="number"
-          value={minutes}
-          onCompute={(value) =>
+          value={minutes.toString()}
+          onCompute={createIntegerHandler((value) =>
             computationHandle({ seconds, minutes: value, hours, days })
-          }
+          )}
         />
         <LabelInput
           key={getKey()}
           label="Seconds"
           type="number"
-          value={seconds}
-          onCompute={(value) =>
+          value={seconds.toString()}
+          onCompute={createIntegerHandler((value) =>
             computationHandle({ seconds: value, minutes, hours, days })
-          }
+          )}
         />
         <div />
         <button

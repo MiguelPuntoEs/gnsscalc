@@ -1,8 +1,8 @@
 import { Position } from '@/types/position';
 import { MINUTES_IN_DEGREE, SECONDS_IN_DEGREE } from '../constants/angles';
 import {
-  WGS84_ECCENTRICITY_SQUARED,
-  WGS84_SEMI_MAJOR_AXIS,
+    WGS84_ECCENTRICITY_SQUARED,
+    WGS84_SEMI_MAJOR_AXIS,
 } from '../constants/geoid';
 import { deg2rad } from './units';
 
@@ -114,7 +114,14 @@ export function getEnuDifference(
   return [deltaE, deltaN, deltaU];
 }
 
-export function getAer(x, y, z, xRef, yRef, zRef) {
+export function getAer(
+  x: number,
+  y: number,
+  z: number,
+  xRef: number,
+  yRef: number,
+  zRef: number
+): [number, number, number] {
   const slant = Math.sqrt((x - xRef) ** 2 + (y - yRef) ** 2 + (z - zRef) ** 2);
 
   if (!slant) return [0, 0, 0];

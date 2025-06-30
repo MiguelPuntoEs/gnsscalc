@@ -1,4 +1,4 @@
-import { DateTime } from 'luxon';
+import { DateTime, WeekdayNumbers } from 'luxon';
 
 export default function isValidDate(d: Date): boolean {
   return d instanceof Date && !Number.isNaN(d);
@@ -14,14 +14,10 @@ export function parseDate(dateStr: string, timeStr: string): Date {
 }
 
 export function getDateFromWeekOfYear(
-  weekOfYear: string,
+  weekOfYear: number,
   dateStr: string,
   timeStr: string
 ): Date | undefined {
-  const weekOfYearParsed = Number.parseInt(weekOfYear, 10);
-
-  if (Number.isNaN(weekOfYearParsed)) return undefined;
-
   const baseDate = DateTime.fromJSDate(parseDate(dateStr, timeStr), {
     zone: 'utc',
   });
@@ -29,8 +25,8 @@ export function getDateFromWeekOfYear(
   const dt = DateTime.fromObject(
     {
       weekYear: baseDate.weekYear,
-      weekNumber: weekOfYearParsed,
-      weekday: baseDate.weekday,
+      weekNumber: weekOfYear,
+      weekday: baseDate.weekday as WeekdayNumbers,
       hour: baseDate.hour,
       minute: baseDate.minute,
       second: baseDate.second,
