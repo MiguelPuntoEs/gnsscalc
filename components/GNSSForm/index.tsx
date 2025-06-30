@@ -21,7 +21,7 @@ import {
   getDateFromUtc,
   getGpsLeap,
   HourCode,
-  MILLISECONDS_IN_SECOND
+  MILLISECONDS_IN_SECOND,
 } from 'gnss-js';
 import { useCallback } from 'react';
 
@@ -185,7 +185,13 @@ export default function GNSSForm({
       label: 'Hour Code',
       value: result.hourCode,
       onCompute: (value: string) =>
-        computationHandle(() => getDateFromHourCode(value as HourCode, date)),
+        computationHandle(() => {
+          try {
+            return getDateFromHourCode(value as HourCode, date);
+          } catch {
+            return undefined;
+          }
+        }),
     },
     {
       label: 'Julian Date',
