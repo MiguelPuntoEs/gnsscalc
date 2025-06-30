@@ -78,7 +78,9 @@ export default function PositionForm({
       <LabelInput
         label="Latitude"
         type="number"
-        value={(latitude.value ?? 0).toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
+        value={(latitude.value ?? 0).toFixed(
+          DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE
+        )}
         onCompute={createFloatHandler((value) =>
           computationHandle(() =>
             getPositionFromGeodetic(value, longitude.value ?? 0, height)
@@ -88,7 +90,9 @@ export default function PositionForm({
       <LabelInput
         label="Longitude"
         type="number"
-        value={(longitude.value ?? 0).toFixed(DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE)}
+        value={(longitude.value ?? 0).toFixed(
+          DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE
+        )}
         onCompute={createFloatHandler((value) =>
           computationHandle(() =>
             getPositionFromGeodetic(latitude.value ?? 0, value, height)
@@ -101,7 +105,11 @@ export default function PositionForm({
         value={height.toFixed(DECIMAL_PLACES_FOR_HEIGHT)}
         onCompute={createFloatHandler((value) =>
           computationHandle(() =>
-            getPositionFromGeodetic(latitude.value ?? 0, longitude.value ?? 0, value)
+            getPositionFromGeodetic(
+              latitude.value ?? 0,
+              longitude.value ?? 0,
+              value
+            )
           )
         )}
       />

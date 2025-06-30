@@ -28,7 +28,7 @@ import {
   MILLISECONDS_IN_SECOND
 } from 'gnss-js';
 
-export default function useCalculator(date: Date): TimeResult {
+export default function useTimeCalculator(date: Date): TimeResult {
   const result = useMemo(
     () => {
       const taiDateObj = getTaiDate(date);

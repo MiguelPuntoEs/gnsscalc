@@ -1,6 +1,6 @@
 import CalculatorForm from '@/components/CalculatorForm';
 import LabelInput from '@/components/LabelInput';
-import useCalculator from '@/hooks/time';
+import useTimeCalculator from '@/hooks/time';
 import {
   getDateFromBdsTime,
   getDateFromDayOfWeek,
@@ -53,7 +53,7 @@ export default function GNSSForm({
   date: Date;
   onDateChange: (date: Date) => void;
 }) {
-  const result = useCalculator(date);
+  const result = useTimeCalculator(date);
 
   const computationHandle = (
     func: () => Date | undefined
