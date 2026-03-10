@@ -1,6 +1,5 @@
 import { WGS84_SEMI_MAJOR_AXIS, WGS84_ECCENTRICITY_SQUARED } from '../constants/geoid';
 
-const e = Math.sqrt(WGS84_ECCENTRICITY_SQUARED);
 const e2 = WGS84_ECCENTRICITY_SQUARED;
 
 // UTM scale factor

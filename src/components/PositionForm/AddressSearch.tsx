@@ -44,6 +44,7 @@ export default function AddressSearch({
         signal: controller.signal,
         headers: { 'Accept-Language': navigator.language },
       });
+      if (!res.ok) throw new Error(res.statusText);
       const data: NominatimResult[] = await res.json();
       setResults(data);
       setOpen(true);
@@ -71,7 +72,10 @@ export default function AddressSearch({
   }, [query]);
 
   const select = (result: NominatimResult) => {
-    onSelect(parseFloat(result.lat), parseFloat(result.lon));
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+    if (Number.isNaN(lat) || Number.isNaN(lon)) return;
+    onSelect(lat, lon);
     skipNextSearch.current = true;
     setQuery(result.display_name);
     setOpen(false);
@@ -144,7 +148,7 @@ export default function AddressSearch({
         <ul className="absolute z-10 left-0 right-0 mt-1.5 rounded-lg bg-bg-raised border border-border/60 overflow-hidden shadow-xl shadow-black/40">
           {results.length > 0 ? (
             results.map((r, i) => (
-              <li key={i}>
+              <li key={`${r.lat},${r.lon}`}>
                 <button
                   type="button"
                   className={`w-full flex items-start gap-2.5 text-left px-3 py-2 text-xs leading-relaxed border-0 bg-transparent text-fg m-0 rounded-none transition-colors cursor-pointer ${

@@ -151,7 +151,18 @@ export default function PositionForm({
                   onPositionChange(
                     getPositionFromGeodetic(latitude, longitude, altitude ?? 0)
                   ),
-                (error) => console.warn('Geolocation failed:', error.message)
+                (error) => {
+                  const messages: Record<number, string> = {
+                    [GeolocationPositionError.PERMISSION_DENIED]:
+                      'Location permission denied. Please allow location access in your browser settings.',
+                    [GeolocationPositionError.POSITION_UNAVAILABLE]:
+                      'Location unavailable. Please try again.',
+                    [GeolocationPositionError.TIMEOUT]:
+                      'Location request timed out. Please try again.',
+                  };
+                  alert(messages[error.code] ?? 'Could not get your location.');
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
               );
             }
           }}

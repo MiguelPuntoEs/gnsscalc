@@ -1,12 +1,31 @@
 import { useCallback, useRef, useState } from 'react';
 
+function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard) {
+    return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  }
+  return fallbackCopy(text);
+}
+
+function fallbackCopy(text: string): Promise<void> {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+  return Promise.resolve();
+}
+
 /** Overlay copy button that sits inside a `relative group` wrapper. */
 export function useCopyFeedback(getValue: () => string) {
   const [copied, setCopied] = useState(false);
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const copy = useCallback(() => {
-    navigator.clipboard.writeText(getValue().trim()).then(() => {
+    copyToClipboard(getValue().trim()).then(() => {
       setCopied(true);
       clearTimeout(timeout.current);
       timeout.current = setTimeout(() => setCopied(false), 1500);
@@ -28,8 +47,8 @@ export default function CopyIcon({
       type="button"
       tabIndex={-1}
       onClick={onCopy}
-      className={`absolute left-1.5 top-1/2 -translate-y-1/2 bg-transparent border-0 p-0 m-0 transition-opacity ${
-        copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'
+      className={`absolute left-0 top-1/2 -translate-y-1/2 bg-transparent border-0 p-2 m-0 transition-opacity ${
+        copied ? 'opacity-100' : 'opacity-40 sm:opacity-0 sm:group-hover:opacity-60'
       }`}
     >
       {copied ? (

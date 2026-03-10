@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import useEditableValue from '../../hooks/useEditableValue';
 import useTimeCalculator from '../../hooks/time';
 import {
@@ -296,6 +296,9 @@ export default function GNSSForm({
   const getRinex = useCallback(() => result.rinex, [result.rinex]);
   const { copied: rinexCopied, copy: copyRinex } = useCopyFeedback(getRinex);
 
+  const [nowPressed, setNowPressed] = useState(false);
+  const nowTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   const rinexEdit = useEditableValue(result.rinex, (value: string) =>
     computationHandle(() => getDateFromRINEX(value))
   );
@@ -305,10 +308,10 @@ export default function GNSSForm({
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
-            className={`inline-flex items-center gap-1 text-[11px] transition-colors bg-transparent border-0 p-0 m-0 cursor-pointer ${
-              rinexCopied ? 'text-green-400' : 'text-fg/50 hover:text-fg'
+            className={`inline-flex items-center gap-1 text-xs transition-colors rounded-md px-2 py-1 border cursor-pointer ${
+              rinexCopied ? 'text-green-400 border-green-400/30' : 'text-fg/50 hover:text-fg border-white/10 hover:border-white/20'
             }`}
             type="button"
             onClick={copyRinex}
@@ -326,7 +329,7 @@ export default function GNSSForm({
             {rinexCopied ? 'Copied!' : 'RINEX'}
           </button>
           <button
-            className="inline-flex items-center gap-1 text-[11px] text-accent hover:text-accent/80 transition-colors bg-transparent border-0 p-0 m-0 cursor-pointer font-semibold"
+            className={`inline-flex items-center gap-1 text-xs transition-colors rounded-md px-2 py-1 border cursor-pointer font-semibold ${nowPressed ? 'text-green-400 border-green-400/30' : 'text-accent border-accent/30 hover:border-accent/50'}`}
             type="button"
             onClick={() => {
               const now = new Date();
@@ -335,9 +338,12 @@ export default function GNSSForm({
               onDateChange(
                 new Date(now.getTime() + gpsLeap * MILLISECONDS_IN_SECOND)
               );
+              setNowPressed(true);
+              clearTimeout(nowTimeout.current);
+              nowTimeout.current = setTimeout(() => setNowPressed(false), 1500);
             }}
           >
-            Now
+            {nowPressed ? 'Updated!' : 'Now'}
           </button>
         </div>
       </div>
