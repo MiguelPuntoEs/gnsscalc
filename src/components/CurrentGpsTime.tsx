@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react';
 import { getGpsLeap, getGpsTime, getWeekNumber, MILLISECONDS_IN_SECOND } from 'gnss-js';
 
+function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex-1 min-w-36 rounded-xl bg-bg-raised border border-border/60 px-4 py-3">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-fg/35 mb-1">{label}</div>
+      <div className="tabular-nums font-semibold">{children}</div>
+    </div>
+  );
+}
+
 export default function CurrentGpsTime() {
   const [now, setNow] = useState<Date | null>(null);
 
@@ -23,19 +32,16 @@ export default function CurrentGpsTime() {
   const timeStr = now.toISOString().split('T')[1]?.slice(0, -1);
 
   return (
-    <div className="flex flex-wrap gap-4 mb-6">
-      <div className="flex-1 min-w-36 rounded-md border border-border px-4 py-3">
-        <div className="text-xs uppercase tracking-wide text-fg/60 mb-1">GPS Date</div>
-        <div className="tabular-nums font-semibold">{dateStr} <span className="text-fg/80">{timeStr}</span></div>
-      </div>
-      <div className="flex-1 min-w-36 rounded-md border border-border px-4 py-3">
-        <div className="text-xs uppercase tracking-wide text-fg/60 mb-1">GPS Week</div>
-        <div className="tabular-nums font-semibold text-lg">{week}</div>
-      </div>
-      <div className="flex-1 min-w-36 rounded-md border border-border px-4 py-3">
-        <div className="text-xs uppercase tracking-wide text-fg/60 mb-1">GPS Seconds</div>
-        <div className="tabular-nums font-semibold text-lg">{Math.floor(gpsSeconds)}</div>
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <StatCard label="GPS Date">
+        {dateStr} <span className="text-fg/60">{timeStr}</span>
+      </StatCard>
+      <StatCard label="GPS Week">
+        <span className="text-lg">{week}</span>
+      </StatCard>
+      <StatCard label="GPS Seconds">
+        <span className="text-lg">{Math.floor(gpsSeconds)}</span>
+      </StatCard>
     </div>
   );
 }

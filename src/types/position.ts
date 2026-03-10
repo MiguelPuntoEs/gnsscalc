@@ -25,3 +25,21 @@ export type ENUResult = {
 };
 
 export type Position = [number, number, number];
+
+export type DistanceResult = {
+  orthodromic: number;
+  loxodromic: number;
+  euclidean: number;
+  initialBearing: number;
+  finalBearing: number;
+  rhumbBearing: number;
+  midpoint: [number, number]; // [lat, lon] in degrees
+  horizonA: number;
+  horizonB: number;
+};
+
+export type CoordinateFormats = {
+  utm: { easting: number; northing: number; zone: number; hemisphere: 'N' | 'S' };
+  maidenhead: string;
+  geohash: string;
+};

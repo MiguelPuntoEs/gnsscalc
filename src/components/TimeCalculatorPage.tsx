@@ -3,12 +3,18 @@ import { getTimeDifference } from 'gnss-js';
 import GNSSForm from './GNSSForm/GNSSForm';
 import GNSSTimeDifference from './GNSSTimeDifference/GNSSTimeDifference';
 
+function roundedNow() {
+  const now = new Date();
+  now.setMilliseconds(0);
+  return now;
+}
+
 export default function TimeCalculatorPage() {
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [finalDate, setFinalDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date>(roundedNow);
+  const [finalDate, setFinalDate] = useState<Date>(roundedNow);
 
   return (
-    <section className="flex flex-wrap gap-6">
+    <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
       <GNSSForm
         title="Initial Time"
         date={startDate}

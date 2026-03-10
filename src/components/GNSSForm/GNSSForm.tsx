@@ -1,3 +1,5 @@
+import { useCallback } from 'react';
+import useEditableValue from '../../hooks/useEditableValue';
 import useTimeCalculator from '../../hooks/time';
 import {
   getDateFromBdsTime,
@@ -25,8 +27,26 @@ import type { HourCode } from 'gnss-js';
 import { SCALE } from '../../constants/time';
 import { createNumberHandler } from '../../util/formats';
 import { getDateFromWeekOfYear, parseDate } from '../../util/time';
+import { useCopyFeedback } from '../CopyIcon';
 import Field from '../Field';
 import type { FieldProps } from '../Field';
+
+function FieldSection({
+  label,
+  fields,
+}: {
+  label: string;
+  fields: FieldProps[];
+}) {
+  return (
+    <div className="card-fields">
+      <span className="section-label">{label}</span>
+      {fields.map((field) => (
+        <Field key={field.label} {...field} />
+      ))}
+    </div>
+  );
+}
 
 export default function GNSSForm({
   title,
@@ -49,7 +69,7 @@ export default function GNSSForm({
     return resultDate;
   };
 
-  const fields: FieldProps[] = [
+  const gpsWeekFields: FieldProps[] = [
     {
       label: 'Week no.',
       value: result.weekNumber.toString(),
@@ -66,6 +86,9 @@ export default function GNSSForm({
       ),
       numeric: true,
     },
+  ];
+
+  const timestampFields: FieldProps[] = [
     {
       label: 'GPS Time',
       value: result.gpsTime.toString(),
@@ -106,6 +129,9 @@ export default function GNSSForm({
       ),
       numeric: true,
     },
+  ];
+
+  const glonassFields: FieldProps[] = [
     {
       label: 'GLO N4',
       value: result.gloN4.toString(),
@@ -126,6 +152,9 @@ export default function GNSSForm({
       ),
       numeric: true,
     },
+  ];
+
+  const calendarFields: FieldProps[] = [
     {
       label: 'Day of Year',
       value: result.dayOfYear.toString(),
@@ -172,6 +201,9 @@ export default function GNSSForm({
           }
         }),
     },
+  ];
+
+  const julianFields: FieldProps[] = [
     {
       label: 'Julian Date',
       value: result.julianDate.toString(),
@@ -196,55 +228,56 @@ export default function GNSSForm({
       ),
       numeric: true,
     },
-    {
-      label: 'Leap Sec.',
-      value: result.leapSec,
-      disabled: true,
-      readOnly: true,
-    },
+  ];
+
+  const dateTimeFields: FieldProps[] = [
     {
       label: 'Date [TAI]',
       value: result.dateTai,
-      onCommit: (value: string) =>
-        computationHandle(() =>
-          getDateFromTai(parseDate(value, result.timeTai))
-        ),
+      onCommit: (value: string) => {
+        const d = parseDate(value, result.timeTai);
+        return computationHandle(() => d && getDateFromTai(d));
+      },
     },
     {
       label: 'Time [TAI]',
       value: result.timeTai,
-      onCommit: (value: string) =>
-        computationHandle(() =>
-          getDateFromTai(parseDate(result.dateTai, value))
-        ),
+      onCommit: (value: string) => {
+        const d = parseDate(result.dateTai, value);
+        return computationHandle(() => d && getDateFromTai(d));
+      },
     },
     {
       label: 'Date [TT]',
       value: result.dateTT,
-      onCommit: (value: string) =>
-        computationHandle(() => getDateFromTt(parseDate(value, result.timeTT))),
+      onCommit: (value: string) => {
+        const d = parseDate(value, result.timeTT);
+        return computationHandle(() => d && getDateFromTt(d));
+      },
     },
     {
       label: 'Time [TT]',
       value: result.timeTT,
-      onCommit: (value: string) =>
-        computationHandle(() => getDateFromTt(parseDate(result.dateTT, value))),
+      onCommit: (value: string) => {
+        const d = parseDate(result.dateTT, value);
+        return computationHandle(() => d && getDateFromTt(d));
+      },
     },
     {
       label: 'Date [UTC]',
       value: result.dateUtc,
-      onCommit: (value: string) =>
-        computationHandle(() =>
-          getDateFromUtc(parseDate(value, result.timeUtc))
-        ),
+      onCommit: (value: string) => {
+        const d = parseDate(value, result.timeUtc);
+        return computationHandle(() => d && getDateFromUtc(d));
+      },
     },
     {
       label: 'Time [UTC]',
       value: result.timeUtc,
-      onCommit: (value: string) =>
-        computationHandle(() =>
-          getDateFromUtc(parseDate(result.dateUtc, value))
-        ),
+      onCommit: (value: string) => {
+        const d = parseDate(result.dateUtc, value);
+        return computationHandle(() => d && getDateFromUtc(d));
+      },
     },
     {
       label: 'Date [GPS]',
@@ -258,47 +291,88 @@ export default function GNSSForm({
       onCommit: (value: string) =>
         computationHandle(() => parseDate(result.dateGps, value)),
     },
-    {
-      label: 'RINEX',
-      value: result.rinex,
-      onCommit: (value: string) =>
-        computationHandle(() => getDateFromRINEX(value)),
-    },
   ];
 
+  const getRinex = useCallback(() => result.rinex, [result.rinex]);
+  const { copied: rinexCopied, copy: copyRinex } = useCopyFeedback(getRinex);
+
+  const rinexEdit = useEditableValue(result.rinex, (value: string) =>
+    computationHandle(() => getDateFromRINEX(value))
+  );
+
   return (
-    <form className="calc-form">
-      <span>{title}</span>
+    <form className="card flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
+        <div className="flex gap-3">
+          <button
+            className={`inline-flex items-center gap-1 text-[11px] transition-colors bg-transparent border-0 p-0 m-0 cursor-pointer ${
+              rinexCopied ? 'text-green-400' : 'text-fg/50 hover:text-fg'
+            }`}
+            type="button"
+            onClick={copyRinex}
+          >
+            {rinexCopied ? (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3">
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+              </svg>
+            )}
+            {rinexCopied ? 'Copied!' : 'RINEX'}
+          </button>
+          <button
+            className="inline-flex items-center gap-1 text-[11px] text-accent hover:text-accent/80 transition-colors bg-transparent border-0 p-0 m-0 cursor-pointer font-semibold"
+            type="button"
+            onClick={() => {
+              const now = new Date();
+              now.setMilliseconds(0);
+              const gpsLeap = getGpsLeap(now);
+              onDateChange(
+                new Date(now.getTime() + gpsLeap * MILLISECONDS_IN_SECOND)
+              );
+            }}
+          >
+            Now
+          </button>
+        </div>
+      </div>
 
-      {fields.map((field) => (
-        <Field key={field.label} {...field} />
-      ))}
+      <div className="flex items-center gap-1.5 text-[10px] tabular-nums">
+        <span
+          className="inline-flex items-center rounded-full bg-accent/10 text-accent/80 px-2 py-0.5 font-medium"
+          title="GPS time minus UTC"
+        >
+          GPS &minus; UTC = {result.leapGpsUtc}s
+        </span>
+        <span
+          className="inline-flex items-center rounded-full bg-accent/10 text-accent/80 px-2 py-0.5 font-medium"
+          title="TAI minus UTC"
+        >
+          TAI &minus; UTC = {result.leapTaiUtc}s
+        </span>
+      </div>
 
-      <button
-        className="btn"
-        type="button"
-        onClick={() => {
-          const now = new Date();
-          const gpsLeap = getGpsLeap(now);
-          onDateChange(
-            new Date(now.getTime() + gpsLeap * MILLISECONDS_IN_SECOND)
-          );
-        }}
-      >
-        Now
-      </button>
+      {/* RINEX – hero field */}
+      <input
+        value={rinexEdit.value}
+        onChange={rinexEdit.onChange}
+        onKeyDown={rinexEdit.onKeyDown}
+        onBlur={rinexEdit.onBlur}
+        aria-invalid={rinexEdit.error || undefined}
+        className={`w-full font-mono text-center bg-accent/5 border border-accent/20 rounded px-3 py-1.5 text-sm ${rinexEdit.error ? '!border-red-500 !text-red-500' : ''}`}
+      />
 
-      <button
-        className="btn-secondary"
-        type="button"
-        onClick={() => {
-          navigator.clipboard.writeText(result.rinex).catch((err) => {
-            console.error('Failed to copy: ', err);
-          });
-        }}
-      >
-        Copy RINEX
-      </button>
+      <FieldSection label="GPS Week" fields={gpsWeekFields} />
+      <FieldSection label="Timestamps" fields={timestampFields} />
+      <FieldSection label="GLONASS" fields={glonassFields} />
+      <FieldSection label="Calendar" fields={calendarFields} />
+      <FieldSection label="Julian" fields={julianFields} />
+      <FieldSection label="Date / Time" fields={dateTimeFields} />
     </form>
   );
 }

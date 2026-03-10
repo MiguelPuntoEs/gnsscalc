@@ -15,7 +15,8 @@ export type TimeResult = {
   julianDate: string;
   mjd: string;
   mjd2000: string;
-  leapSec: string;
+  leapTaiUtc: number;
+  leapGpsUtc: number;
   gloN4: number;
   gloNa: number;
   dateTai: string;

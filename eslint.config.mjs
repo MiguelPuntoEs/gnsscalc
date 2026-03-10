@@ -6,7 +6,7 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.config({
-    extends: ['plugin:react/recommended', 'plugin:react-hooks/recommended', 'prettier'],
+    extends: ['plugin:react/recommended', 'plugin:react-hooks/recommended', 'plugin:jsx-a11y/recommended', 'prettier'],
     settings: {
       react: {
         version: 'detect',

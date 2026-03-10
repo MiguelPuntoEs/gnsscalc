@@ -1,5 +1,6 @@
 import type { Position } from '../../types/position';
 import { useENUCalculator } from '../../hooks/positioning';
+import CopyableInput from '../CopyableInput';
 
 export default function ENUForm({
   title = '',
@@ -13,17 +14,18 @@ export default function ENUForm({
   const { deltaE, deltaN, deltaU } = useENUCalculator(position, refPosition);
 
   return (
-    <form className="calc-form self-start">
-      <span>{title}</span>
+    <div className="card-output flex flex-col gap-2">
+      <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
+      <div className="card-fields">
+        <label title="East offset (meters)">&Delta;E</label>
+        <CopyableInput value={`${deltaE.toFixed(3)} m`} />
 
-      <label>&Delta;E</label>
-      <input value={deltaE.toFixed(5)} readOnly disabled />
+        <label title="North offset (meters)">&Delta;N</label>
+        <CopyableInput value={`${deltaN.toFixed(3)} m`} />
 
-      <label>&Delta;N</label>
-      <input value={deltaN.toFixed(5)} readOnly disabled />
-
-      <label>&Delta;U</label>
-      <input value={deltaU.toFixed(5)} readOnly disabled />
-    </form>
+        <label title="Up offset (meters)">&Delta;U</label>
+        <CopyableInput value={`${deltaU.toFixed(3)} m`} />
+      </div>
+    </div>
   );
 }

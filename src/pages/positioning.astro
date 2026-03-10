@@ -9,19 +9,26 @@ const positioningFaq = [
   { question: 'What is the difference between ellipsoidal height and sea level altitude?', answer: 'Ellipsoidal height is the distance above the WGS84 ellipsoid, which is a mathematical surface. Mean sea level (orthometric height) follows the geoid, an irregular equipotential surface. The two can differ by up to ±100 m depending on location.' },
   { question: 'What are azimuth and elevation?', answer: 'Azimuth is the horizontal angle from North, measured clockwise (0–360°). Elevation is the vertical angle above the local horizon (0° = horizon, 90° = zenith). Together with slant range they form the AER coordinate system, commonly used for satellite tracking and antenna pointing.' },
   { question: 'What is the ENU coordinate system?', answer: 'ENU (East-North-Up) is a local tangent-plane coordinate system centered at a reference point. East points along the local parallel, North along the local meridian, and Up is normal to the ellipsoid. It is used to express relative positions in an intuitive, human-readable frame.' },
+  { question: 'What is the difference between orthodromic and loxodromic distance?', answer: 'Orthodromic (great-circle) distance is the shortest path between two points on the ellipsoid surface. Loxodromic (rhumb line) distance follows a path of constant bearing, which is longer but simpler to navigate. For short distances the difference is negligible.' },
+  { question: 'What is UTM?', answer: 'UTM (Universal Transverse Mercator) is a map projection that divides the Earth into 60 zones of 6° longitude each. Within each zone, positions are expressed as easting and northing in metres. UTM is widely used in surveying, mapping and military applications because it provides a flat, metric grid with minimal distortion.' },
+  { question: 'What is a Maidenhead grid locator?', answer: 'The Maidenhead Locator System divides the Earth into grid squares identified by alternating letters and digits (e.g. JN58td). It is primarily used by amateur radio operators to describe station locations concisely. Each 6-character locator identifies an area of roughly 5 × 2.5 km.' },
+  { question: 'What is a geohash?', answer: 'A geohash is a compact string that encodes a geographic location by recursively subdividing the world into a grid. Longer strings mean higher precision. Geohashes are used in databases and web applications for efficient spatial indexing and proximity searches.' },
+  { question: 'What is the geometric horizon distance?', answer: 'The geometric horizon distance is how far an observer can see to the horizon from a given height above the ellipsoid, assuming standard atmospheric refraction (k = 0.13). It depends only on the observer\'s altitude and the Earth\'s radius.' },
 ];
 ---
 
 <BaseLayout
   title="ECEF to Geodetic Converter | GNSS Positioning Calculator"
-  description="Convert ECEF (X, Y, Z) to latitude, longitude, height. Calculate azimuth, elevation, slant range (AER) and East-North-Up (ENU) coordinates. Free online WGS84 coordinate converter."
+  description="Convert ECEF (X, Y, Z) to latitude, longitude, height, UTM, Maidenhead and geohash. Calculate azimuth, elevation, slant range (AER), East-North-Up (ENU) coordinates, orthodromic and loxodromic distances, bearings and horizon distance. Free online WGS84 coordinate converter."
   faq={positioningFaq}
 >
   <h1>GNSS Positioning Calculator</h1>
   <p>
-    Convert between ECEF cartesian coordinates and geodetic (latitude, longitude, height)
-    on the WGS84 ellipsoid. Compute azimuth, elevation and slant range (AER) or
-    East-North-Up (ENU) differences between two positions.
+    Convert between ECEF cartesian coordinates, geodetic (latitude, longitude, height),
+    DMS, UTM, Maidenhead and geohash on the WGS84 ellipsoid. Search any address to set
+    a position. Compute azimuth, elevation, slant range (AER), East-North-Up (ENU)
+    offsets, orthodromic, loxodromic and Euclidean distances, bearings and horizon
+    distance between two points.
   </p>
 
   <PositioningCalculatorPage client:load />
@@ -33,12 +40,18 @@ const positioningFaq = [
       global Earth-Centered, Earth-Fixed (ECEF) cartesian coordinate system.
       The converter transforms these to geodetic coordinates (latitude,
       longitude, ellipsoidal height) on the WGS84 reference ellipsoid, and
-      vice versa.
+      vice versa. You can also enter coordinates in degrees-minutes-seconds
+      (DMS) notation.
     </p>
     <p>
       <strong>Height</strong> [m] is the ellipsoidal height above the WGS84
       ellipsoid, not to be confused with orthometric height (above mean sea
       level).
+    </p>
+    <p>
+      Use the <strong>address search</strong> to look up any place by name
+      and automatically fill in its coordinates, or click
+      <strong>My location</strong> to use your device's GPS.
     </p>
   </section>
 
@@ -70,6 +83,58 @@ const positioningFaq = [
       <strong>&Delta;E</strong> [m] East component,
       <strong>&Delta;N</strong> [m] North component, and
       <strong>&Delta;U</strong> [m] Up component.
+    </p>
+  </section>
+
+  <section>
+    <h2>Distances &amp; Bearings</h2>
+    <p>
+      <strong>Orthodromic distance</strong> is the shortest path between two
+      points on the ellipsoid surface (great-circle distance), computed using
+      the Vincenty inverse formula on the WGS84 ellipsoid.
+    </p>
+    <p>
+      <strong>Loxodromic distance</strong> (rhumb line) is the distance along
+      a path of constant bearing. It is always equal to or longer than the
+      orthodromic distance.
+    </p>
+    <p>
+      <strong>Euclidean distance</strong> is the straight-line 3D distance
+      between the two ECEF positions (through the Earth).
+    </p>
+    <p>
+      The <strong>initial</strong> and <strong>final bearings</strong> are the
+      headings at the start and end of the great-circle arc.
+      The <strong>rhumb bearing</strong> is the constant heading along the
+      loxodromic path. The <strong>midpoint</strong> is the geographic center
+      of the great-circle arc, and the <strong>horizon distances</strong>
+      indicate how far each position can see to the geometric horizon based
+      on its height.
+    </p>
+  </section>
+
+  <section>
+    <h2>Coordinate Formats</h2>
+    <p>
+      Each position card also displays the coordinates in several additional
+      representations:
+    </p>
+    <p>
+      <strong>UTM</strong> (Universal Transverse Mercator) projects the position
+      onto a flat metric grid defined by a zone number (1–60) and hemisphere.
+      Easting and northing are given in metres. UTM is the standard format for
+      topographic maps and land surveying.
+    </p>
+    <p>
+      <strong>Maidenhead</strong> is a compact grid-square locator widely used in
+      amateur radio. A 6-character code (e.g.&nbsp;JN58td) identifies an area of
+      roughly 5&nbsp;&times;&nbsp;2.5&nbsp;km.
+    </p>
+    <p>
+      <strong>Geohash</strong> is an alphanumeric string that encodes a position
+      by recursively halving the coordinate space. It is used in databases and
+      web applications for spatial indexing. The 8-character default gives
+      sub-metre precision.
     </p>
   </section>
 
@@ -118,6 +183,43 @@ const positioningFaq = [
         a reference point. East points along the local parallel, North along the
         local meridian, and Up is normal to the ellipsoid. It is used to express
         relative positions in an intuitive, human-readable frame.
+      </dd>
+      <dt>What is the difference between orthodromic and loxodromic distance?</dt>
+      <dd>
+        Orthodromic (great-circle) distance is the shortest path between two
+        points on the ellipsoid surface. Loxodromic (rhumb line) distance follows
+        a path of constant bearing, which is longer but simpler to navigate. For
+        short distances the difference is negligible.
+      </dd>
+      <dt>What is UTM?</dt>
+      <dd>
+        UTM (Universal Transverse Mercator) is a map projection that divides the
+        Earth into 60 zones of 6° longitude each. Within each zone, positions are
+        expressed as easting and northing in metres. UTM is widely used in
+        surveying, mapping and military applications because it provides a flat,
+        metric grid with minimal distortion.
+      </dd>
+      <dt>What is a Maidenhead grid locator?</dt>
+      <dd>
+        The Maidenhead Locator System divides the Earth into grid squares
+        identified by alternating letters and digits (e.g.&nbsp;JN58td). It is
+        primarily used by amateur radio operators to describe station locations
+        concisely. Each 6-character locator identifies an area of roughly
+        5&nbsp;&times;&nbsp;2.5&nbsp;km.
+      </dd>
+      <dt>What is a geohash?</dt>
+      <dd>
+        A geohash is a compact string that encodes a geographic location by
+        recursively subdividing the world into a grid. Longer strings mean higher
+        precision. Geohashes are used in databases and web applications for
+        efficient spatial indexing and proximity searches.
+      </dd>
+      <dt>What is the geometric horizon distance?</dt>
+      <dd>
+        The geometric horizon distance is how far an observer can see to the
+        horizon from a given height above the ellipsoid, assuming standard
+        atmospheric refraction (k&nbsp;=&nbsp;0.13). It depends only on the
+        observer's altitude and the Earth's radius.
       </dd>
     </dl>
   </section>

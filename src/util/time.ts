@@ -1,12 +1,12 @@
 import { DateTime } from 'luxon';
 import type { WeekdayNumbers } from 'luxon';
 
-export function parseDate(dateStr: string, timeStr: string): Date {
+export function parseDate(dateStr: string, timeStr: string): Date | undefined {
   const dt_string: string =
     dateStr.replace(/[.,;\s]+/g, '-') + 'T' + timeStr.replace(/[,;\s]+/g, ':');
   const dt = DateTime.fromISO(dt_string, { zone: 'utc' });
 
-  return dt.isValid ? dt.toJSDate() : new Date();
+  return dt.isValid ? dt.toJSDate() : undefined;
 }
 
 export function getDateFromWeekOfYear(
@@ -14,7 +14,10 @@ export function getDateFromWeekOfYear(
   dateStr: string,
   timeStr: string
 ): Date | undefined {
-  const baseDate = DateTime.fromJSDate(parseDate(dateStr, timeStr), {
+  const parsed = parseDate(dateStr, timeStr);
+  if (!parsed) return undefined;
+
+  const baseDate = DateTime.fromJSDate(parsed, {
     zone: 'utc',
   });
 
@@ -31,5 +34,5 @@ export function getDateFromWeekOfYear(
     { zone: 'utc' }
   );
 
-  return dt.isValid ? dt.toJSDate() : new Date();
+  return dt.isValid ? dt.toJSDate() : undefined;
 }
