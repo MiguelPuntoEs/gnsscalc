@@ -21,11 +21,12 @@ const canonicalUrl = baseUrl + Astro.url.pathname;
 const defaultDescription = 'GNSS Calculator is a tool to perform time conversions between different scales and several time computations.';
 const description = pageDescription || defaultDescription;
 
-const isHome = Astro.url.pathname === '/';
+const pathname = Astro.url.pathname;
+const schemaName = pathname === '/' ? 'GPS Time Converter' : pathname === '/positioning' ? 'GNSS Positioning Calculator' : 'NMEA Log Viewer';
 const schema = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  "name": isHome ? "GPS Time Converter" : "GNSS Positioning Calculator",
+  "name": schemaName,
   "url": canonicalUrl,
   "description": description,
   "applicationCategory": "UtilityApplication",
