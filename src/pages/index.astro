@@ -1,0 +1,155 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TimeCalculatorPage from '../components/TimeCalculatorPage';
+import CurrentGpsTime from '../components/CurrentGpsTime';
+
+
+const timeFaq = [
+  { question: 'What is GPS time?', answer: 'GPS time is a continuous time scale maintained by GPS satellites, starting from January 6, 1980, 00:00:00 UTC. Unlike UTC, GPS time does not include leap seconds, so it currently runs 18 seconds ahead of UTC.' },
+  { question: 'What is the difference between GPS time and UTC?', answer: 'UTC includes leap seconds to stay aligned with Earth\'s rotation, while GPS time is continuous and never adjusted. As of 2025 the offset is 18 seconds (GPS time = UTC + 18 s). This offset changes only when a new leap second is introduced by the IERS.' },
+  { question: 'What is the GPS epoch?', answer: 'The GPS epoch is the reference start point of GPS time: January 6, 1980, 00:00:00 UTC. All GPS timestamps are counted as seconds elapsed since this epoch.' },
+  { question: 'How do I convert GPS time to UTC?', answer: 'Subtract the current number of leap seconds from the GPS timestamp. Enter a GPS time value in the converter above and the tool will automatically compute the UTC equivalent, accounting for all historical leap seconds.' },
+  { question: 'What is GPS week number?', answer: 'The GPS week number counts complete weeks since the GPS epoch (January 6, 1980). It is transmitted by GPS satellites along with the time of week (TOW) in seconds. The week number rolled over from 1023 to 0 on August 21, 1999, and will roll over again on November 20, 2137.' },
+  { question: 'What is the difference between Julian Date and Modified Julian Date?', answer: 'Julian Date (JD) counts days since January 1, 4713 B.C., 12:00:00, resulting in large numbers. Modified Julian Date (MJD) simplifies this by subtracting 2 400 000.5, so MJD = JD − 2 400 000.5, with its epoch on November 17, 1858, 00:00:00.' },
+];
+---
+
+<BaseLayout
+  title="GPS Time Converter | GNSS Time Calculator"
+  description="Convert GPS time to UTC, UNIX, Julian Date, MJD, TAI, Galileo and BDS time. GPS week calculator, current GPS time, timestamp converter. Free online GNSS tool."
+  faq={timeFaq}
+>
+  <h1>GPS Time Converter</h1>
+  <p>
+    Convert between GPS, Galileo, BDS, UNIX timestamps, Julian Date, MJD, UTC, TAI and more.
+    Use the GPS week calculator, check the current GPS time, or compute time differences between epochs.
+  </p>
+
+  <h2>Current GPS Time</h2>
+  <CurrentGpsTime client:load />
+
+  <TimeCalculatorPage client:load />
+
+  <section>
+    <h2>GPS Time to UTC Conversion</h2>
+    <p>
+      <strong>GPS Time</strong> is the number of seconds since January 6,
+      1980, 00:00:00. GPS time does not include leap seconds, so the offset
+      between GPS time and UTC grows over time. Use the converter above to
+      translate a GPS timestamp to UTC or any other time scale.
+    </p>
+    <p>
+      <strong>GAL Time</strong> (Galileo System Time) is the number of seconds
+      since August 22, 1999, 00:00:00. Galileo time is steered to remain
+      within 50 nanoseconds of TAI.
+    </p>
+    <p>
+      <strong>BDS Time</strong> (BeiDou Navigation Satellite System Time) is
+      the number of seconds since January 1, 2006, 00:00:00.
+    </p>
+    <p>
+      <strong>UNIX Time</strong> is the number of seconds since January 1,
+      1970, 00:00:00. Unlike GPS time, UNIX time includes leap seconds.
+    </p>
+  </section>
+
+  <section>
+    <h2>GPS Week Calculator</h2>
+    <p>
+      The GPS week number counts the number of complete weeks since the GPS
+      epoch (January 6, 1980). The time of week (TOW) is the number of
+      seconds elapsed since the beginning of the current GPS week.
+      Edit the <strong>Week no.</strong> or <strong>Time of week</strong>
+      fields above to convert from GPS week and TOW to a calendar date.
+    </p>
+  </section>
+
+  <section>
+    <h2>Julian Date &amp; Modified Julian Date</h2>
+    <p>
+      <strong>Julian Date</strong> (JD) is the number of days since January 1,
+      4713 B.C., 12:00:00. It defines the number of mean solar days elapsed
+      since the epoch January 1.5d, 4713 before Christ (Hoffman-Wellenhof,
+      1994). All Julian dates on this page are expressed in the TT (Terrestrial Time) scale.
+    </p>
+    <p>
+      <strong>MJD</strong> (Modified Julian Date) simplifies Julian Date by
+      removing the leading digits: MJD = JD &minus; 2400000.5, making the
+      epoch November 17, 1858, 00:00:00.
+    </p>
+    <p>
+      <strong>MJD2000</strong> counts days since January 1, 2000, 00:00:00.
+    </p>
+  </section>
+
+  <section>
+    <h2>Leap Seconds &amp; Time Scales</h2>
+    <p>
+      <strong>Important:</strong> leap seconds are only applied to UTC
+      computation. GPS, Galileo and BDS time scales are continuous and
+      do not include leap seconds.
+    </p>
+    <p>
+      Leap second data is sourced from{' '}
+      <a
+        href="https://data.iana.org/time-zones/data/leap-seconds.list"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        IANA
+      </a>. For the latest bulletin, check{' '}
+      <a
+        href="https://datacenter.iers.org/data/latestVersion/bulletinC.txt"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        IERS Bulletin C
+      </a>.
+    </p>
+  </section>
+
+  <section>
+    <h2>GPS Time FAQ</h2>
+    <dl>
+      <dt>What is GPS time?</dt>
+      <dd>
+        GPS time is a continuous time scale maintained by GPS satellites, starting
+        from January 6, 1980, 00:00:00 UTC. Unlike UTC, GPS time does not include
+        leap seconds, so it currently runs 18 seconds ahead of UTC.
+      </dd>
+      <dt>What is the difference between GPS time and UTC?</dt>
+      <dd>
+        UTC includes leap seconds to stay aligned with Earth's rotation, while GPS
+        time is continuous and never adjusted. As of 2025 the offset is 18 seconds
+        (GPS time = UTC + 18 s). This offset changes only when a new leap second
+        is introduced by the IERS.
+      </dd>
+      <dt>What is the GPS epoch?</dt>
+      <dd>
+        The GPS epoch is the reference start point of GPS time: January 6, 1980,
+        00:00:00 UTC. All GPS timestamps are counted as seconds elapsed since this
+        epoch.
+      </dd>
+      <dt>How do I convert GPS time to UTC?</dt>
+      <dd>
+        Subtract the current number of leap seconds from the GPS timestamp. Enter
+        a GPS time value in the converter above and the tool will automatically
+        compute the UTC equivalent, accounting for all historical leap seconds.
+      </dd>
+      <dt>What is GPS week number?</dt>
+      <dd>
+        The GPS week number counts complete weeks since the GPS epoch (January 6,
+        1980). It is transmitted by GPS satellites along with the time of week
+        (TOW) in seconds. The week number rolled over from 1023 to 0 on
+        August 21, 1999, and will roll over again on November 20, 2137.
+      </dd>
+      <dt>What is the difference between Julian Date and Modified Julian Date?</dt>
+      <dd>
+        Julian Date (JD) counts days since January 1, 4713 B.C., 12:00:00,
+        resulting in large numbers. Modified Julian Date (MJD) simplifies this by
+        subtracting 2 400 000.5, so MJD = JD − 2 400 000.5, with its epoch on
+        November 17, 1858, 00:00:00.
+      </dd>
+    </dl>
+  </section>
+</BaseLayout>

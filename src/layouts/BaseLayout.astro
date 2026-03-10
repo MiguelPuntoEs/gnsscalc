@@ -1,0 +1,100 @@
+---
+import Header from '../components/Header/Header.astro';
+import Footer from '../components/Footer/Footer.astro';
+import '../styles/global.css';
+
+interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+interface Props {
+  title: string;
+  description?: string;
+  faq?: FaqItem[];
+}
+
+const { title, description: pageDescription, faq } = Astro.props;
+
+const baseUrl = 'https://gnsscalc.com';
+const canonicalUrl = baseUrl + Astro.url.pathname;
+const defaultDescription = 'GNSS Calculator is a tool to perform time conversions between different scales and several time computations.';
+const description = pageDescription || defaultDescription;
+
+const isHome = Astro.url.pathname === '/';
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": isHome ? "GPS Time Converter" : "GNSS Positioning Calculator",
+  "url": canonicalUrl,
+  "description": description,
+  "applicationCategory": "UtilityApplication",
+  "operatingSystem": "Any",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Person",
+    "name": "Miguel González",
+    "url": "https://www.miguel.es"
+  },
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "GNSS Calculator",
+    "url": baseUrl,
+  }
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>{title}</title>
+
+    <link rel="icon" type="image/png" href="/icons/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/icons/favicon-16x16.png" sizes="16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-152x152.png" />
+    <meta name="application-name" content="GNSS Calculator" />
+
+    <meta name="description" content={description} />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href={canonicalUrl} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(schema)} />
+    {faq && (
+      <script type="application/ld+json" set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": faq.map(({ question, answer }) => ({
+          "@type": "Question",
+          "name": question,
+          "acceptedAnswer": { "@type": "Answer", "text": answer },
+        })),
+      })} />
+    )}
+
+    <meta property="og:title" content={title} />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:type" content="website" />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={`${baseUrl}/img/icon.png`} />
+    <meta property="og:url" content={canonicalUrl} />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`${baseUrl}/img/icon.png`} />
+  </head>
+  <body>
+    <Header />
+    <main class="max-w-4xl mx-auto px-6 pb-12">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

@@ -8,9 +8,8 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# astro
+.astro/
 
 # production
 /build
@@ -29,8 +28,6 @@ yarn-error.log*
 .env.*
 !.env.example
 
-# vercel
-.vercel
 
 # TypeScript
 dist/

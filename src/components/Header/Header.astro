@@ -1,0 +1,13 @@
+---
+const pathname = Astro.url.pathname;
+---
+
+<header class="border-b border-border">
+  <div class="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
+    <a href="/" class="text-xl font-bold tracking-tight text-white">gnsscalc</a>
+    <nav class="flex gap-6 text-sm font-medium">
+      <a href="/" class={pathname === '/' ? 'text-white' : 'text-fg/60 hover:text-white'}>Time</a>
+      <a href="/positioning" class={pathname === '/positioning' ? 'text-white' : 'text-fg/60 hover:text-white'}>Positioning</a>
+    </nav>
+  </div>
+</header>
