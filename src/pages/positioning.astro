@@ -1,0 +1,124 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PositioningCalculatorPage from '../components/PositioningCalculatorPage';
+
+const positioningFaq = [
+  { question: 'What is ECEF?', answer: 'ECEF (Earth-Centered, Earth-Fixed) is a 3D cartesian coordinate system with its origin at the Earth\'s center of mass. The X axis points to the intersection of the prime meridian and equator, Z points to the North Pole, and Y completes the right-handed system. GPS satellites broadcast positions in ECEF.' },
+  { question: 'How do I convert ECEF to latitude and longitude?', answer: 'An iterative or closed-form algorithm converts X, Y, Z coordinates to geodetic latitude, longitude and ellipsoidal height on a reference ellipsoid (usually WGS84). Enter your ECEF values in the calculator above for an instant conversion.' },
+  { question: 'What is WGS84?', answer: 'WGS84 (World Geodetic System 1984) is the reference ellipsoid and coordinate system used by GPS. It defines the size and shape of the Earth model (semi-major axis 6 378 137 m, flattening 1/298.257223563) used for all coordinate conversions on this page.' },
+  { question: 'What is the difference between ellipsoidal height and sea level altitude?', answer: 'Ellipsoidal height is the distance above the WGS84 ellipsoid, which is a mathematical surface. Mean sea level (orthometric height) follows the geoid, an irregular equipotential surface. The two can differ by up to ±100 m depending on location.' },
+  { question: 'What are azimuth and elevation?', answer: 'Azimuth is the horizontal angle from North, measured clockwise (0–360°). Elevation is the vertical angle above the local horizon (0° = horizon, 90° = zenith). Together with slant range they form the AER coordinate system, commonly used for satellite tracking and antenna pointing.' },
+  { question: 'What is the ENU coordinate system?', answer: 'ENU (East-North-Up) is a local tangent-plane coordinate system centered at a reference point. East points along the local parallel, North along the local meridian, and Up is normal to the ellipsoid. It is used to express relative positions in an intuitive, human-readable frame.' },
+];
+---
+
+<BaseLayout
+  title="ECEF to Geodetic Converter | GNSS Positioning Calculator"
+  description="Convert ECEF (X, Y, Z) to latitude, longitude, height. Calculate azimuth, elevation, slant range (AER) and East-North-Up (ENU) coordinates. Free online WGS84 coordinate converter."
+  faq={positioningFaq}
+>
+  <h1>GNSS Positioning Calculator</h1>
+  <p>
+    Convert between ECEF cartesian coordinates and geodetic (latitude, longitude, height)
+    on the WGS84 ellipsoid. Compute azimuth, elevation and slant range (AER) or
+    East-North-Up (ENU) differences between two positions.
+  </p>
+
+  <PositioningCalculatorPage client:load />
+
+  <section>
+    <h2>ECEF to Geodetic Coordinate Conversion</h2>
+    <p>
+      <strong>X, Y, Z</strong> [m] are the components of a position in the
+      global Earth-Centered, Earth-Fixed (ECEF) cartesian coordinate system.
+      The converter transforms these to geodetic coordinates (latitude,
+      longitude, ellipsoidal height) on the WGS84 reference ellipsoid, and
+      vice versa.
+    </p>
+    <p>
+      <strong>Height</strong> [m] is the ellipsoidal height above the WGS84
+      ellipsoid, not to be confused with orthometric height (above mean sea
+      level).
+    </p>
+  </section>
+
+  <section>
+    <h2>Azimuth, Elevation &amp; Slant Range (AER)</h2>
+    <p>
+      <strong>&theta;</strong> [&deg;] is the elevation angle of the target
+      position as seen from the reference position, measured from the local
+      horizontal plane.
+    </p>
+    <p>
+      <strong>&phi;</strong> [&deg;] is the azimuth angle, measured clockwise
+      from North in the local horizontal plane.
+    </p>
+    <p>
+      <strong>&rho;</strong> [m] is the slant range &mdash; the straight-line
+      distance between the two positions.
+    </p>
+  </section>
+
+  <section>
+    <h2>East-North-Up (ENU) Coordinates</h2>
+    <p>
+      The ENU local coordinate system expresses the difference between two
+      ECEF positions in a frame aligned with the reference position's local
+      horizon:
+    </p>
+    <p>
+      <strong>&Delta;E</strong> [m] East component,
+      <strong>&Delta;N</strong> [m] North component, and
+      <strong>&Delta;U</strong> [m] Up component.
+    </p>
+  </section>
+
+  <section>
+    <h2>Positioning FAQ</h2>
+    <dl>
+      <dt>What is ECEF?</dt>
+      <dd>
+        ECEF (Earth-Centered, Earth-Fixed) is a 3D cartesian coordinate system
+        with its origin at the Earth's center of mass. The X axis points to the
+        intersection of the prime meridian and equator, Z points to the North
+        Pole, and Y completes the right-handed system. GPS satellites broadcast
+        positions in ECEF.
+      </dd>
+      <dt>How do I convert ECEF to latitude and longitude?</dt>
+      <dd>
+        An iterative or closed-form algorithm converts X, Y, Z coordinates to
+        geodetic latitude, longitude and ellipsoidal height on a reference
+        ellipsoid (usually WGS84). Enter your ECEF values in the calculator above
+        for an instant conversion.
+      </dd>
+      <dt>What is WGS84?</dt>
+      <dd>
+        WGS84 (World Geodetic System 1984) is the reference ellipsoid and
+        coordinate system used by GPS. It defines the size and shape of the
+        Earth model (semi-major axis 6 378 137 m, flattening 1/298.257223563)
+        used for all coordinate conversions on this page.
+      </dd>
+      <dt>What is the difference between ellipsoidal height and sea level altitude?</dt>
+      <dd>
+        Ellipsoidal height is the distance above the WGS84 ellipsoid, which is a
+        mathematical surface. Mean sea level (orthometric height) follows the
+        geoid, an irregular equipotential surface. The two can differ by up to
+        ±100 m depending on location.
+      </dd>
+      <dt>What are azimuth and elevation?</dt>
+      <dd>
+        Azimuth is the horizontal angle from North, measured clockwise (0–360°).
+        Elevation is the vertical angle above the local horizon (0° = horizon,
+        90° = zenith). Together with slant range they form the AER coordinate
+        system, commonly used for satellite tracking and antenna pointing.
+      </dd>
+      <dt>What is the ENU coordinate system?</dt>
+      <dd>
+        ENU (East-North-Up) is a local tangent-plane coordinate system centered at
+        a reference point. East points along the local parallel, North along the
+        local meridian, and Up is normal to the ellipsoid. It is used to express
+        relative positions in an intuitive, human-readable frame.
+      </dd>
+    </dl>
+  </section>
+</BaseLayout>

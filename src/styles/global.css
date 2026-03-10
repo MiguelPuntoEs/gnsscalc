@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-fg: #d0d0d3;
+  --color-bg: #2a2a35;
+  --color-bg-raised: #32323f;
+  --color-input: #3f3f4f;
+  --color-border: #4a4a5a;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  h1 {
+    @apply mt-8 mb-2 text-3xl font-bold tracking-tight;
+  }
+
+  h1 + p {
+    @apply text-fg/70 mb-8;
+  }
+
+  h2 {
+    @apply text-lg font-semibold mb-2 mt-6;
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+
+  p {
+    @apply mb-3 leading-relaxed;
+  }
+
+  a {
+    @apply no-underline text-inherit hover:text-white;
+  }
+
+  section {
+    @apply mb-6;
+  }
+
+  input,
+  textarea {
+    background-color: var(--color-input);
+    @apply border-0 rounded-sm text-right font-medium;
+  }
+
+  dl {
+    @apply space-y-3;
+  }
+
+  dt {
+    @apply font-semibold text-white/90;
+  }
+
+  dd {
+    @apply text-fg/75 leading-relaxed;
+  }
+}
+
+@utility btn {
+  @apply m-0 rounded-md px-3 py-1 border-none bg-fg text-bg font-semibold text-xs;
+  @apply transition-colors;
+  @apply hover:bg-white hover:text-bg;
+  @apply active:bg-[#bbb] active:scale-[0.98];
+}
+
+@utility calc-form {
+  @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-1;
+  @apply rounded-lg border border-border p-4 pb-3;
+
+  & input {
+    @apply w-40 text-sm px-[1ch] py-1;
+  }
+  & button {
+    @apply w-40 h-[25px] col-span-2 justify-self-end mt-1;
+  }
+  & label {
+    @apply w-24 inline-block font-bold text-sm self-center;
+  }
+  & > span {
+    @apply font-semibold text-sm col-span-2 text-white/90 mb-1;
+  }
+
+  @media (max-width: 600px) {
+    & button {
+      @apply h-8 text-[0.8rem];
+    }
+    & input {
+      @apply h-8 text-base;
+    }
+  }
+}
+
+@utility btn-secondary {
+  @apply m-0 rounded-md px-3 py-1 font-semibold text-xs;
+  @apply bg-transparent border border-border text-fg;
+  @apply transition-colors;
+  @apply hover:bg-fg/10 hover:border-fg/50;
+  @apply active:bg-fg/15 active:scale-[0.98];
+}
