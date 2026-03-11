@@ -70,6 +70,19 @@ const SYSTEM_NAMES: Record<string, string> = {
   J: 'QZSS', I: 'NavIC', S: 'SBAS',
 };
 
+/** Canonical constellation display order: GPS → GLONASS → Galileo → BeiDou → QZSS → NavIC → SBAS */
+export const SYSTEM_ORDER = ['G', 'R', 'E', 'C', 'J', 'I', 'S'] as const;
+
+const SYSTEM_RANK: Record<string, number> = Object.fromEntries(SYSTEM_ORDER.map((s, i) => [s, i]));
+
+/** Compare two system codes (or PRNs) in canonical constellation order. */
+export function systemCmp(a: string, b: string): number {
+  const ra = SYSTEM_RANK[a.charAt(0)] ?? 99;
+  const rb = SYSTEM_RANK[b.charAt(0)] ?? 99;
+  if (ra !== rb) return ra - rb;
+  return a.localeCompare(b);
+}
+
 export function systemName(code: string): string {
   return SYSTEM_NAMES[code] ?? code;
 }
@@ -741,7 +754,7 @@ function computeStats(
     totalUnique += prns.size;
     systems.push(sys);
   }
-  systems.sort();
+  systems.sort(systemCmp);
 
   const meanSatellites = n > 0 ? epochs.reduce((s, e) => s + e.totalSats, 0) / n : 0;
 

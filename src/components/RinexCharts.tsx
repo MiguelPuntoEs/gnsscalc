@@ -15,49 +15,11 @@ import {
 } from 'recharts';
 import { downsampleEpochs, systemName } from '../util/rinex';
 import type { EpochSummary } from '../util/rinex';
-
-const GRID_STROKE = 'rgba(255,255,255,0.06)';
-const AXIS_STYLE = { fontSize: 10, fill: 'rgba(208,208,211,0.5)' };
-const TOOLTIP_STYLE = {
-  contentStyle: {
-    backgroundColor: '#32323f',
-    border: '1px solid rgba(74,74,90,0.6)',
-    borderRadius: 8,
-    fontSize: 12,
-    color: '#d0d0d3',
-  },
-  labelStyle: { color: 'rgba(208,208,211,0.6)', fontSize: 11 },
-  itemStyle: { color: '#d0d0d3' },
-};
-
-const SYSTEM_COLORS: Record<string, string> = {
-  G: '#4ade80', // GPS — green
-  R: '#f87171', // GLONASS — red
-  E: '#60a5fa', // Galileo — blue
-  C: '#fbbf24', // BeiDou — amber
-  J: '#c084fc', // QZSS — purple
-  I: '#fb923c', // NavIC — orange
-  S: '#94a3b8', // SBAS — slate
-};
-
-function systemColor(sys: string): string {
-  return SYSTEM_COLORS[sys] ?? '#7c8aff';
-}
+import { SYSTEM_COLORS, GRID_STROKE, AXIS_STYLE, TOOLTIP_STYLE, systemColor, formatUTCTime } from '../util/gnss-constants';
+import ChartCard from './ChartCard';
 
 function formatTimeLabel(epoch: EpochSummary): string {
-  const d = new Date(epoch.time);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}`;
-}
-
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">
-      <span className="text-xs font-semibold uppercase tracking-wide text-fg/50 mb-3 block">{title}</span>
-      <div style={{ width: '100%', height: 180 }}>
-        {children}
-      </div>
-    </div>
-  );
+  return formatUTCTime(new Date(epoch.time));
 }
 
 /** Map C/N0 value (0–60 dB-Hz) to a color from dark red → yellow → green. */
@@ -109,8 +71,8 @@ function SatelliteHeatmap({
   }, [systems, prnsPerSystem]);
 
   const numRows = allPrns.length;
-  const numCols = Math.min(ds.length, HEATMAP_MAX_COLS);
-  const colStep = ds.length > HEATMAP_MAX_COLS ? Math.ceil(ds.length / HEATMAP_MAX_COLS) : 1;
+  const colStep = Math.max(1, Math.ceil(ds.length / HEATMAP_MAX_COLS));
+  const numCols = Math.ceil(ds.length / colStep);
 
   const grid = useMemo(() => {
     const g: (number | undefined)[][] = [];
@@ -203,7 +165,11 @@ function SatelliteHeatmap({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas) draw(canvas);
+    if (!canvas) return;
+    draw(canvas);
+    const ro = new ResizeObserver(() => draw(canvas));
+    ro.observe(canvas);
+    return () => ro.disconnect();
   }, [draw]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -238,7 +204,7 @@ function SatelliteHeatmap({
 
   if (numRows === 0) return null;
 
-  const chartH = Math.min(Math.max(numRows * 12 + 50, 120), 500);
+  const chartH = Math.min(Math.max(numRows * 14 + 50, 140), 800);
 
   return (
     <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">
@@ -248,6 +214,8 @@ function SatelliteHeatmap({
       <div className="relative" style={{ width: '100%', height: chartH }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label="Satellite availability and C/N0 heatmap"
           style={{ width: '100%', height: '100%' }}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
@@ -277,7 +245,7 @@ function Cn0Histogram({ epochs, systems }: { epochs: EpochSummary[]; systems: st
 
     for (const e of epochs) {
       for (const [prn, val] of Object.entries(e.snrPerSat)) {
-        const sys = prn[0];
+        const sys = prn.charAt(0);
         if (!counts[sys]) counts[sys] = new Array(CN0_BINS.length).fill(0);
         const bin = Math.min(Math.floor(val / 5), CN0_BINS.length - 1);
         counts[sys]![bin]!++;
@@ -316,7 +284,7 @@ function Cn0Histogram({ epochs, systems }: { epochs: EpochSummary[]; systems: st
             iconSize={10}
             wrapperStyle={{ fontSize: 11, color: 'rgba(208,208,211,0.6)' }}
           />
-          {systems.map(sys => (
+          {[...systems].reverse().map(sys => (
             <Bar
               key={sys}
               dataKey={sys}
@@ -344,7 +312,7 @@ export default function RinexCharts({
     const sets: Record<string, Set<string>> = {};
     for (const e of epochs) {
       for (const prn of Object.keys(e.snrPerSat)) {
-        const sys = prn[0];
+        const sys = prn.charAt(0);
         if (!sets[sys]) sets[sys] = new Set();
         sets[sys]!.add(prn);
       }
@@ -448,7 +416,7 @@ export default function RinexCharts({
                   </linearGradient>
                 ))}
               </defs>
-              {systems.map(sys => (
+              {[...systems].reverse().map(sys => (
                 <Area
                   key={sys}
                   type="stepAfter"
@@ -529,7 +497,7 @@ export default function RinexCharts({
                 iconSize={10}
                 wrapperStyle={{ fontSize: 11, color: 'rgba(208,208,211,0.6)' }}
               />
-              {systems.map(sys => (
+              {[...systems].reverse().map(sys => (
                 <Line
                   key={sys}
                   type="monotone"
