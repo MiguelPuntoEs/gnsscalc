@@ -15,6 +15,34 @@ export const SYSTEM_COLORS: Record<string, string> = {
   S: '#94a3b8', // SBAS — slate
 };
 
+/**
+ * Constellation colors keyed by full name and common abbreviations
+ * (sourcetable identifiers, RINEX shorthand, etc.).
+ * Superset of SYSTEM_COLORS — use this when you have a name/abbreviation
+ * rather than a single-letter system ID.
+ */
+export const CONSTELLATION_COLORS: Record<string, string> = {
+  // Single-letter IDs (same values as SYSTEM_COLORS)
+  G: '#4ade80', R: '#f87171', E: '#60a5fa', C: '#fbbf24',
+  J: '#c084fc', I: '#fb923c', S: '#94a3b8',
+  // Full names
+  GPS: '#4ade80', GLONASS: '#f87171', Galileo: '#60a5fa', BeiDou: '#fbbf24',
+  QZSS: '#a78bfa', NavIC: '#fb923c', SBAS: '#94a3b8',
+  // Sourcetable / shorthand abbreviations
+  GLO: '#f87171', GAL: '#60a5fa', BDS: '#fbbf24', QZS: '#a78bfa', IRN: '#fb923c',
+};
+
+/** Map single-letter system ID to display name and color. */
+export const SYSTEM_META: Record<string, { name: string; color: string }> = {
+  G: { name: 'GPS', color: '#4ade80' },
+  R: { name: 'GLONASS', color: '#f87171' },
+  E: { name: 'Galileo', color: '#60a5fa' },
+  C: { name: 'BeiDou', color: '#fbbf24' },
+  J: { name: 'QZSS', color: '#a78bfa' },
+  I: { name: 'NavIC', color: '#fb923c' },
+  S: { name: 'SBAS', color: '#94a3b8' },
+};
+
 /** Resolve a constellation color, with a sensible fallback for unknown systems. */
 export function systemColor(sys: string): string {
   return SYSTEM_COLORS[sys] ?? '#7c8aff';

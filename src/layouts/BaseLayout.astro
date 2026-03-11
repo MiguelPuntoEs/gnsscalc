@@ -22,7 +22,7 @@ const defaultDescription = 'GNSS Calculator is a tool to perform time conversion
 const description = pageDescription || defaultDescription;
 
 const pathname = Astro.url.pathname;
-const schemaNames: Record<string, string> = { '/': 'GPS Time Converter', '/positioning': 'GNSS Positioning Calculator', '/nmea': 'NMEA Log Viewer', '/rinex': 'RINEX Observation Viewer' };
+const schemaNames: Record<string, string> = { '/': 'GPS Time Converter', '/positioning': 'GNSS Positioning Calculator', '/nmea': 'NMEA Log Viewer', '/rinex': 'RINEX Observation Viewer', '/ntrip': 'NTRIP Client' };
 const schemaName = schemaNames[pathname] ?? 'GNSS Calculator';
 const schema = {
   "@context": "https://schema.org",

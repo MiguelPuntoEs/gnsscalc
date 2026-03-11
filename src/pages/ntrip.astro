@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import NtripPage from '../components/NtripPage';
+
+const ntripFaq = [
+  { question: 'What is NTRIP?', answer: 'NTRIP (Networked Transport of RTCM via Internet Protocol) is a protocol for streaming GNSS correction data over the Internet. A caster distributes data from GNSS reference stations to connected clients for RTK and DGNSS positioning.' },
+  { question: 'What is the difference between NTRIP 1.0 and 2.0?', answer: 'NTRIP 1.0 uses ICY-style responses (non-standard HTTP). NTRIP 2.0 uses standard HTTP/1.1 with chunked transfer encoding and the Ntrip-Version header. Most modern casters support both versions.' },
+  { question: 'What is a sourcetable?', answer: 'A sourcetable lists all available data streams (mountpoints) on a caster. Each entry includes the mountpoint name, data format, GNSS systems, location, bitrate, and authentication requirements.' },
+  { question: 'What is RTCM?', answer: 'RTCM is a binary format for GNSS correction data. RTCM 3.x uses MSM (Multiple Signal Messages) to carry observations for all constellations — GPS, GLONASS, Galileo, BeiDou and more.' },
+  { question: 'What are MSM messages?', answer: 'MSM (Multiple Signal Messages) are RTCM 3 message types (1071-1137) that carry full GNSS observations per constellation. MSM4 provides pseudorange and carrier phase; MSM5 adds Doppler and C/N0; MSM7 provides full-resolution observations.' },
+];
+---
+
+<BaseLayout
+  title="NTRIP Client | GNSS Caster Browser & Stream Monitor"
+  description="Connect to NTRIP casters to browse sourcetables, view mountpoint locations on a map, and monitor live RTCM3 data streams. Supports NTRIP 1.0 and 2.0 protocols."
+  faq={ntripFaq}
+>
+  <h1>NTRIP Client</h1>
+  <p>
+    Browse GNSS correction streams from any NTRIP caster, monitor live RTCM3 data
+    with real-time decoding, and record observations to RINEX.
+  </p>
+
+  <h2>How It Works</h2>
+  <ol class="list-decimal list-inside space-y-1 text-sm text-fg/50 mb-8">
+    <li>Enter a caster address and click <strong class="text-fg/70">Get Sourcetable</strong> to list available streams.</li>
+    <li>Click any mountpoint to connect — look for the
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="inline size-3.5 -mt-0.5 mx-0.5 text-accent"><path d="M2 20h.01"></path><path d="M7 20v-4"></path><path d="M12 20v-8"></path><path d="M17 20V8"></path><path d="M22 4v16"></path></svg>
+      icon next to each stream.</li>
+    <li>The live monitor shows message types, satellite C/N0, sky plot, and station metadata.</li>
+    <li>Hit <strong class="text-fg/70">Record RINEX</strong> to capture observations and download a .obs file.</li>
+  </ol>
+
+  <NtripPage client:load />
+
+  <section>
+    <h2>FAQ</h2>
+    <dl>
+      <dt>What is NTRIP?</dt>
+      <dd>
+        NTRIP (Networked Transport of RTCM via Internet Protocol) is a protocol
+        for streaming GNSS correction data over the Internet. A caster distributes
+        data from reference stations to connected clients for RTK and DGNSS positioning.
+      </dd>
+      <dt>What is the difference between NTRIP 1.0 and 2.0?</dt>
+      <dd>
+        NTRIP 1.0 uses non-standard ICY responses. NTRIP 2.0 uses standard
+        HTTP/1.1 with chunked transfer encoding. Most modern casters support both.
+      </dd>
+      <dt>What is a sourcetable?</dt>
+      <dd>
+        The sourcetable lists all available data streams on a caster — each entry
+        includes the mountpoint name, format, GNSS systems, coordinates, bitrate
+        and authentication requirements.
+      </dd>
+      <dt>What is RTCM?</dt>
+      <dd>
+        RTCM is a binary format for GNSS correction data. RTCM 3.x uses MSM
+        (Multiple Signal Messages) to carry observations for GPS, GLONASS,
+        Galileo, BeiDou and more.
+      </dd>
+      <dt>What are MSM messages?</dt>
+      <dd>
+        MSM messages (types 1071–1137) carry full GNSS observations per
+        constellation. MSM4 provides pseudorange and carrier phase; MSM5 adds
+        Doppler and C/N0; MSM7 provides full-resolution data.
+      </dd>
+    </dl>
+  </section>
+</BaseLayout>

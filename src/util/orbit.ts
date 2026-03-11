@@ -4,6 +4,7 @@
  */
 
 import type { KeplerEphemeris, GlonassEphemeris, Ephemeris } from './nav';
+import type { EphemerisInfo } from './ntrip';
 
 /* ================================================================== */
 /*  Constants                                                          */
@@ -80,7 +81,7 @@ export function keplerPosition(eph: KeplerEphemeris, t: number): SatPosition {
   for (let i = 0; i < 10; i++) {
     const dE = (Mk - (Ek - eph.e * Math.sin(Ek))) / (1 - eph.e * Math.cos(Ek));
     Ek += dE;
-    if (Math.abs(dE) < 1e-14) break;
+    if (Math.abs(dE) < 1e-12) break;
   }
 
   // True anomaly
@@ -111,7 +112,7 @@ export function keplerPosition(eph: KeplerEphemeris, t: number): SatPosition {
 
   // BeiDou GEO satellites use a different ECEF transformation (BDS-SIS-ICD).
   // GEO sats have near-zero inclination (< 0.2 rad) vs ~0.96 rad for MEO/IGSO.
-  const isBdsGeo = eph.system === 'C' && Math.abs(eph.i0) < 0.2;
+  const isBdsGeo = eph.system === 'C' && Math.abs(eph.i0) < 0.1 && a > 4.0e7;
 
   if (isBdsGeo) {
     // GEO node: no Earth rotation subtracted from omegaDot
@@ -266,6 +267,21 @@ export function ecefToGeodetic(x: number, y: number, z: number): { lat: number; 
   const alt = p / Math.cos(lat) - N;
 
   return { lat, lon, alt };
+}
+
+/** Convert geodetic (lat, lon in radians, alt in meters) to ECEF. */
+export function geodeticToEcef(lat: number, lon: number, alt: number): [number, number, number] {
+  const a = 6378137.0;
+  const f = 1 / 298.257223563;
+  const e2 = 2 * f - f * f;
+  const sinLat = Math.sin(lat);
+  const cosLat = Math.cos(lat);
+  const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
+  return [
+    (N + alt) * cosLat * Math.cos(lon),
+    (N + alt) * cosLat * Math.sin(lon),
+    (N * (1 - e2) + alt) * sinLat,
+  ];
 }
 
 /** Compute azimuth and elevation from receiver ECEF to satellite ECEF. */
@@ -543,4 +559,141 @@ function selectBest(ephs: Ephemeris[], timeMs: number): Ephemeris | null {
     if (dt < bestDt) { bestDt = dt; best = eph; }
   }
   return best;
+}
+
+/* ================================================================== */
+/*  Live RTCM3 ephemeris → orbit computation                           */
+/* ================================================================== */
+
+const GPS_EPOCH_MS = Date.UTC(1980, 0, 6);
+const BDS_EPOCH_MS = Date.UTC(2006, 0, 1);
+const GAL_EPOCH_MS = GPS_EPOCH_MS; // Galileo uses GST which shares GPS epoch
+
+/** Convert an RTCM3 EphemerisInfo to the Ephemeris type used by orbit computation. */
+function ephInfoToEphemeris(info: EphemerisInfo): Ephemeris | null {
+  const sys = info.prn.charAt(0);
+
+  if (sys === 'R') {
+    // GLONASS — needs state vector
+    if (info.x === undefined || info.y === undefined || info.z === undefined) return null;
+    if (info.vx === undefined || info.vy === undefined || info.vz === undefined) return null;
+    // Approximate tocDate from tb (15-minute intervals from 00:00 Moscow time = UTC+3)
+    const now = new Date(info.lastReceived);
+    const utcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const tbSec = (info.tb ?? 0) * 900; // tb in 15-min intervals
+    const moscowOffset = 3 * 3600; // Moscow = UTC+3
+    const tocMs = utcMidnight + (tbSec - moscowOffset) * 1000;
+    return {
+      system: 'R',
+      prn: info.prn,
+      tocDate: new Date(tocMs),
+      tauN: -(info.af0 ?? 0),  // RTCM stores -tauN
+      gammaN: info.gammaN ?? 0,
+      messageFrameTime: 0,
+      x: info.x, xDot: info.vx, xAcc: info.ax ?? 0,
+      y: info.y, yDot: info.vy, yAcc: info.ay ?? 0,
+      z: info.z, zDot: info.vz, zAcc: info.az ?? 0,
+      health: info.health,
+      freqNum: info.freqChannel ?? 0,
+    } satisfies GlonassEphemeris;
+  }
+
+  // Keplerian systems (GPS/Galileo/BeiDou/QZSS)
+  if (info.sqrtA === undefined || info.eccentricity === undefined ||
+      info.inclination === undefined || info.omega0 === undefined ||
+      info.argPerigee === undefined || info.meanAnomaly === undefined ||
+      info.toe === undefined || info.week === undefined) return null;
+
+  // Compute tocDate from week + toc
+  let epochMs: number;
+  let tocSec = info.toc ?? info.toe;
+  if (sys === 'C') {
+    epochMs = BDS_EPOCH_MS;
+  } else if (sys === 'E') {
+    epochMs = GAL_EPOCH_MS;
+  } else {
+    epochMs = GPS_EPOCH_MS;
+  }
+  const tocDate = new Date(epochMs + info.week * 7 * 86400_000 + tocSec * 1000);
+
+  return {
+    system: sys as 'G' | 'E' | 'C' | 'J' | 'I',
+    prn: info.prn,
+    toc: tocSec,
+    tocDate,
+    af0: info.af0 ?? 0,
+    af1: info.af1 ?? 0,
+    af2: info.af2 ?? 0,
+    iode: info.iode ?? 0,
+    crs: info.crs ?? 0,
+    deltaN: info.deltaN ?? 0,
+    m0: info.meanAnomaly,
+    cuc: info.cuc ?? 0,
+    e: info.eccentricity,
+    cus: info.cus ?? 0,
+    sqrtA: info.sqrtA,
+    toe: info.toe,
+    cic: info.cic ?? 0,
+    omega0: info.omega0,
+    cis: info.cis ?? 0,
+    i0: info.inclination,
+    crc: info.crc ?? 0,
+    omega: info.argPerigee,
+    omegaDot: info.omegaDot ?? 0,
+    idot: info.idot ?? 0,
+    week: info.week,
+    svHealth: info.health,
+    tgd: 0,
+  } satisfies KeplerEphemeris;
+}
+
+/**
+ * Compute current satellite az/el from live RTCM3 ephemeris data.
+ * Returns array of SatAzEl for all satellites with valid ephemeris.
+ */
+export function computeLiveSkyPositions(
+  ephemerides: Map<string, EphemerisInfo>,
+  rxPos: [number, number, number],
+  cn0Map?: Map<string, number>,
+): SatAzEl[] {
+  const now = Date.now();
+  const result: SatAzEl[] = [];
+  const [rxX, rxY, rxZ] = rxPos;
+
+  // Precompute receiver geodetic for ENU transform
+  const { lat: rxLat, lon: rxLon } = ecefToGeodetic(rxX, rxY, rxZ);
+  const sinRxLat = Math.sin(rxLat), cosRxLat = Math.cos(rxLat);
+  const sinRxLon = Math.sin(rxLon), cosRxLon = Math.cos(rxLon);
+
+  for (const info of ephemerides.values()) {
+    const eph = ephInfoToEphemeris(info);
+    if (!eph) continue;
+
+    try {
+      const pos = computeSatPosition(eph, now);
+      const geo = ecefToGeodetic(pos.x, pos.y, pos.z);
+
+      // Inline az/el (avoid extra ecefToGeodetic call for rx)
+      const dx = pos.x - rxX, dy = pos.y - rxY, dz = pos.z - rxZ;
+      const east = -sinRxLon * dx + cosRxLon * dy;
+      const north = -sinRxLat * cosRxLon * dx - sinRxLat * sinRxLon * dy + cosRxLat * dz;
+      const up = cosRxLat * cosRxLon * dx + cosRxLat * sinRxLon * dy + sinRxLat * dz;
+      const az = (Math.atan2(east, north) + TWO_PI) % TWO_PI;
+      const el = Math.atan2(up, Math.sqrt(east * east + north * north));
+
+      if (el > -0.05) { // slight margin below horizon
+        result.push({
+          prn: info.prn,
+          az, el,
+          lat: geo.lat,
+          lon: geo.lon,
+          cn0: cn0Map?.get(info.prn),
+        });
+      }
+    } catch {
+      // Skip satellites with invalid ephemeris
+    }
+  }
+
+  return result;
 }

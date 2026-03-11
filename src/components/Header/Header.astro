@@ -1,15 +1,72 @@
 ---
 const pathname = Astro.url.pathname;
+
+const links = [
+  { href: '/', label: 'Time' },
+  { href: '/positioning', label: 'Positioning' },
+  { href: '/nmea', label: 'NMEA' },
+  { href: '/rinex', label: 'RINEX' },
+  { href: '/ntrip', label: 'NTRIP' },
+];
 ---
 
 <header class="border-b border-border">
   <div class="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
     <a href="/" class="text-xl font-bold tracking-tight text-white">gnsscalc</a>
-    <nav class="flex gap-6 text-sm font-medium">
-      <a href="/" class={pathname === '/' ? 'text-white' : 'text-fg/60 hover:text-white'}>Time</a>
-      <a href="/positioning" class={pathname === '/positioning' ? 'text-white' : 'text-fg/60 hover:text-white'}>Positioning</a>
-      <a href="/nmea" class={pathname === '/nmea' ? 'text-white' : 'text-fg/60 hover:text-white'}>NMEA</a>
-      <a href="/rinex" class={pathname === '/rinex' ? 'text-white' : 'text-fg/60 hover:text-white'}>RINEX</a>
+
+    {/* Desktop nav */}
+    <nav class="hidden sm:flex gap-6 text-sm font-medium">
+      {links.map(({ href, label }) => (
+        <a href={href} class={pathname === href ? 'text-white' : 'text-fg/60 hover:text-white'}>{label}</a>
+      ))}
     </nav>
+
+    {/* Mobile hamburger */}
+    <button
+      id="menu-toggle"
+      class="sm:hidden flex flex-col justify-center gap-[5px] w-8 h-8 -mr-1"
+      aria-label="Toggle menu"
+      aria-expanded="false"
+    >
+      <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar1" />
+      <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar2" />
+      <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar3" />
+    </button>
   </div>
+
+  {/* Mobile dropdown */}
+  <nav
+    id="mobile-nav"
+    class="sm:hidden hidden border-t border-border/40"
+  >
+    <div class="max-w-4xl mx-auto px-6 py-3 flex flex-col gap-1">
+      {links.map(({ href, label }) => (
+        <a
+          href={href}
+          class={`py-2 px-2 -mx-2 rounded-md text-sm font-medium transition-colors ${
+            pathname === href
+              ? 'text-white bg-white/5'
+              : 'text-fg/60 hover:text-white hover:bg-white/5'
+          }`}
+        >{label}</a>
+      ))}
+    </div>
+  </nav>
 </header>
+
+<script>
+  const btn = document.getElementById('menu-toggle')!;
+  const nav = document.getElementById('mobile-nav')!;
+  const bar1 = document.getElementById('bar1')!;
+  const bar2 = document.getElementById('bar2')!;
+  const bar3 = document.getElementById('bar3')!;
+
+  btn.addEventListener('click', () => {
+    const open = nav.classList.toggle('hidden');
+    const isOpen = !open;
+    btn.setAttribute('aria-expanded', String(isOpen));
+    bar1.style.transform = isOpen ? 'translateY(6.5px) rotate(45deg)' : '';
+    bar2.style.opacity = isOpen ? '0' : '1';
+    bar3.style.transform = isOpen ? 'translateY(-6.5px) rotate(-45deg)' : '';
+  });
+</script>

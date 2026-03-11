@@ -692,30 +692,6 @@ export default function SkyPlotCharts({
     return () => { if (animRef.current != null) cancelAnimationFrame(animRef.current); };
   }, [playing, numEpochs]);
 
-  // Precompute full sky tracks (independent of epochIdx) — O(epochs × prns) once
-  // Each point stores its epoch index so slicing can filter by time correctly.
-  const fullSkyTracks = useMemo(() => {
-    if (!hasRxPos) return {} as TrackSegments;
-    const segs: TrackSegments = {};
-    const wasAboveMask: Record<string, boolean> = {};
-    for (let i = 0; i < numEpochs; i++) {
-      const aboveNow = new Set<string>();
-      for (const prn of prns) {
-        if (!enabledSystems.has(prn.charAt(0))) continue;
-        const pt = positions[prn]![i];
-        if (!pt || pt.el < elevMaskRad) continue;
-        aboveNow.add(prn);
-        if (!segs[prn]) segs[prn] = [];
-        if (!wasAboveMask[prn]) segs[prn]!.push([]);
-        segs[prn]!.at(-1)!.push({ az: pt.az, el: pt.el, lat: pt.lat, lon: pt.lon, epoch: i });
-      }
-      for (const prn of Object.keys(segs)) {
-        wasAboveMask[prn] = aboveNow.has(prn);
-      }
-    }
-    return segs;
-  }, [prns, positions, enabledSystems, hasRxPos, numEpochs, elevMaskRad]);
-
   // Precompute full ground tracks (independent of epochIdx)
   const fullGroundTracks = useMemo(() => {
     const segs: TrackSegments = {};
@@ -734,28 +710,25 @@ export default function SkyPlotCharts({
     return segs;
   }, [prns, positions, enabledSystems]);
 
-  // Slice precomputed tracks up to epochIdx — filter by epoch tag
+  // Build sky tracks directly up to epochIdx — simple O(epochIdx × prns) per frame
   const { skyTracks, skyCurrentPositions, skyCurrentObserved } = useMemo(() => {
     if (!hasRxPos) return { skyTracks: {} as TrackSegments, skyCurrentPositions: {} as Record<string, SatAzEl>, skyCurrentObserved: new Set<string>() };
-    const sliced: TrackSegments = {};
-    for (const [prn, segments] of Object.entries(fullSkyTracks)) {
-      const prnSegs: TrackPoint[][] = [];
-      for (const seg of segments) {
-        // All points in a segment are contiguous, so once we hit epoch > epochIdx we stop
-        if (seg[0]!.epoch > epochIdx) break;
-        if (seg.at(-1)!.epoch <= epochIdx) {
-          prnSegs.push(seg); // entire segment is within range
-        } else {
-          // Partial segment — find cutoff via binary-ish scan (points are epoch-sorted)
-          let end = seg.length;
-          for (let j = 0; j < seg.length; j++) {
-            if (seg[j]!.epoch > epochIdx) { end = j; break; }
-          }
-          if (end > 0) prnSegs.push(seg.slice(0, end));
-          break; // no later segments can be in range
-        }
+    const segs: TrackSegments = {};
+    const wasAbove: Record<string, boolean> = {};
+    for (let i = 0; i <= epochIdx && i < numEpochs; i++) {
+      const aboveNow = new Set<string>();
+      for (const prn of prns) {
+        if (!enabledSystems.has(prn.charAt(0))) continue;
+        const pt = positions[prn]![i];
+        if (!pt || pt.el < elevMaskRad) continue;
+        aboveNow.add(prn);
+        if (!segs[prn]) segs[prn] = [];
+        if (!wasAbove[prn]) segs[prn]!.push([]);
+        segs[prn]!.at(-1)!.push({ az: pt.az, el: pt.el, lat: pt.lat, lon: pt.lon, epoch: i });
       }
-      if (prnSegs.length > 0) sliced[prn] = prnSegs;
+      for (const prn of Object.keys(segs)) {
+        wasAbove[prn] = aboveNow.has(prn);
+      }
     }
 
     const cur: Record<string, SatAzEl> = {};
@@ -770,8 +743,8 @@ export default function SkyPlotCharts({
         if (epochObs?.has(prn)) obs.add(prn);
       }
     }
-    return { skyTracks: sliced, skyCurrentPositions: cur, skyCurrentObserved: obs };
-  }, [fullSkyTracks, epochIdx, prns, positions, enabledSystems, hasRxPos, observedPrns, numEpochs, elevMaskRad]);
+    return { skyTracks: segs, skyCurrentPositions: cur, skyCurrentObserved: obs };
+  }, [epochIdx, prns, positions, enabledSystems, hasRxPos, observedPrns, numEpochs, elevMaskRad]);
 
   // Slice ground tracks up to epochIdx — filter by epoch tag
   const { groundTracks, groundCurrentPositions } = useMemo(() => {
