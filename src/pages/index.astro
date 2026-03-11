@@ -6,7 +6,7 @@ import CurrentGpsTime from '../components/CurrentGpsTime';
 
 const timeFaq = [
   { question: 'What is GPS time?', answer: 'GPS time is a continuous time scale maintained by GPS satellites, starting from January 6, 1980, 00:00:00 UTC. Unlike UTC, GPS time does not include leap seconds, so it currently runs 18 seconds ahead of UTC.' },
-  { question: 'What is the difference between GPS time and UTC?', answer: 'UTC includes leap seconds to stay aligned with Earth\'s rotation, while GPS time is continuous and never adjusted. As of 2025 the offset is 18 seconds (GPS time = UTC + 18 s). This offset changes only when a new leap second is introduced by the IERS.' },
+  { question: 'What is the difference between GPS time and UTC?', answer: 'UTC includes leap seconds to stay aligned with Earth\'s rotation, while GPS time is continuous and never adjusted. The current offset is 18 seconds (GPS time = UTC + 18 s). This offset changes only when a new leap second is introduced by the IERS.' },
   { question: 'What is the GPS epoch?', answer: 'The GPS epoch is the reference start point of GPS time: January 6, 1980, 00:00:00 UTC. All GPS timestamps are counted as seconds elapsed since this epoch.' },
   { question: 'How do I convert GPS time to UTC?', answer: 'Subtract the current number of leap seconds from the GPS timestamp. Enter a GPS time value in the converter above and the tool will automatically compute the UTC equivalent, accounting for all historical leap seconds.' },
   { question: 'What is GPS week number?', answer: 'The GPS week number counts complete weeks since the GPS epoch (January 6, 1980). It is transmitted by GPS satellites along with the time of week (TOW) in seconds. The week number rolled over from 1023 to 0 on August 21, 1999, and will roll over again on November 20, 2137.' },
@@ -50,7 +50,9 @@ const timeFaq = [
     </p>
     <p>
       <strong>UNIX Time</strong> is the number of seconds since January 1,
-      1970, 00:00:00. Unlike GPS time, UNIX time includes leap seconds.
+      1970, 00:00:00 UTC. UNIX time is tied to UTC but counts every day as
+      exactly 86 400 seconds, so leap seconds are not explicitly represented
+      in the timestamp.
     </p>
   </section>
 
@@ -115,6 +117,7 @@ const timeFaq = [
       <li><a href="/positioning" class="text-accent hover:text-white">Positioning Calculator</a> — convert ECEF, geodetic, UTM and compute distances</li>
       <li><a href="/rinex" class="text-accent hover:text-white">RINEX Viewer</a> — analyze observation files with signal strength and satellite visibility</li>
       <li><a href="/ntrip" class="text-accent hover:text-white">NTRIP Client</a> — connect to GNSS correction streams and record RINEX observations</li>
+      <li><a href="/spectrum" class="text-accent hover:text-white">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>
     </ul>
   </section>
 
@@ -130,7 +133,7 @@ const timeFaq = [
       <dt>What is the difference between GPS time and UTC?</dt>
       <dd>
         UTC includes leap seconds to stay aligned with Earth's rotation, while GPS
-        time is continuous and never adjusted. As of 2025 the offset is 18 seconds
+        time is continuous and never adjusted. The current offset is 18 seconds
         (GPS time = UTC + 18 s). This offset changes only when a new leap second
         is introduced by the IERS.
       </dd>

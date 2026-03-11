@@ -22,6 +22,11 @@ const ntripFaq = [
     Browse GNSS correction streams from any NTRIP caster, monitor live RTCM3 data
     with real-time decoding, and record observations to RINEX.
   </p>
+  <p class="text-sm text-fg/50">
+    Connections are proxied through a minimal relay that forwards data without
+    storing it. Your credentials are sent directly to the caster — nothing is
+    logged or retained.
+  </p>
 
   <h2>How It Works</h2>
   <ol class="list-decimal list-inside space-y-1 text-sm text-fg/50 mb-8">
@@ -41,6 +46,7 @@ const ntripFaq = [
       <li><a href="/rinex" class="text-accent hover:text-white">RINEX Viewer</a> — analyze recorded RINEX observation files offline</li>
       <li><a href="/positioning" class="text-accent hover:text-white">Positioning Calculator</a> — convert station coordinates between ECEF, geodetic and UTM</li>
       <li><a href="/" class="text-accent hover:text-white">GPS Time Converter</a> — convert GPS time, week number and other GNSS time scales</li>
+      <li><a href="/spectrum" class="text-accent hover:text-white">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>
     </ul>
   </section>
 

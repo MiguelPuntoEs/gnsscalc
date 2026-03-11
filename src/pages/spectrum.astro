@@ -1,0 +1,135 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SpectrumPage from '../components/SpectrumPage';
+
+const spectrumFaq = [
+  { question: 'What is the GNSS L-band?', answer: 'The GNSS L-band is the portion of the radio spectrum between approximately 1150 MHz and 1610 MHz used by all major satellite navigation systems. It is divided into sub-bands (L1, L2, L5, E5, E6, B1, B3, etc.) allocated to different constellations and signal types.' },
+  { question: 'What is Power Spectral Density (PSD)?', answer: 'Power Spectral Density describes how the power of a signal is distributed across frequency. For GNSS signals, the PSD shape is determined by the modulation type (BPSK, BOC, AltBOC) and the chipping rate. The PSD chart shows each signal\'s spectral footprint in dB, letting you visualise bandwidth and spectral overlap.' },
+  { question: 'What is BPSK modulation?', answer: 'BPSK (Binary Phase Shift Keying) is the simplest GNSS spreading modulation. Its PSD is a sinc² function centered on the carrier frequency. Examples include GPS L1 C/A (BPSK(1)), GPS L5 (BPSK(10)), and GLONASS L1 C/A (BPSK(0.511)).' },
+  { question: 'What is BOC modulation?', answer: 'BOC (Binary Offset Carrier) modulation shifts spectral energy away from the center frequency, creating a split-spectrum shape. BOC(m,n) is defined by the sub-carrier rate m×1.023 MHz and the code rate n×1.023 MHz. Sine-phased BOC (BOCs) is used by GPS L1C and Galileo E1; cosine-phased BOC (BOCc) is used by Galileo E1 PRS.' },
+  { question: 'What is AltBOC modulation?', answer: 'AltBOC (Alternate BOC) is a wideband modulation used by Galileo E5 and BeiDou B2. AltBOC(15,10) places four signal components across a 51 MHz bandwidth centered between the E5a and E5b carriers, enabling very precise ranging when processed as a single wideband signal.' },
+  { question: 'Why do some signals share the same center frequency?', answer: 'Several constellations transmit on shared frequencies by international agreement. For example, GPS L1, Galileo E1, BeiDou B1C and QZSS L1 all share 1575.42 MHz; GPS L5, Galileo E5a, BeiDou B2a and NavIC L5 share 1176.45 MHz. Different modulations (BPSK, BOC, CBOC) ensure the signals remain distinguishable.' },
+  { question: 'What constellations are shown?', answer: 'The chart covers all major GNSS constellations: GPS, GLONASS (FDMA and CDMA), Galileo, BeiDou-2, BeiDou-3, QZSS, and NavIC. Each constellation is plotted in its own row with individual signal components labeled and color-coded.' },
+];
+---
+
+<BaseLayout
+  title="GNSS Signal Spectrum | L-Band PSD Viewer"
+  description="Interactive Power Spectral Density (PSD) chart of all GNSS signals across the L-band. Visualise GPS, GLONASS, Galileo, BeiDou, QZSS and NavIC signal spectra with BPSK, BOC and AltBOC modulations. Free online GNSS spectrum viewer."
+  faq={spectrumFaq}
+  breadcrumbLabel="Signal Spectrum"
+>
+  <h1>GNSS Signal Spectrum</h1>
+  <p>
+    Interactive Power Spectral Density (PSD) chart of all GNSS navigation signals
+    across the L-band (1150–1610 MHz). Toggle constellations, zoom into specific bands,
+    and hover over signals to see modulation details. Covers GPS, GLONASS (FDMA &amp; CDMA),
+    Galileo, BeiDou-2/3, QZSS and NavIC.
+  </p>
+  <p class="text-sm text-fg/50">
+    All PSD curves are computed analytically in your browser from the modulation definitions —
+    no pre-rendered images. Modulation formulas follow the standard BPSK, BOC(s/c) and AltBOC models.
+  </p>
+
+  <SpectrumPage client:load />
+
+  <section>
+    <h2>L-Band Signal Allocation</h2>
+    <p>
+      GNSS signals occupy the L-band between approximately 1150 MHz and 1610 MHz.
+      The <strong>upper L-band</strong> (1559–1610 MHz) carries L1/E1/B1 signals,
+      while the <strong>lower L-band</strong> (1164–1300 MHz) carries L2, L5, E5,
+      E6, B2 and B3 signals. Modern signals use split-spectrum BOC modulations
+      to improve ranging accuracy and reduce interference with legacy BPSK signals
+      on the same carrier.
+    </p>
+  </section>
+
+  <section>
+    <h2>Signal Modulation Types</h2>
+    <p>
+      <strong>BPSK(n)</strong> — Binary Phase Shift Keying with chipping rate
+      n × 1.023 MHz. Produces a sinc² spectral shape with main lobe width
+      proportional to the chipping rate. Used by GPS C/A, GPS L5, GLONASS L1/L2 and
+      BeiDou B1I/B2I.
+    </p>
+    <p>
+      <strong>BOCs(m,n)</strong> — Sine-phased Binary Offset Carrier. The sub-carrier
+      at m × 1.023 MHz splits the spectrum into two lobes offset from the carrier,
+      improving code tracking accuracy and spectral separation. Used by GPS L1C,
+      Galileo E1 OS and BeiDou B1C.
+    </p>
+    <p>
+      <strong>BOCc(m,n)</strong> — Cosine-phased Binary Offset Carrier. Similar to
+      BOCs but with a cosine sub-carrier, producing a wider spectral split. Used by
+      Galileo E1 PRS and E6 PRS.
+    </p>
+    <p>
+      <strong>AltBOC(m,n)</strong> — Alternating BOC with constant-envelope
+      multiplexing. Combines four signal components (data/pilot on two sub-carriers)
+      into a single wideband signal. Used by Galileo E5 and BeiDou B2a/B2b,
+      spanning ~51 MHz.
+    </p>
+  </section>
+
+  <section>
+    <h2>Related Tools</h2>
+    <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
+      <li><a href="/rinex" class="text-accent hover:text-white">RINEX Observation Viewer</a> — analyze observation files with signal strength and satellite visibility</li>
+      <li><a href="/nmea" class="text-accent hover:text-white">NMEA Log Viewer</a> — parse NMEA logs and plot GNSS tracks on a map</li>
+      <li><a href="/" class="text-accent hover:text-white">GPS Time Converter</a> — convert GPS week, TOW, Julian Date and other time scales</li>
+      <li><a href="/positioning" class="text-accent hover:text-white">Positioning Calculator</a> — convert coordinates and compute distances</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>GNSS Spectrum FAQ</h2>
+    <dl>
+      <dt>What is the GNSS L-band?</dt>
+      <dd>
+        The GNSS L-band is the portion of the radio spectrum between approximately
+        1150 MHz and 1610 MHz used by all major satellite navigation systems. It is
+        divided into sub-bands allocated to different constellations and signal types.
+      </dd>
+      <dt>What is Power Spectral Density (PSD)?</dt>
+      <dd>
+        Power Spectral Density describes how the power of a signal is distributed
+        across frequency. For GNSS signals, the PSD shape is determined by the
+        modulation type and chipping rate. This chart shows each signal's spectral
+        footprint in dB.
+      </dd>
+      <dt>What is BPSK modulation?</dt>
+      <dd>
+        BPSK (Binary Phase Shift Keying) is the simplest GNSS spreading modulation.
+        Its PSD is a sinc² function centered on the carrier frequency. Examples
+        include GPS L1 C/A, GPS L5, and GLONASS C/A.
+      </dd>
+      <dt>What is BOC modulation?</dt>
+      <dd>
+        BOC (Binary Offset Carrier) shifts spectral energy away from the center
+        frequency, creating a split-spectrum shape. BOCs (sine-phased) is used by
+        GPS L1C and Galileo E1 OS; BOCc (cosine-phased) is used by Galileo PRS
+        signals.
+      </dd>
+      <dt>What is AltBOC modulation?</dt>
+      <dd>
+        AltBOC (Alternate BOC) is a wideband modulation used by Galileo E5 and
+        BeiDou B2. AltBOC(15,10) places four signal components across ~51 MHz,
+        enabling very precise ranging.
+      </dd>
+      <dt>Why do some signals share the same center frequency?</dt>
+      <dd>
+        Several constellations transmit on shared frequencies by international
+        agreement. For example, GPS L1, Galileo E1, BeiDou B1C and QZSS L1 all
+        share 1575.42 MHz. Different modulations ensure the signals remain
+        separable.
+      </dd>
+      <dt>What constellations are shown?</dt>
+      <dd>
+        GPS, GLONASS (FDMA and CDMA), Galileo, BeiDou-2, BeiDou-3, QZSS, and
+        NavIC. Each constellation is plotted in its own row with signals labeled
+        and color-coded by component.
+      </dd>
+    </dl>
+  </section>
+</BaseLayout>
