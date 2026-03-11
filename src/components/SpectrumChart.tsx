@@ -5,6 +5,7 @@ import {
   CONSTELLATIONS,
   BAND_PRESETS,
 } from '../util/gnss-signals';
+import { BDS_SATELLITES } from '../util/gnss-constants';
 import { phiBPSK, phiBOCs, phiBOCc, phiAltBOC, computePsdDb } from '../util/psd';
 
 const F0 = 1.023e6;
@@ -81,16 +82,33 @@ interface TooltipInfo {
   color: string;
 }
 
+interface HitRegion {
+  path: Path2D;
+  sig: SignalDef;
+  row: ConstellationRow;
+}
+
+const BDS_GROUPS = (() => {
+  const groups: Record<string, string[]> = {};
+  for (const sat of BDS_SATELLITES) {
+    const key = `${sat.phase} ${sat.orbit}`;
+    (groups[key] ??= []).push(sat.prn);
+  }
+  return groups;
+})();
+
 export default function SpectrumChart() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const hitRegionsRef = useRef<HitRegion[]>([]);
   const [bandIdx, setBandIdx] = useState(1);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(CONSTELLATIONS.map((c) => [c.key, true])),
   );
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(900);
+  const [showBdsTable, setShowBdsTable] = useState(true);
 
   const band = BAND_PRESETS[bandIdx];
   const visibleRows = useMemo(
@@ -127,6 +145,7 @@ export default function SpectrumChart() {
 
       // Clear
       ctx.clearRect(0, 0, w, h);
+      const hitRegions: HitRegion[] = [];
 
       const plotLeft = LABEL_WIDTH;
       const plotRight = w - 20;
@@ -175,21 +194,18 @@ export default function SpectrumChart() {
           const baseline = rowCenter;
           const isDown = sig.direction === 'down';
 
-          // Convert dB to a normalised amplitude [0..halfRow]
           const toAmp = (db: number) => {
             const norm = (db - dbMin) / (dbMax - dbMin);
             return Math.max(0, Math.min(1, norm)) * halfRow;
           };
 
-          // For 'up': x unchanged, y = baseline - amp
-          // For 'down' (sheared): x' = x - amp*sinT, y' = baseline + amp*cosT
           const toXY = (xBase: number, amp: number): [number, number] => {
             if (!isDown) return [xBase, baseline - amp];
             return [xBase - amp * sinT, baseline + amp * cosT];
           };
 
-          // Build filled path
-          ctx.beginPath();
+          // Build Path2D for the filled shape (used for hit testing + rendering)
+          const path = new Path2D();
           let started = false;
           for (let i = 0; i < freqsMHz.length; i++) {
             const xBase = toX(freqsMHz[i]);
@@ -199,26 +215,29 @@ export default function SpectrumChart() {
             const amp = toAmp(dbVal);
             const [px, py] = toXY(xBase, amp);
             if (!started) {
-              ctx.moveTo(xBase, baseline);
-              ctx.lineTo(px, py);
+              path.moveTo(xBase, baseline);
+              path.lineTo(px, py);
               started = true;
             } else {
-              ctx.lineTo(px, py);
+              path.lineTo(px, py);
             }
           }
           if (started) {
-            // Close back to baseline at the last visible point
             for (let i = freqsMHz.length - 1; i >= 0; i--) {
               const xBase = toX(freqsMHz[i]);
               if (xBase < plotLeft - 10 || xBase > plotRight + 10) continue;
               const dbVal = psdDb[i] + PSD_OFFSET;
               if (dbVal < dbMin) continue;
-              ctx.lineTo(xBase, baseline);
+              path.lineTo(xBase, baseline);
               break;
             }
-            ctx.closePath();
+            path.closePath();
             ctx.fillStyle = sig.color + '55';
-            ctx.fill();
+            ctx.fill(path);
+
+            // Store for hit testing
+            hitRegions.push({ path, sig, row });
+
             // Stroke outline
             ctx.strokeStyle = sig.color + 'aa';
             ctx.lineWidth = 1;
@@ -287,6 +306,8 @@ export default function SpectrumChart() {
       ctx.font = '10px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Frequency [MHz]', (plotLeft + plotRight) / 2, bottomY + 20);
+
+      hitRegionsRef.current = hitRegions;
     },
     [canvasWidth, canvasHeight, band, visibleRows, precomputed],
   );
@@ -296,11 +317,13 @@ export default function SpectrumChart() {
     if (canvas) draw(canvas);
   }, [draw]);
 
-  // Mouse hover for tooltip
+  // Mouse hover for tooltip — uses Path2D hit testing for pixel-perfect detection
   const handleMouse = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
@@ -317,50 +340,36 @@ export default function SpectrumChart() {
 
       const fMHz = minMHz + ((mx - plotLeft) / plotWidth) * (maxMHz - minMHz);
 
-      // Find which row
-      const rowIdx = Math.floor((my - TOP_PAD) / ROW_HEIGHT);
-      if (rowIdx < 0 || rowIdx >= visibleRows.length) {
-        setTooltip(null);
-        return;
-      }
-
-      const row = visibleRows[rowIdx];
-      const signals = precomputed.get(row.key);
-      if (!signals) { setTooltip(null); return; }
-
-      // Find closest signal with PSD above floor at this frequency
-      let best: { sig: SignalDef; db: number } | null = null;
-      for (const { sig, freqsMHz, psdDb } of signals) {
-        // Find nearest frequency index
-        let lo = 0, hi = freqsMHz.length - 1;
-        while (lo < hi) {
-          const mid = (lo + hi) >> 1;
-          if (freqsMHz[mid] < fMHz) lo = mid + 1;
-          else hi = mid;
-        }
-        const db = psdDb[lo] + PSD_OFFSET;
-        if (db > 10 && (!best || db > best.db)) {
-          best = { sig, db };
+      // Reset transform so isPointInPath tests in CSS-pixel space (matching Path2D coords)
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      let hit: HitRegion | null = null;
+      for (let i = hitRegionsRef.current.length - 1; i >= 0; i--) {
+        const region = hitRegionsRef.current[i]!;
+        if (region && ctx.isPointInPath(region.path, mx, my)) {
+          hit = region;
+          break;
         }
       }
+      ctx.restore();
 
-      if (best) {
+      if (hit) {
         setTooltip({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-          label: best.sig.label,
-          constellation: row.label,
+          x: mx,
+          y: my,
+          label: hit.sig.label,
+          constellation: hit.row.label,
           freq: `${fMHz.toFixed(2)} MHz`,
-          modulation: best.sig.modulation === 'composite'
+          modulation: hit.sig.modulation === 'composite'
             ? 'CBOC'
-            : `${best.sig.modulation}(${best.sig.params.join(',')})`,
-          color: best.sig.color,
+            : `${hit.sig.modulation}(${hit.sig.params.join(',')})`,
+          color: hit.sig.color,
         });
       } else {
         setTooltip(null);
       }
     },
-    [canvasWidth, band, visibleRows, precomputed],
+    [canvasWidth, band],
   );
 
   const toggleConstellation = (key: string) =>
@@ -445,6 +454,39 @@ export default function SpectrumChart() {
           </div>
         )}
       </div>
+
+      {/* BDS-2 / BDS-3 satellite reference */}
+      <details
+        open={showBdsTable}
+        onToggle={(e) => setShowBdsTable((e.target as HTMLDetailsElement).open)}
+        className="rounded-xl bg-bg-raised/60 border border-border/40 overflow-hidden"
+      >
+        <summary className="px-4 py-2.5 text-xs text-fg/60 cursor-pointer hover:text-fg/80 select-none">
+          BeiDou satellite phase &amp; orbit reference
+        </summary>
+        <div className="px-4 pb-4 pt-1">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="text-fg/40 border-b border-border/30">
+                <th className="text-left py-1.5 pr-4 font-medium">Group</th>
+                <th className="text-left py-1.5 pr-4 font-medium">Signals</th>
+                <th className="text-left py-1.5 font-medium">PRNs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(BDS_GROUPS).map(([group, prns]) => (
+                <tr key={group} className="border-b border-border/20">
+                  <td className="py-1.5 pr-4 text-fg/70 whitespace-nowrap font-medium">{group}</td>
+                  <td className="py-1.5 pr-4 text-fg/50 whitespace-nowrap">
+                    {group.startsWith('BDS-2') ? 'B1I, B2I, B3I' : 'B1C, B1I, B2a, B2b, B3I'}
+                  </td>
+                  <td className="py-1.5 text-fg/60">{prns.join(', ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

@@ -89,7 +89,7 @@ function SatelliteHeatmap({
   }, [ds, allPrns, numRows, numCols, colStep]);
 
   const LABEL_W = 36;
-  const LEGEND_H = 18;
+  const LEGEND_H = 50;
 
   const draw = useCallback((canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
@@ -204,7 +204,7 @@ function SatelliteHeatmap({
 
   if (numRows === 0) return null;
 
-  const chartH = Math.min(Math.max(numRows * 14 + 50, 140), 800);
+  const chartH = Math.min(Math.max(numRows * 14 + 80, 160), 900);
 
   return (
     <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">

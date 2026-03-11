@@ -15,7 +15,8 @@ import 'leaflet/dist/leaflet.css';
 import type { EpochSkyData, SatAzEl, AllPositionsData } from '../util/orbit';
 import { computeDop } from '../util/orbit';
 import { systemName, systemCmp } from '../util/rinex';
-import { SYSTEM_COLORS, GRID_STROKE, AXIS_STYLE, TOOLTIP_STYLE, DEFAULT_ELEV_MASK_DEG } from '../util/gnss-constants';
+import type { EpochSummary } from '../util/rinex';
+import { SYSTEM_COLORS, GRID_STROKE, AXIS_STYLE, TOOLTIP_STYLE, DEFAULT_ELEV_MASK_DEG, systemColor } from '../util/gnss-constants';
 import ChartCard from './ChartCard';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -501,7 +502,7 @@ function ElevationHeatmap({ skyData }: { skyData: EpochSkyData[] }) {
     if (numRows === 0 || numCols === 0) return;
 
     const plotW = rect.width - LABEL_W;
-    const plotH = rect.height - 30;
+    const plotH = rect.height - 60;
     const cellW = plotW / numCols;
     const cellH = Math.min(plotH / numRows, 14);
 
@@ -575,7 +576,7 @@ function ElevationHeatmap({ skyData }: { skyData: EpochSkyData[] }) {
     const y = e.clientY - rect.top;
     const plotW = rect.width - LABEL_W;
     const cellW = plotW / numCols;
-    const plotH = rect.height - 30;
+    const plotH = rect.height - 60;
     const cellH = Math.min(plotH / numRows, 14);
     const col = Math.floor((x - LABEL_W) / cellW);
     const row = Math.floor(y / cellH);
@@ -600,7 +601,7 @@ function ElevationHeatmap({ skyData }: { skyData: EpochSkyData[] }) {
 
   if (numRows === 0) return null;
 
-  const chartH = Math.min(Math.max(numRows * 14 + 50, 140), 800);
+  const chartH = Math.min(Math.max(numRows * 14 + 80, 160), 900);
 
   return (
     <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">
@@ -627,6 +628,182 @@ function ElevationHeatmap({ skyData }: { skyData: EpochSkyData[] }) {
 }
 
 /* ================================================================== */
+/*  Elevation vs C/N0 per frequency band                               */
+/* ================================================================== */
+
+/** Human-readable band labels per constellation + RINEX band digit. */
+const BAND_LABELS: Record<string, Record<string, string>> = {
+  G: { '1': 'L1', '2': 'L2', '5': 'L5' },
+  R: { '1': 'G1', '2': 'G2', '3': 'G3', '4': 'G1a', '6': 'G2a' },
+  E: { '1': 'E1', '5': 'E5a', '6': 'E6', '7': 'E5b', '8': 'E5' },
+  C: { '1': 'B1', '2': 'B1-2', '5': 'B2a', '6': 'B3', '7': 'B2b', '8': 'B2' },
+  J: { '1': 'L1', '2': 'L2', '5': 'L5', '6': 'L6' },
+  I: { '5': 'L5', '9': 'S' },
+  S: { '1': 'L1', '5': 'L5' },
+};
+
+/** Common band name across constellations for grouping. */
+const COMMON_BAND: Record<string, string> = {
+  '1': 'L1/E1/B1', '2': 'L2/G2/B1-2', '5': 'L5/E5a/B2a',
+  '6': 'E6/B3/L6', '7': 'E5b/B2b', '8': 'E5/B2',
+};
+
+function ElevationCn0({ epochSkyData, epochs }: { epochSkyData: EpochSkyData[]; epochs: EpochSummary[] }) {
+  const data = useMemo(() => {
+    // Build a time → epoch map for fast lookup
+    const epochByTime = new Map<number, EpochSummary>();
+    for (const e of epochs) epochByTime.set(e.time, e);
+
+    // Discover all bands that appear in the data (scan once, not per-sat)
+    const bandSet = new Set<string>();
+    for (const e of epochs) {
+      if (!e.snrPerSatBand) continue;
+      for (const key of Object.keys(e.snrPerSatBand)) {
+        const colon = key.indexOf(':');
+        if (colon !== -1) bandSet.add(key.substring(colon + 1));
+      }
+    }
+    const bands = [...bandSet].sort();
+    if (bands.length === 0) return null;
+
+    // Collect binned (elevation, cn0) pairs keyed by "sys:band"
+    const pairs = new Map<string, { elSum: number; cn0Sum: number; n: number }[]>();
+
+    for (const sky of epochSkyData) {
+      const snrBand = epochByTime.get(sky.time)?.snrPerSatBand;
+      if (!snrBand) continue;
+      for (const sat of sky.satellites) {
+        const sys = sat.prn[0]!;
+        const elDeg = sat.el * 180 / Math.PI;
+        const bin = Math.min(Math.floor(elDeg), 89);
+        // Direct key lookup per band — O(bands) instead of O(all entries)
+        for (const band of bands) {
+          const cn0 = snrBand[`${sat.prn}:${band}`];
+          if (cn0 === undefined) continue;
+          const seriesKey = `${sys}:${band}`;
+          let arr = pairs.get(seriesKey);
+          if (!arr) {
+            arr = Array.from({ length: 90 }, () => ({ elSum: 0, cn0Sum: 0, n: 0 }));
+            pairs.set(seriesKey, arr);
+          }
+          const b = arr[bin]!;
+          b.elSum += elDeg;
+          b.cn0Sum += cn0;
+          b.n++;
+        }
+      }
+    }
+
+    if (pairs.size === 0) return null;
+
+    // Group by band — each band becomes one chart with a shared data array
+    const charts: {
+      band: string;
+      label: string;
+      keys: { dataKey: string; name: string; color: string }[];
+      rows: Record<string, number>[];
+    }[] = [];
+
+    for (const band of bands) {
+      const keys: typeof charts[0]['keys'] = [];
+      // Collect series for this band
+      const seriesForBand: { sys: string; dataKey: string; name: string; bins: typeof pairs extends Map<string, infer V> ? V : never }[] = [];
+      for (const [seriesKey, bins] of pairs) {
+        const [sys, b] = seriesKey.split(':');
+        if (b !== band || !sys) continue;
+        const sysLabel = BAND_LABELS[sys]?.[band] ?? `Band ${band}`;
+        const dataKey = sys;
+        const name = `${systemName(sys)} ${sysLabel}`;
+        seriesForBand.push({ sys, dataKey, name, bins });
+      }
+      if (seriesForBand.length === 0) continue;
+      seriesForBand.sort((a, b) => systemCmp(a.sys, b.sys));
+
+      // Build shared rows — one per elevation bin that has data for any series
+      const rows: Record<string, number>[] = [];
+      for (let i = 0; i < 90; i++) {
+        const row: Record<string, number> = {};
+        let hasAny = false;
+        for (const s of seriesForBand) {
+          const bin = s.bins[i]!;
+          if (bin.n >= 2) {
+            row[s.dataKey] = Math.round((bin.cn0Sum / bin.n) * 10) / 10;
+            row.el = Math.round(bin.elSum / bin.n);
+            hasAny = true;
+          }
+        }
+        if (hasAny) rows.push(row);
+      }
+      if (rows.length === 0) continue;
+
+      for (const s of seriesForBand) {
+        keys.push({ dataKey: s.dataKey, name: s.name, color: systemColor(s.sys) });
+      }
+      charts.push({ band, label: COMMON_BAND[band] ?? `Band ${band}`, keys, rows });
+    }
+
+    return charts.length > 0 ? charts : null;
+  }, [epochSkyData, epochs]);
+
+  if (!data || data.length === 0) return null;
+
+  return (
+    <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">
+      <span className="text-xs font-semibold uppercase tracking-wide text-fg/50 mb-3 block">
+        Elevation vs C/N0
+      </span>
+      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(data.length, 3)}, 1fr)` }}>
+        {data.map(chart => (
+          <div key={chart.band}>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-fg/35 mb-1 block">
+              {chart.label}
+            </span>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={chart.rows} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+                <XAxis
+                  dataKey="el"
+                  type="number"
+                  domain={[0, 90]}
+                  ticks={[0, 15, 30, 45, 60, 75, 90]}
+                  tick={AXIS_STYLE}
+                  tickLine={false}
+                  axisLine={false}
+                  label={{ value: 'Elev (°)', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: 'rgba(208,208,211,0.35)' } }}
+                />
+                <YAxis
+                  domain={[0, 60]}
+                  ticks={[0, 10, 20, 30, 40, 50, 60]}
+                  tick={AXIS_STYLE}
+                  tickLine={false}
+                  axisLine={false}
+                  width={30}
+                  label={{ value: 'dB-Hz', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: 9, fill: 'rgba(208,208,211,0.35)' } }}
+                />
+                <Tooltip {...TOOLTIP_STYLE} formatter={(v) => `${Number(v).toFixed(1)} dB-Hz`} labelFormatter={(l) => `${Number(l)}°`} />
+                <Legend iconSize={8} wrapperStyle={{ fontSize: 10, color: 'rgba(208,208,211,0.6)' }} />
+                {chart.keys.map(k => (
+                  <Line
+                    key={k.dataKey}
+                    dataKey={k.dataKey}
+                    name={k.name}
+                    stroke={k.color}
+                    strokeWidth={1.5}
+                    dot={false}
+                    connectNulls
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  Main export — owns timeline, filters, and shared state             */
 /* ================================================================== */
 
@@ -634,11 +811,14 @@ export default function SkyPlotCharts({
   allPositions,
   observedPrns,
   rxPos,
+  epochs,
 }: {
   allPositions: AllPositionsData;
   /** Per-epoch observed PRN sets (aligned with allPositions.times). Null when nav-only. */
   observedPrns?: Set<string>[] | null;
   rxPos?: [number, number, number];
+  /** Parsed RINEX epoch summaries (for per-band C/N0). */
+  epochs?: EpochSummary[];
 }) {
   const { prns, times, positions } = allPositions;
   const numEpochs = times.length;
@@ -968,6 +1148,7 @@ export default function SkyPlotCharts({
       </div>
 
       {epochSkyData && <ElevationHeatmap skyData={epochSkyData} />}
+      {epochSkyData && epochs && <ElevationCn0 epochSkyData={epochSkyData} epochs={epochs} />}
       {epochSkyData && <DopTimeline skyData={epochSkyData} />}
     </div>
   );

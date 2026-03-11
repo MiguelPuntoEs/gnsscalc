@@ -20,14 +20,22 @@ export interface RinexHeader {
   type: string;
   satSystem: string;
   markerName: string;
+  markerType: string;
   observer: string;
   agency: string;
-  approxPosition: [number, number, number] | null;
+  receiverNumber: string;
+  receiverType: string;
+  receiverVersion: string;
+  antNumber: string;
   antType: string;
+  approxPosition: [number, number, number] | null;
+  antDelta: [number, number, number] | null;
   interval: number | null;
   timeOfFirstObs: Date | null;
   timeOfLastObs: Date | null;
   obsTypes: Record<string, string[]>; // system letter → obs codes
+  /** GLONASS frequency channel numbers. Key = slot (1-24), value = channel k (−7…+6). */
+  glonassSlots: Record<number, number>;
   isCrx: boolean;
   crxVersion: number;
 }
@@ -39,6 +47,8 @@ export interface EpochSummary {
   meanSnr: number | null;
   snrPerSystem: Record<string, number>;
   snrPerSat: Record<string, number>; // PRN (e.g. "G01") → mean SNR
+  /** Per-satellite per-band SNR.  Key = "PRN:band" e.g. "G01:1" → dB-Hz */
+  snrPerSatBand?: Record<string, number>;
 }
 
 export interface RinexStats {
@@ -93,10 +103,13 @@ export function systemName(code: string): string {
 
 function parseHeader(lines: string[]): RinexHeader {
   const h: RinexHeader = {
-    version: 0, type: '', satSystem: '', markerName: '',
-    observer: '', agency: '', approxPosition: null, antType: '',
+    version: 0, type: '', satSystem: '', markerName: '', markerType: '',
+    observer: '', agency: '',
+    receiverNumber: '', receiverType: '', receiverVersion: '',
+    antNumber: '', antType: '',
+    approxPosition: null, antDelta: null,
     interval: null, timeOfFirstObs: null, timeOfLastObs: null,
-    obsTypes: {}, isCrx: false, crxVersion: 0,
+    obsTypes: {}, glonassSlots: {}, isCrx: false, crxVersion: 0,
   };
 
   let currentObsSys = '';
@@ -120,13 +133,29 @@ function parseHeader(lines: string[]): RinexHeader {
       case 'MARKER NAME':
         h.markerName = data.trim();
         break;
+      case 'MARKER TYPE':
+        h.markerType = data.trim();
+        break;
       case 'OBSERVER / AGENCY':
         h.observer = data.substring(0, 20).trim();
         h.agency = data.substring(20).trim();
         break;
+      case 'REC # / TYPE / VERS':
+        h.receiverNumber = data.substring(0, 20).trim();
+        h.receiverType = data.substring(20, 40).trim();
+        h.receiverVersion = data.substring(40, 60).trim();
+        break;
       case 'ANT # / TYPE':
+        h.antNumber = data.substring(0, 20).trim();
         h.antType = data.substring(20).trim();
         break;
+      case 'ANTENNA: DELTA H/E/N': {
+        const d = data.trim().split(/\s+/).map(Number);
+        if (d.length >= 3 && !d.slice(0, 3).some(isNaN)) {
+          h.antDelta = [d[0]!, d[1]!, d[2]!];
+        }
+        break;
+      }
       case 'APPROX POSITION XYZ': {
         const p = data.trim().split(/\s+/).map(Number);
         if (p.length >= 3 && p[0] !== undefined && p[1] !== undefined && p[2] !== undefined
@@ -155,6 +184,22 @@ function parseHeader(lines: string[]): RinexHeader {
         } else if (currentObsSys && h.obsTypes[currentObsSys]) {
           const codes = data.substring(7, 60).trim().split(/\s+/).filter(Boolean);
           h.obsTypes[currentObsSys]!.push(...codes);
+        }
+        break;
+      }
+      case 'GLONASS SLOT / FRQ #': {
+        // Format: nSats (3 chars), then up to 8 pairs of "Rnn k" (slot + channel)
+        const nSats = parseInt(data.substring(0, 3));
+        void nSats;
+        for (let i = 0; i < 8; i++) {
+          const off = 4 + i * 7;
+          const sat = data.substring(off, off + 3).trim();
+          const ch = data.substring(off + 3, off + 7).trim();
+          if (sat && sat[0] === 'R' && ch) {
+            const slot = parseInt(sat.substring(1));
+            const k = parseInt(ch);
+            if (!isNaN(slot) && !isNaN(k)) h.glonassSlots[slot] = k;
+          }
         }
         break;
       }
@@ -187,24 +232,26 @@ function parseHeaderTime(data: string): Date | null {
 /*  SNR index helpers                                                  */
 /* ================================================================== */
 
-function snrIndices(obsTypes: Record<string, string[]>, system: string): number[] {
+function snrIndicesWithBand(obsTypes: Record<string, string[]>, system: string): { idx: number; band: string }[] {
   const codes = obsTypes[system];
   if (!codes) return [];
-  const idx: number[] = [];
+  const result: { idx: number; band: string }[] = [];
   for (let i = 0; i < codes.length; i++) {
-    if (codes[i]!.startsWith('S')) idx.push(i);
+    const c = codes[i]!;
+    if (c.startsWith('S')) result.push({ idx: i, band: c[1]! });
   }
-  return idx;
+  return result;
 }
 
-function snrIndicesV2(obsTypes: Record<string, string[]>): number[] {
+function snrIndicesWithBandV2(obsTypes: Record<string, string[]>): { idx: number; band: string }[] {
   const codes = obsTypes['_v2'];
   if (!codes) return [];
-  const idx: number[] = [];
+  const result: { idx: number; band: string }[] = [];
   for (let i = 0; i < codes.length; i++) {
-    if (codes[i]!.startsWith('S')) idx.push(i);
+    const c = codes[i]!;
+    if (c.startsWith('S')) result.push({ idx: i, band: c[1]! });
   }
-  return idx;
+  return result;
 }
 
 /* ================================================================== */
@@ -280,10 +327,19 @@ function parseEpochLine2(line: string): EpochLineInfo | null {
 /*  Streaming parser                                                   */
 /* ================================================================== */
 
+/** Callback invoked for each satellite observation line with all raw values. */
+export type SatObsCallback = (
+  time: number,
+  prn: string,
+  codes: string[],
+  values: (number | null)[],
+) => void;
+
 export async function parseRinexStream(
   file: File,
   onProgress?: (percent: number) => void,
   signal?: AbortSignal,
+  onSatObs?: SatObsCallback,
 ): Promise<RinexResult> {
   const decoder = new TextDecoder('ascii');
   let buffer = '';
@@ -298,6 +354,7 @@ export async function parseRinexStream(
   let snrValues: number[] = [];
   let snrPerSystemAccum: Record<string, number[]> = {};
   let snrPerSatAccum: Record<string, number[]> = {};
+  let snrPerSatBandAccum: Record<string, number[]> = {}; // "PRN:band" → values
 
   // --- RINEX (non-CRX) state ---
   let satLinesRemaining = 0;
@@ -307,7 +364,7 @@ export async function parseRinexStream(
   let v2SatIndex = 0;
   let v2LinesPerSat = 0;
   let v2CurrentSatLine = 0;
-  let v2SnrIndices: number[] = [];
+  let v2SnrBandInfo: { idx: number; band: string }[] = [];
   let v2ContinuationSatsRemaining = 0;
 
   // --- CRX state ---
@@ -327,12 +384,17 @@ export async function parseRinexStream(
     satsPerSystem[sys] = (satsPerSystem[sys] ?? 0) + 1;
   }
 
-  function pushSnr(sys: string, prn: string, val: number) {
+  function pushSnr(sys: string, prn: string, val: number, band?: string) {
     snrValues.push(val);
     if (!snrPerSystemAccum[sys]) snrPerSystemAccum[sys] = [];
     snrPerSystemAccum[sys]!.push(val);
     if (!snrPerSatAccum[prn]) snrPerSatAccum[prn] = [];
     snrPerSatAccum[prn]!.push(val);
+    if (band) {
+      const key = `${prn}:${band}`;
+      if (!snrPerSatBandAccum[key]) snrPerSatBandAccum[key] = [];
+      snrPerSatBandAccum[key]!.push(val);
+    }
   }
 
   function finishEpoch() {
@@ -347,17 +409,22 @@ export async function parseRinexStream(
     for (const [prn, vals] of Object.entries(snrPerSatAccum)) {
       if (vals.length > 0) snrPerSat[prn] = vals.reduce((a, b) => a + b, 0) / vals.length;
     }
+    const snrPerSatBand: Record<string, number> = {};
+    for (const [key, vals] of Object.entries(snrPerSatBandAccum)) {
+      if (vals.length > 0) snrPerSatBand[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
     epochs.push({
       time: epochInfo.time,
       totalSats: Object.values(satsPerSystem).reduce((a, b) => a + b, 0),
       satsPerSystem: { ...satsPerSystem },
-      meanSnr, snrPerSystem: snrBySys, snrPerSat,
+      meanSnr, snrPerSystem: snrBySys, snrPerSat, snrPerSatBand,
     });
     epochInfo = null;
     satsPerSystem = {};
     snrValues = [];
     snrPerSystemAccum = {};
     snrPerSatAccum = {};
+    snrPerSatBandAccum = {};
   }
 
   function resetEpochAccum(info: EpochLineInfo) {
@@ -366,6 +433,7 @@ export async function parseRinexStream(
     snrValues = [];
     snrPerSystemAccum = {};
     snrPerSatAccum = {};
+    snrPerSatBandAccum = {};
   }
 
   /* -------- RINEX 3 (non-CRX) -------- */
@@ -376,13 +444,22 @@ export async function parseRinexStream(
     const prn = line.substring(0, 3);
     trackSat(sys, prn);
     const obsLine = line.substring(3);
-    for (const idx of snrIndices(header.obsTypes, sys)) {
+    for (const { idx, band } of snrIndicesWithBand(header.obsTypes, sys)) {
       const val = readObsValue(obsLine, idx);
-      if (val !== null && val > 0) pushSnr(sys, prn, val);
+      if (val !== null && val > 0) pushSnr(sys, prn, val, band);
+    }
+    if (onSatObs && epochInfo) {
+      const codes = header.obsTypes[sys] ?? [];
+      const values: (number | null)[] = new Array(codes.length);
+      for (let i = 0; i < codes.length; i++) values[i] = readObsValue(obsLine, i);
+      onSatObs(epochInfo.time, prn, codes, values);
     }
   }
 
   /* -------- RINEX 2 (non-CRX) -------- */
+
+  // v2: accumulate all obs values across continuation lines for onSatObs callback
+  let v2ObsAccum: (number | null)[] = [];
 
   function processSatLineV2(line: string) {
     if (!header || v2SatIndex >= v2SatIds.length) return;
@@ -392,17 +469,31 @@ export async function parseRinexStream(
     const prn = sys + satId.substring(1).padStart(2, '0');
 
     // Only count satellite on first line
-    if (v2CurrentSatLine === 0) trackSat(sys, prn);
+    if (v2CurrentSatLine === 0) {
+      trackSat(sys, prn);
+      if (onSatObs) v2ObsAccum = [];
+    }
 
     const lineOffset = v2CurrentSatLine * 5;
-    for (const idx of v2SnrIndices) {
+    for (const { idx, band } of v2SnrBandInfo) {
       if (idx >= lineOffset && idx < lineOffset + 5) {
         const val = readObsValue(line, idx - lineOffset);
-        if (val !== null && val > 0) pushSnr(sys, prn, val);
+        if (val !== null && val > 0) pushSnr(sys, prn, val, band);
+      }
+    }
+    if (onSatObs) {
+      for (let i = 0; i < 5; i++) {
+        if (lineOffset + i < (header.obsTypes['_v2'] ?? []).length) {
+          v2ObsAccum.push(readObsValue(line, i));
+        }
       }
     }
     v2CurrentSatLine++;
     if (v2CurrentSatLine >= v2LinesPerSat) {
+      if (onSatObs && epochInfo) {
+        const codes = header.obsTypes['_v2'] ?? [];
+        onSatObs(epochInfo.time, prn, codes, v2ObsAccum);
+      }
       v2CurrentSatLine = 0;
       v2SatIndex++;
     }
@@ -430,26 +521,36 @@ export async function parseRinexStream(
     }
     while (states.length < ntype) states.push(null);
 
-    // Determine which obs indices are SNR
-    const sIdx = header.version >= 3
-      ? snrIndices(header.obsTypes, sys)
-      : snrIndicesV2(header.obsTypes);
+    // Determine which obs indices are SNR (with band info)
+    const sBand = header.version >= 3
+      ? snrIndicesWithBand(header.obsTypes, sys)
+      : snrIndicesWithBandV2(header.obsTypes);
+    const sBandMap = new Map(sBand.map(s => [s.idx, s.band]));
 
-    // Decompress each observation
+    // Decompress each observation, collecting values for callback
+    const obsValues: (number | null)[] = onSatObs ? new Array(ntype).fill(null) : [];
+
     for (let j = 0; j < ntype; j++) {
       const field = fields[j]!;
-      if (field.empty) {
-        // Preserve previous arc state (C code keeps dy0 intact for empty fields)
-        continue;
-      }
+      if (field.empty) continue;
 
       const { state, result } = crxDecompress(states[j] ?? null, field);
       states[j] = state;
 
-      if (sIdx.includes(j)) {
+      if (onSatObs) obsValues[j] = result / 1000;
+
+      const band = sBandMap.get(j);
+      if (band !== undefined) {
         const snrFloat = result / 1000;
-        if (snrFloat > 0) pushSnr(sys, prn, snrFloat);
+        if (snrFloat > 0) pushSnr(sys, prn, snrFloat, band);
       }
+    }
+
+    if (onSatObs && epochInfo) {
+      const codes = header.version >= 3
+        ? (header.obsTypes[sys] ?? [])
+        : (header.obsTypes['_v2'] ?? []);
+      onSatObs(epochInfo.time, prn, codes, obsValues);
     }
   }
 
@@ -624,7 +725,7 @@ export async function parseRinexStream(
           v2SatIds = info.satIds ?? [];
           const v2ObsPerSat = (header.obsTypes['_v2'] ?? []).length;
           v2LinesPerSat = Math.ceil(v2ObsPerSat / 5) || 1;
-          v2SnrIndices = snrIndicesV2(header.obsTypes);
+          v2SnrBandInfo = snrIndicesWithBandV2(header.obsTypes);
           v2SatIndex = 0;
           v2CurrentSatLine = 0;
           const continuationLines = Math.max(0, Math.ceil((info.numSats - 12) / 12));
@@ -809,6 +910,14 @@ export function downsampleEpochs(epochs: EpochSummary[]): EpochSummary[] {
       if (vals.length > 0) snrPerSat[prn] = vals.reduce((a, b) => a + b, 0) / vals.length;
     }
 
+    const allBandKeys = new Set<string>();
+    for (const e of group) if (e.snrPerSatBand) for (const k of Object.keys(e.snrPerSatBand)) allBandKeys.add(k);
+    const snrPerSatBand: Record<string, number> = {};
+    for (const k of allBandKeys) {
+      const vals = group.map(e => e.snrPerSatBand?.[k]).filter((v): v is number => v != null);
+      if (vals.length > 0) snrPerSatBand[k] = vals.reduce((a, b) => a + b, 0) / vals.length;
+    }
+
     result.push({
       time: group[Math.floor(gn / 2)]!.time,
       totalSats: Math.round(group.reduce((s, e) => s + e.totalSats, 0) / gn),
@@ -816,6 +925,7 @@ export function downsampleEpochs(epochs: EpochSummary[]): EpochSummary[] {
       meanSnr: snrVals.length > 0 ? snrVals.reduce((a, b) => a + b, 0) / snrVals.length : null,
       snrPerSystem,
       snrPerSat,
+      snrPerSatBand: allBandKeys.size > 0 ? snrPerSatBand : undefined,
     });
   }
   return result;

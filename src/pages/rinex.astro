@@ -5,31 +5,72 @@ import RinexReaderPage from '../components/RinexReaderPage';
 const rinexFaq = [
   { question: 'What is RINEX?', answer: 'RINEX (Receiver Independent Exchange Format) is a standard text format for GNSS observation data. It allows data from any receiver to be post-processed with any compatible software, regardless of the receiver manufacturer.' },
   { question: 'What is a RINEX observation file?', answer: 'A RINEX observation file contains raw measurements from a GNSS receiver: pseudoranges, carrier phases, Doppler shifts and signal-to-noise ratios for each tracked satellite at each epoch. The file extension is typically .obs, .rnx, or .YYo (e.g. .24o for 2024).' },
-  { question: 'What RINEX versions are supported?', answer: 'This tool supports RINEX 2.x and 3.x observation files. RINEX 3 uses a cleaner per-system observation layout and is the recommended format for multi-constellation data.' },
+  { question: 'What RINEX versions are supported?', answer: 'This tool supports RINEX 2.x, 3.x and 4.x observation and navigation files, including Hatanaka-compressed (CRX) and gzip-compressed files. RINEX 3+ uses a cleaner per-system observation layout and is the recommended format for multi-constellation data.' },
+  { question: 'What is multipath analysis?', answer: 'The tool computes code-minus-carrier (CMC) multipath combinations for each dual-frequency signal pair. The MP observable isolates pseudorange multipath and noise from geometry. Arc-mean debiasing removes carrier-phase ambiguities, and per-arc RMS values quantify multipath severity per satellite and signal.' },
+  { question: 'How are cycle slips detected?', answer: 'Three complementary methods are used in priority order: Melbourne-Wübbena (MW) wide-lane combination with adaptive sigma thresholds, geometry-free (GF) phase combination for ionospheric jumps, and single-frequency phase-code divergence as a last resort. Detected slips automatically break multipath arcs.' },
+  { question: 'What is data completeness?', answer: 'Completeness measures the percentage of epochs where each observation code was present for satellites that actually transmit that signal. Satellites that do not support a signal (e.g. GPS Block IIR without L5) are excluded from expected counts to avoid inflating gap statistics.' },
   { question: 'What is C/N0?', answer: 'C/N0 (carrier-to-noise density ratio) is a measure of signal quality expressed in dB-Hz. Higher values indicate a stronger, cleaner signal. Typical values range from 20 dB-Hz (weak) to 50+ dB-Hz (strong, open sky).' },
   { question: 'Can this tool handle large files?', answer: 'Yes. The parser reads the file in small chunks using streaming, so even multi-gigabyte RINEX files can be processed without exceeding browser memory. Nothing is uploaded — all processing happens locally in your browser.' },
-  { question: 'What constellations are supported?', answer: 'All standard GNSS constellations: GPS (G), GLONASS (R), Galileo (E), BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S).' },
+  { question: 'What constellations are supported?', answer: 'All standard GNSS constellations: GPS (G), GLONASS (R), Galileo (E), BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S). GLONASS FDMA frequencies are computed per-satellite from the channel numbers in the RINEX header.' },
+  { question: 'Can I load a navigation file?', answer: 'Yes. Drop a RINEX navigation file alongside the observation file to compute satellite orbits, sky plots, elevation angles and DOP values. Multipath vs elevation charts are also available when orbit data is present.' },
 ];
 ---
 
 <BaseLayout
-  title="RINEX Observation Viewer | GNSS Signal Analyzer"
-  description="Upload and analyze RINEX observation files. View satellite visibility, signal strength (C/N0), constellation breakdown and observation statistics. Supports RINEX 2.x and 3.x. Free online RINEX viewer — no upload, fully local."
+  title="RINEX Viewer & Quality Analyzer | Multipath, Cycle Slips, Completeness"
+  description="Analyze RINEX observation files: multipath (CMC), cycle slip detection (MW/GF/SF), data completeness, C/N0, satellite visibility, sky plots, DOP and header editing. Supports RINEX 2–4, Hatanaka CRX and gzip. All GNSS constellations. Free online tool — fully local, no upload."
   faq={rinexFaq}
-  breadcrumbLabel="RINEX Observation Viewer"
+  breadcrumbLabel="RINEX Viewer"
 >
-  <h1>RINEX Observation Viewer</h1>
+  <h1>RINEX Viewer & Quality Analyzer</h1>
   <p>
-    Upload a RINEX observation file to analyze satellite visibility,
-    signal strength and observation statistics. Supports RINEX 2.x and 3.x
-    with multi-constellation data (GPS, GLONASS, Galileo, BeiDou and more).
+    Drop a RINEX observation file to run a full signal quality analysis —
+    code multipath, cycle slip detection, data completeness, C/N0 and
+    satellite tracking — then edit header fields inline with IGS equipment
+    autocomplete. Add a navigation file for sky plots, elevation-dependent
+    multipath and DOP.
   </p>
   <p class="text-sm text-fg/50">
-    All processing happens locally in your browser — your file is never uploaded anywhere.
-    Large files (even multi-GB) are handled via streaming.
+    All processing happens locally in your browser — nothing is uploaded.
+    Large files (multi-GB) are streamed. Download the modified file when done.
   </p>
 
   <RinexReaderPage client:load />
+
+  <section>
+    <h2>Signal Quality Analysis</h2>
+    <p>
+      The tool automatically runs a comprehensive signal quality analysis on every
+      loaded observation file. This includes code multipath estimation using
+      the code-minus-carrier (CMC) linear combination, cycle slip detection
+      with Melbourne-W&uuml;bbena, geometry-free and single-frequency methods,
+      and per-signal data completeness tracking.
+    </p>
+    <p>
+      Multipath RMS is computed per signal pair (e.g.&nbsp;MP L1&ndash;L2,
+      MP L1&ndash;L5) and per satellite, with arc-mean debiasing to remove
+      carrier-phase ambiguities. Cycle slips detected by any method automatically
+      break multipath arcs, preventing contaminated estimates. Results include
+      time-series heatmaps, distribution histograms and per-satellite scatter plots.
+    </p>
+  </section>
+
+  <section>
+    <h2>Observation Overview</h2>
+    <p>
+      The viewer shows tracked satellites per constellation over time, mean
+      signal strength (C/N0) and a summary of observation types in the file.
+      Data completeness is reported per signal and per satellite, correctly
+      excluding satellites that do not transmit a given signal (e.g.&nbsp;GPS
+      Block&nbsp;IIR without L5).
+    </p>
+    <p>
+      When a navigation file is loaded alongside the observations, sky plots
+      display satellite trajectories and the multipath-vs-elevation chart
+      reveals how multipath varies with satellite geometry. DOP values are
+      computed from the combined observation and orbit data.
+    </p>
+  </section>
 
   <section>
     <h2>RINEX File Structure</h2>
@@ -43,23 +84,8 @@ const rinexFaq = [
       RINEX 2.x stores all constellations in a flat list, while RINEX 3.x
       groups observations per satellite system with explicit type codes
       (e.g.&nbsp;C1C, L1C, S1C for GPS L1 C/A). This tool parses both formats
-      automatically.
-    </p>
-  </section>
-
-  <section>
-    <h2>Observation Analysis</h2>
-    <p>
-      After parsing, the viewer shows the number of tracked satellites per
-      constellation over time, mean signal strength (C/N0) and a summary of
-      observation types available in the file. These metrics help assess data
-      quality, receiver performance and observation conditions.
-    </p>
-    <p>
-      The sky plot displays satellite trajectories computed from a bundled
-      navigation file or broadcast ephemerides, letting you correlate signal
-      drops with satellite geometry. The C/N0 chart highlights weak signals
-      and multipath-affected observations.
+      automatically, selecting the best tracking attribute when multiple codes
+      are available for the same band.
     </p>
   </section>
 
@@ -92,9 +118,33 @@ const rinexFaq = [
       </dd>
       <dt>What RINEX versions are supported?</dt>
       <dd>
-        This tool supports RINEX 2.x and 3.x observation files. RINEX 3 uses a
-        cleaner per-system observation layout and is the recommended format for
-        multi-constellation data.
+        This tool supports RINEX 2.x, 3.x and 4.x observation and navigation
+        files, including Hatanaka-compressed (CRX) and gzip-compressed files.
+        RINEX 3+ uses a cleaner per-system observation layout and is the
+        recommended format for multi-constellation data.
+      </dd>
+      <dt>What is multipath analysis?</dt>
+      <dd>
+        The tool computes code-minus-carrier (CMC) multipath combinations for
+        each dual-frequency signal pair. The MP observable isolates pseudorange
+        multipath and noise from geometry. Arc-mean debiasing removes
+        carrier-phase ambiguities, and per-arc RMS values quantify multipath
+        severity per satellite and signal.
+      </dd>
+      <dt>How are cycle slips detected?</dt>
+      <dd>
+        Three complementary methods are used in priority order:
+        Melbourne-W&uuml;bbena (MW) wide-lane combination with adaptive sigma
+        thresholds, geometry-free (GF) phase combination for ionospheric jumps,
+        and single-frequency phase-code divergence as a last resort. Detected
+        slips automatically break multipath arcs.
+      </dd>
+      <dt>What is data completeness?</dt>
+      <dd>
+        Completeness measures the percentage of epochs where each observation
+        code was present for satellites that actually transmit that signal.
+        Satellites that do not support a signal (e.g. GPS Block&nbsp;IIR without
+        L5) are excluded from expected counts to avoid inflating gap statistics.
       </dd>
       <dt>What is C/N0?</dt>
       <dd>
@@ -111,7 +161,16 @@ const rinexFaq = [
       <dt>What constellations are supported?</dt>
       <dd>
         All standard GNSS constellations: GPS (G), GLONASS (R), Galileo (E),
-        BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S).
+        BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S). GLONASS FDMA
+        frequencies are computed per-satellite from channel numbers in the
+        RINEX header.
+      </dd>
+      <dt>Can I load a navigation file?</dt>
+      <dd>
+        Yes. Drop a RINEX navigation file alongside the observation file to
+        compute satellite orbits, sky plots, elevation angles and DOP values.
+        Multipath vs elevation charts are also available when orbit data is
+        present.
       </dd>
     </dl>
   </section>
