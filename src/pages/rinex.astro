@@ -16,6 +16,7 @@ const rinexFaq = [
   title="RINEX Observation Viewer | GNSS Signal Analyzer"
   description="Upload and analyze RINEX observation files. View satellite visibility, signal strength (C/N0), constellation breakdown and observation statistics. Supports RINEX 2.x and 3.x. Free online RINEX viewer — no upload, fully local."
   faq={rinexFaq}
+  breadcrumbLabel="RINEX Observation Viewer"
 >
   <h1>RINEX Observation Viewer</h1>
   <p>
@@ -38,6 +39,15 @@ const rinexFaq = [
       observation types available in the file. These metrics help assess data
       quality, receiver performance and observation conditions.
     </p>
+  </section>
+
+  <section>
+    <h2>Related Tools</h2>
+    <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
+      <li><a href="/ntrip" class="text-accent hover:text-white">NTRIP Client</a> — record live RINEX observations from GNSS correction streams</li>
+      <li><a href="/nmea" class="text-accent hover:text-white">NMEA Log Viewer</a> — parse NMEA logs and plot tracks on a map</li>
+      <li><a href="/" class="text-accent hover:text-white">GPS Time Converter</a> — convert GPS week, TOW, Julian Date and other time scales</li>
+    </ul>
   </section>
 
   <section>

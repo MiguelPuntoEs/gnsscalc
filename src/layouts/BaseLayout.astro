@@ -12,9 +12,10 @@ interface Props {
   title: string;
   description?: string;
   faq?: FaqItem[];
+  breadcrumbLabel?: string;
 }
 
-const { title, description: pageDescription, faq } = Astro.props;
+const { title, description: pageDescription, faq, breadcrumbLabel } = Astro.props;
 
 const baseUrl = 'https://gnsscalc.com';
 const canonicalUrl = baseUrl + Astro.url.pathname;
@@ -55,13 +56,21 @@ const schema = {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2a2a35" />
 
     <title>{title}</title>
 
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/png" href="/icons/favicon-32x32.png" sizes="32x32" />
     <link rel="icon" type="image/png" href="/icons/favicon-16x16.png" sizes="16x16" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180x180.png" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="application-name" content="GNSS Calculator" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://unpkg.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=fallback" rel="stylesheet" />
 
     <meta name="description" content={description} />
     <meta name="robots" content="index, follow" />
@@ -79,18 +88,33 @@ const schema = {
         })),
       })} />
     )}
+    {breadcrumbLabel && (
+      <script type="application/ld+json" set:html={JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "GNSS Calculator", "item": baseUrl },
+          { "@type": "ListItem", "position": 2, "name": breadcrumbLabel, "item": canonicalUrl },
+        ],
+      })} />
+    )}
 
     <meta property="og:title" content={title} />
     <meta property="og:locale" content="en_US" />
     <meta property="og:type" content="website" />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content={`${baseUrl}/img/icon.png`} />
+    <meta property="og:image" content={`${baseUrl}/img/og.webp`} />
+    <meta property="og:image:width" content="1536" />
+    <meta property="og:image:height" content="1024" />
     <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:site_name" content="GNSS Calculator" />
 
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@MiguelPuntoEs" />
+    <meta name="twitter:creator" content="@MiguelPuntoEs" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={`${baseUrl}/img/icon.png`} />
+    <meta name="twitter:image" content={`${baseUrl}/img/og.webp`} />
   </head>
   <body>
     <Header />

@@ -15,6 +15,7 @@ const ntripFaq = [
   title="NTRIP Client | GNSS Caster Browser & Stream Monitor"
   description="Connect to NTRIP casters to browse sourcetables, view mountpoint locations on a map, and monitor live RTCM3 data streams. Supports NTRIP 1.0 and 2.0 protocols."
   faq={ntripFaq}
+  breadcrumbLabel="NTRIP Client"
 >
   <h1>NTRIP Client</h1>
   <p>
@@ -35,7 +36,16 @@ const ntripFaq = [
   <NtripPage client:load />
 
   <section>
-    <h2>FAQ</h2>
+    <h2>Related Tools</h2>
+    <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
+      <li><a href="/rinex" class="text-accent hover:text-white">RINEX Viewer</a> — analyze recorded RINEX observation files offline</li>
+      <li><a href="/positioning" class="text-accent hover:text-white">Positioning Calculator</a> — convert station coordinates between ECEF, geodetic and UTM</li>
+      <li><a href="/" class="text-accent hover:text-white">GPS Time Converter</a> — convert GPS time, week number and other GNSS time scales</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>NTRIP FAQ</h2>
     <dl>
       <dt>What is NTRIP?</dt>
       <dd>
