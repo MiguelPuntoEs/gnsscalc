@@ -1,0 +1,85 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import RinexReaderPage from '../components/RinexReaderPage';
+
+const rinexFaq = [
+  { question: 'What is RINEX?', answer: 'RINEX (Receiver Independent Exchange Format) is a standard text format for GNSS observation data. It allows data from any receiver to be post-processed with any compatible software, regardless of the receiver manufacturer.' },
+  { question: 'What is a RINEX observation file?', answer: 'A RINEX observation file contains raw measurements from a GNSS receiver: pseudoranges, carrier phases, Doppler shifts and signal-to-noise ratios for each tracked satellite at each epoch. The file extension is typically .obs, .rnx, or .YYo (e.g. .24o for 2024).' },
+  { question: 'What RINEX versions are supported?', answer: 'This tool supports RINEX 2.x and 3.x observation files. RINEX 3 uses a cleaner per-system observation layout and is the recommended format for multi-constellation data.' },
+  { question: 'What is C/N0?', answer: 'C/N0 (carrier-to-noise density ratio) is a measure of signal quality expressed in dB-Hz. Higher values indicate a stronger, cleaner signal. Typical values range from 20 dB-Hz (weak) to 50+ dB-Hz (strong, open sky).' },
+  { question: 'Can this tool handle large files?', answer: 'Yes. The parser reads the file in small chunks using streaming, so even multi-gigabyte RINEX files can be processed without exceeding browser memory. Nothing is uploaded — all processing happens locally in your browser.' },
+  { question: 'What constellations are supported?', answer: 'All standard GNSS constellations: GPS (G), GLONASS (R), Galileo (E), BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S).' },
+];
+---
+
+<BaseLayout
+  title="RINEX Observation Viewer | GNSS Signal Analyzer"
+  description="Upload and analyze RINEX observation files. View satellite visibility, signal strength (C/N0), constellation breakdown and observation statistics. Supports RINEX 2.x and 3.x. Free online RINEX viewer — no upload, fully local."
+  faq={rinexFaq}
+>
+  <h1>RINEX Observation Viewer</h1>
+  <p>
+    Upload a RINEX observation file to analyze satellite visibility,
+    signal strength and observation statistics. Supports RINEX 2.x and 3.x
+    with multi-constellation data (GPS, GLONASS, Galileo, BeiDou and more).
+  </p>
+  <p class="text-sm text-fg/50">
+    All processing happens locally in your browser — your file is never uploaded anywhere.
+    Large files (even multi-GB) are handled via streaming.
+  </p>
+
+  <RinexReaderPage client:load />
+
+  <section>
+    <h2>Observation Analysis</h2>
+    <p>
+      After parsing, the viewer shows the number of tracked satellites per
+      constellation over time, mean signal strength (C/N0) and a summary of
+      observation types available in the file. These metrics help assess data
+      quality, receiver performance and observation conditions.
+    </p>
+  </section>
+
+  <section>
+    <h2>RINEX FAQ</h2>
+    <dl>
+      <dt>What is RINEX?</dt>
+      <dd>
+        RINEX (Receiver Independent Exchange Format) is a standard text format
+        for GNSS observation data. It allows data from any receiver to be
+        post-processed with any compatible software, regardless of the receiver
+        manufacturer.
+      </dd>
+      <dt>What is a RINEX observation file?</dt>
+      <dd>
+        A RINEX observation file contains raw measurements from a GNSS receiver:
+        pseudoranges, carrier phases, Doppler shifts and signal-to-noise ratios
+        for each tracked satellite at each epoch. The file extension is typically
+        .obs, .rnx, or .YYo (e.g. .24o for 2024).
+      </dd>
+      <dt>What RINEX versions are supported?</dt>
+      <dd>
+        This tool supports RINEX 2.x and 3.x observation files. RINEX 3 uses a
+        cleaner per-system observation layout and is the recommended format for
+        multi-constellation data.
+      </dd>
+      <dt>What is C/N0?</dt>
+      <dd>
+        C/N0 (carrier-to-noise density ratio) is a measure of signal quality
+        expressed in dB-Hz. Higher values indicate a stronger, cleaner signal.
+        Typical values range from 20 dB-Hz (weak) to 50+ dB-Hz (strong, open sky).
+      </dd>
+      <dt>Can this tool handle large files?</dt>
+      <dd>
+        Yes. The parser reads the file in small chunks using streaming, so even
+        multi-gigabyte RINEX files can be processed without exceeding browser
+        memory. Nothing is uploaded — all processing happens locally in your browser.
+      </dd>
+      <dt>What constellations are supported?</dt>
+      <dd>
+        All standard GNSS constellations: GPS (G), GLONASS (R), Galileo (E),
+        BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S).
+      </dd>
+    </dl>
+  </section>
+</BaseLayout>
