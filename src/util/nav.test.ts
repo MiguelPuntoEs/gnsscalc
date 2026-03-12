@@ -6,7 +6,7 @@ import { keplerPosition, ecefToAzEl, computeDop } from './orbit';
 import { ecefToGeodetic } from './positioning';
 import type { KeplerEphemeris } from './nav';
 
-const NAV_FILE = join(__dirname, '../../data/rinex/navigation/ABMF00GLP_R_20260010000_01D_MN.rnx');
+const NAV_FILE = join(__dirname, '../../test-fixtures/BRDC.nav');
 
 describe('Navigation file parser', () => {
   const text = readFileSync(NAV_FILE, 'utf-8');
@@ -22,9 +22,9 @@ describe('Navigation file parser', () => {
     expect(gps.length).toBeGreaterThan(0);
     const g14 = gps.find(e => e.prn === 'G14') as KeplerEphemeris;
     expect(g14).toBeDefined();
-    expect(g14.af0).toBeCloseTo(7.258476689458e-4, 10);
-    expect(g14.e).toBeCloseTo(6.458024843596e-3, 10);
-    expect(g14.sqrtA).toBeCloseTo(5153.644140244, 3);
+    expect(g14.af0).toBeCloseTo(2.863593399520e-4, 10);
+    expect(g14.e).toBeCloseTo(3.804026404400e-3, 10);
+    expect(g14.sqrtA).toBeCloseTo(5153.677343370, 3);
   });
 
   it('parses GLONASS ephemerides', () => {
@@ -47,7 +47,7 @@ describe('Navigation file parser', () => {
   });
 });
 
-describe('Orbit computation', () => {
+describe('Orbit computation – nav file', () => {
   it('computes GPS satellite position from ephemeris', () => {
     const text = readFileSync(NAV_FILE, 'utf-8');
     const result = parseNavFile(text);
@@ -60,7 +60,9 @@ describe('Orbit computation', () => {
     expect(r).toBeGreaterThan(20e6); // > 20,000 km
     expect(r).toBeLessThan(30e6);    // < 30,000 km
   });
+});
 
+describe('Orbit computation', () => {
   it('computes azimuth and elevation', () => {
     // Receiver at ECEF roughly at equator
     const rxX = 6378137; // on equator, prime meridian

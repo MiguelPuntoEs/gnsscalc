@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRinexStream, downsampleEpochs } from './rinex';
-import type { EpochSummary } from './rinex';
+import { parseRinexStream } from './rinex';
 
 /** Helper: create a File from a string. */
 function fileFrom(content: string, name = 'test.obs'): File {
@@ -344,50 +343,3 @@ ANOTHER HEADER RECORD                                       COMMENT
   });
 });
 
-/* ---------- Real CRX 1.0 file ---------- */
-
-describe('CRX 1.0 real file', () => {
-  it('parses real CRX 1.0 file (sni10010.26d)', async () => {
-    const fs = await import('node:fs');
-    const buf = fs.readFileSync('data/rinex/hatanaka/2.11/sni10010.26d');
-    const file = new File([buf], 'sni10010.26d');
-    const result = await parseRinexStream(file);
-    expect(result.header.isCrx).toBe(true);
-    expect(result.header.crxVersion).toBe(1);
-    expect(result.header.version).toBe(2.11);
-    expect(result.stats.totalEpochs).toBeGreaterThan(100);
-    expect(result.stats.uniqueSatellites).toBeGreaterThan(20);
-    expect(result.stats.meanSnr).toBeGreaterThan(0);
-    expect(result.header.obsTypes['_v2']).toHaveLength(20);
-    // Sanity check: SNR should be in reasonable range (20-60 dB-Hz)
-    expect(result.stats.meanSnr).toBeGreaterThan(20);
-    expect(result.stats.meanSnr).toBeLessThan(60);
-  });
-});
-
-/* ---------- downsampling ---------- */
-
-describe('downsampleEpochs', () => {
-  it('returns input when under threshold', () => {
-    const epochs: EpochSummary[] = [
-      { time: 1000, totalSats: 10, satsPerSystem: { G: 10 }, meanSnr: 40, snrPerSystem: { G: 40 }, snrPerSat: { G01: 40 } },
-    ];
-    expect(downsampleEpochs(epochs)).toBe(epochs);
-  });
-
-  it('downsamples large arrays', () => {
-    const epochs: EpochSummary[] = Array.from({ length: 5000 }, (_, i) => ({
-      time: i * 1000,
-      totalSats: 10,
-      satsPerSystem: { G: 6, E: 4 },
-      meanSnr: 40,
-      snrPerSystem: { G: 42, E: 38 },
-      snrPerSat: { G01: 42, E01: 38 },
-    }));
-
-    const ds = downsampleEpochs(epochs);
-    expect(ds.length).toBeLessThanOrEqual(2000);
-    expect(ds.length).toBeGreaterThan(0);
-    expect(ds[0]!.totalSats).toBe(10);
-  });
-});

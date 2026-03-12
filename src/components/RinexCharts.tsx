@@ -13,19 +13,21 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { downsampleEpochs, systemName } from '../util/rinex';
-import type { EpochSummary } from '../util/rinex';
+import { systemName } from '../util/rinex';
+import type { EpochGrid } from '../util/epoch-grid';
+import {
+  gridToChartRows,
+  gridPrnsPerSystem,
+  gridSnrPerSatDownsampled,
+  gridCn0Histogram,
+} from '../util/epoch-grid';
 import { SYSTEM_COLORS, systemColor, formatUTCTime } from '../util/gnss-constants';
 import { useChartTheme, getChartTheme } from '../hooks/useChartTheme';
 import ChartCard from './ChartCard';
 
-function formatTimeLabel(epoch: EpochSummary): string {
-  return formatUTCTime(new Date(epoch.time));
-}
-
 /** Map C/N0 value (0–60 dB-Hz) to a color from dark red → yellow → green. */
 function cn0Color(value: number | undefined): string {
-  if (value == null) return 'rgba(255,255,255,0.03)';
+  if (value == null || isNaN(value)) return 'rgba(255,255,255,0.03)';
   const t = Math.max(0, Math.min(1, value / 55));
   if (t < 0.5) {
     const u = t * 2;
@@ -39,29 +41,20 @@ function cn0Color(value: number | undefined): string {
   return `rgb(${r}, ${g}, ${Math.round(30 + 50 * u)})`;
 }
 
-interface ChartRow {
-  label: string;
-  total: number;
-  snr: number | null;
-  [key: string]: string | number | null;
-}
-
 const HEATMAP_MAX_COLS = 600;
 
 function SatelliteHeatmap({
-  epochs,
+  grid,
   systems,
   prnsPerSystem,
 }: {
-  epochs: EpochSummary[];
+  grid: EpochGrid;
   systems: string[];
   prnsPerSystem: Record<string, string[]>;
 }) {
   const theme = useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-
-  const ds = useMemo(() => downsampleEpochs(epochs), [epochs]);
 
   const allPrns = useMemo(() => {
     const result: string[] = [];
@@ -72,23 +65,20 @@ function SatelliteHeatmap({
     return result;
   }, [systems, prnsPerSystem]);
 
-  const numRows = allPrns.length;
-  const colStep = Math.max(1, Math.ceil(ds.length / HEATMAP_MAX_COLS));
-  const numCols = Math.ceil(ds.length / colStep);
+  // Downsample and build per-PRN index map
+  const ds = useMemo(() => gridSnrPerSatDownsampled(grid), [grid]);
 
-  const grid = useMemo(() => {
-    const g: (number | undefined)[][] = [];
-    for (let r = 0; r < numRows; r++) {
-      const prn = allPrns[r]!;
-      const row: (number | undefined)[] = [];
-      for (let c = 0; c < numCols; c++) {
-        const ei = c * colStep;
-        row.push(ds[ei]?.snrPerSat[prn]);
-      }
-      g.push(row);
-    }
-    return g;
-  }, [ds, allPrns, numRows, numCols, colStep]);
+  // Map from allPrns order → grid.prns index
+  const prnToGridIdx = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < grid.prns.length; i++) map.set(grid.prns[i]!, i);
+    return map;
+  }, [grid.prns]);
+
+  const numRows = allPrns.length;
+  const colStep = Math.max(1, Math.ceil(ds.nCols / HEATMAP_MAX_COLS));
+  const numCols = Math.ceil(ds.nCols / colStep);
+  const nPrn = grid.prns.length;
 
   const LABEL_W = 36;
   const LEGEND_H = 50;
@@ -112,11 +102,15 @@ function SatelliteHeatmap({
     const cellH = Math.min(plotH / numRows, 14);
     const actualH = cellH * numRows;
 
-    // Draw cells
+    // Draw cells — direct columnar access
     for (let r = 0; r < numRows; r++) {
-      const gridRow = grid[r]!;
+      const prn = allPrns[r]!;
+      const pIdx = prnToGridIdx.get(prn);
+      if (pIdx == null) continue;
       for (let c = 0; c < numCols; c++) {
-        ctx.fillStyle = cn0Color(gridRow[c]);
+        const srcCol = c * colStep;
+        const val = ds.snr[srcCol * nPrn + pIdx]!;
+        ctx.fillStyle = cn0Color(isNaN(val) ? undefined : val);
         ctx.fillRect(LABEL_W + c * cellW, r * cellH, cellW + 0.5, cellH - 0.5);
       }
     }
@@ -141,9 +135,10 @@ function SatelliteHeatmap({
     ctx.textAlign = 'center';
     const labelStep = Math.max(1, Math.floor(numCols / 6));
     for (let c = 0; c < numCols; c += labelStep) {
-      const e = ds[c * colStep];
-      if (!e) continue;
-      const d = new Date(e.time);
+      const srcCol = c * colStep;
+      const time = ds.times[srcCol];
+      if (time == null) continue;
+      const d = new Date(time);
       const lbl = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
       ctx.fillText(lbl, LABEL_W + c * cellW + cellW / 2, timeY);
     }
@@ -164,7 +159,7 @@ function SatelliteHeatmap({
     ctx.fillText('dB-Hz', legendX + legendW / 2, legendY + 16);
     ctx.textAlign = 'right';
     ctx.fillText('55', legendX + legendW, legendY + 16);
-  }, [grid, ds, allPrns, numRows, numCols, colStep]);
+  }, [ds, allPrns, prnToGridIdx, numRows, numCols, colStep, nPrn]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -191,15 +186,17 @@ function SatelliteHeatmap({
       tip.style.display = 'none';
       return;
     }
-    const val = grid[row]![col];
     const prn = allPrns[row]!;
-    const epoch = ds[col * colStep];
-    const timeStr = epoch ? formatTimeLabel(epoch) : '';
+    const pIdx = prnToGridIdx.get(prn);
+    const srcCol = col * colStep;
+    const val = pIdx != null ? ds.snr[srcCol * nPrn + pIdx] : undefined;
+    const time = ds.times[srcCol];
+    const timeStr = time != null ? formatUTCTime(new Date(time)) : '';
     tip.style.display = 'block';
     tip.style.left = `${e.clientX - rect.left + 12}px`;
     tip.style.top = `${e.clientY - rect.top - 8}px`;
-    tip.textContent = val != null ? `${prn} @ ${timeStr}: ${val.toFixed(1)} dB-Hz` : `${prn} @ ${timeStr}: —`;
-  }, [grid, allPrns, ds, numCols, numRows, colStep]);
+    tip.textContent = val != null && !isNaN(val) ? `${prn} @ ${timeStr}: ${val.toFixed(1)} dB-Hz` : `${prn} @ ${timeStr}: —`;
+  }, [allPrns, prnToGridIdx, ds, numCols, numRows, colStep, nPrn]);
 
   const handleMouseLeave = useCallback(() => {
     if (tooltipRef.current) tooltipRef.current.style.display = 'none';
@@ -239,31 +236,9 @@ function SatelliteHeatmap({
   );
 }
 
-const CN0_BINS = Array.from({ length: 12 }, (_, i) => i * 5);
-
-function Cn0Histogram({ epochs, systems }: { epochs: EpochSummary[]; systems: string[] }) {
+function Cn0Histogram({ grid, systems }: { grid: EpochGrid; systems: string[] }) {
   const theme = useChartTheme();
-  const histData = useMemo(() => {
-    const counts: Record<string, number[]> = {};
-    for (const sys of systems) counts[sys] = new Array(CN0_BINS.length).fill(0);
-
-    for (const e of epochs) {
-      for (const [prn, val] of Object.entries(e.snrPerSat)) {
-        const sys = prn.charAt(0);
-        if (!counts[sys]) counts[sys] = new Array(CN0_BINS.length).fill(0);
-        const bin = Math.min(Math.floor(val / 5), CN0_BINS.length - 1);
-        counts[sys]![bin]!++;
-      }
-    }
-
-    return CN0_BINS.map((low, i) => {
-      const row: Record<string, string | number> = { bin: `${low}–${low + 5}` };
-      for (const sys of systems) {
-        row[sys] = counts[sys]?.[i] ?? 0;
-      }
-      return row;
-    });
-  }, [epochs, systems]);
+  const histData = useMemo(() => gridCn0Histogram(grid, systems), [grid, systems]);
 
   return (
     <ChartCard title="C/N0 distribution (dB-Hz)">
@@ -305,46 +280,18 @@ function Cn0Histogram({ epochs, systems }: { epochs: EpochSummary[]; systems: st
 }
 
 export default function RinexCharts({
-  epochs,
+  grid,
   systems,
 }: {
-  epochs: EpochSummary[];
+  grid: EpochGrid;
   systems: string[];
 }) {
   const theme = useChartTheme();
-  const prnsPerSystem = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    const sets: Record<string, Set<string>> = {};
-    for (const e of epochs) {
-      for (const prn of Object.keys(e.snrPerSat)) {
-        const sys = prn.charAt(0);
-        if (!sets[sys]) sets[sys] = new Set();
-        sets[sys]!.add(prn);
-      }
-    }
-    for (const [sys, s] of Object.entries(sets)) {
-      map[sys] = [...s].sort();
-    }
-    return map;
-  }, [epochs]);
+  const prnsPerSystem = useMemo(() => gridPrnsPerSystem(grid), [grid]);
 
-  const data = useMemo<ChartRow[]>(() => {
-    const ds = downsampleEpochs(epochs);
-    return ds.map(e => {
-      const row: ChartRow = {
-        label: formatTimeLabel(e),
-        total: e.totalSats,
-        snr: e.meanSnr !== null ? Math.round(e.meanSnr * 10) / 10 : null,
-      };
-      for (const sys of systems) {
-        row[`sat_${sys}`] = e.satsPerSystem[sys] ?? 0;
-        row[`snr_${sys}`] = e.snrPerSystem[sys] != null
-          ? Math.round(e.snrPerSystem[sys] * 10) / 10
-          : null;
-      }
-      return row;
-    });
-  }, [epochs, systems]);
+  const formatTime = useCallback((time: number) => formatUTCTime(new Date(time)), []);
+
+  const data = useMemo(() => gridToChartRows(grid, formatTime), [grid, formatTime]);
 
   const hasSnr = data.some(d => d.snr !== null);
   const tickInterval = Math.max(1, Math.floor(data.length / 6));
@@ -521,11 +468,11 @@ export default function RinexCharts({
 
       {/* Satellite availability heatmap — sat × time, color = C/N0 */}
       {nextChart(
-        <SatelliteHeatmap epochs={epochs} systems={systems} prnsPerSystem={prnsPerSystem} />
+        <SatelliteHeatmap grid={grid} systems={systems} prnsPerSystem={prnsPerSystem} />
       )}
 
       {/* C/N0 distribution histogram */}
-      {hasSnr && nextChart(<Cn0Histogram epochs={epochs} systems={systems} />)}
+      {hasSnr && nextChart(<Cn0Histogram grid={grid} systems={systems} />)}
 
       {/* Overall mean C/N0 */}
       {hasSnr && nextChart(

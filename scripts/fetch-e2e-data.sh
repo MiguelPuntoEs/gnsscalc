@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DATA_DIR="$SCRIPT_DIR/../data/e2e"
+DATA_DIR="$SCRIPT_DIR/../test-fixtures"
 BASE="https://igs.bkg.bund.de/root_ftp/IGS"
 
 mkdir -p "$DATA_DIR"

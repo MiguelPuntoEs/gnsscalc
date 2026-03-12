@@ -2,7 +2,7 @@ import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import type { EpochSkyData, SatAzEl, AllPositionsData } from '../util/orbit';
 import { computeDop } from '../util/orbit';
 import { systemName, systemCmp } from '../util/rinex';
-import type { EpochSummary } from '../util/rinex';
+import type { EpochGrid } from '../util/epoch-grid';
 import { SYSTEM_COLORS, DEFAULT_ELEV_MASK_DEG } from '../util/gnss-constants';
 import PolarSkyPlot from './PolarSkyPlot';
 import type { TrackPoint, TrackSegments } from './PolarSkyPlot';
@@ -15,12 +15,12 @@ export default function SkyPlotCharts({
   allPositions,
   observedPrns,
   rxPos,
-  epochs,
+  grid,
 }: {
   allPositions: AllPositionsData;
   observedPrns?: Set<string>[] | null;
   rxPos?: [number, number, number];
-  epochs?: EpochSummary[];
+  grid?: EpochGrid;
 }) {
   const { prns, times, positions } = allPositions;
   const numEpochs = times.length;
@@ -337,7 +337,7 @@ export default function SkyPlotCharts({
       </div>
 
       {epochSkyData && <ElevationHeatmap skyData={epochSkyData} />}
-      {epochSkyData && epochs && <ElevationCn0 epochSkyData={epochSkyData} epochs={epochs} />}
+      {epochSkyData && grid && <ElevationCn0 epochSkyData={epochSkyData} grid={grid} />}
       {epochSkyData && <DopTimeline skyData={epochSkyData} />}
     </div>
   );

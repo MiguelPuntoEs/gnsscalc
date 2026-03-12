@@ -1,106 +1,25 @@
 /**
- * RINEX 3.04 observation file writer from parsed RINEX data.
+ * RINEX 3.04 observation file writer.
  *
- * Re-parses obs files using the SatObsCallback to capture raw observations,
- * then writes a merged RINEX 3 obs file.
+ * Streams text through gzip compression so we never hold the full
+ * uncompressed output in memory. Returns a gzip-compressed Blob.
  */
 
-import { parseRinexStream } from './rinex';
 import type { RinexHeader } from './rinex';
 import { padL, padR, fmtF, hdrLine } from './rinex-format';
-import { downloadText } from './nav-writer';
 
 /* ================================================================== */
 /*  Types                                                              */
 /* ================================================================== */
 
-export interface RawEpoch {
-  time: number; // unix ms
-  sats: Map<string, Map<string, number | null>>; // PRN → obsCode → value
-}
-
-/* ================================================================== */
-/*  Collect raw observations by re-parsing                             */
-/* ================================================================== */
-
 /**
- * Re-parse obs files and collect raw observation data for writing.
- * Returns merged epochs sorted chronologically.
+ * Compact epoch — stores observation values in Float64Arrays
+ * indexed by a per-system obs code registry (NaN = missing).
+ * ~10-15x less memory than Map-of-Maps.
  */
-export async function collectRawObs(
-  files: File[],
-  onProgress?: (percent: number) => void,
-): Promise<{ header: RinexHeader; epochs: RawEpoch[]; obsTypes: Map<string, string[]> }> {
-  const epochMap = new Map<number, RawEpoch>();
-  const obsTypeSets = new Map<string, Set<string>>();
-  let baseHeader: RinexHeader | null = null;
-
-  for (let fi = 0; fi < files.length; fi++) {
-    const file = files[fi]!;
-
-    const result = await parseRinexStream(
-      file,
-      onProgress ? (p) => {
-        const overall = (fi + p / 100) / files.length * 100;
-        onProgress(Math.round(overall));
-      } : undefined,
-      undefined,
-      // SatObsCallback: capture raw observation values
-      (time, prn, codes, values) => {
-        let epoch = epochMap.get(time);
-        if (!epoch) {
-          epoch = { time, sats: new Map() };
-          epochMap.set(time, epoch);
-        }
-
-        let satObs = epoch.sats.get(prn);
-        if (!satObs) {
-          satObs = new Map();
-          epoch.sats.set(prn, satObs);
-        }
-
-        const sys = prn[0]!;
-        let typeSet = obsTypeSets.get(sys);
-        if (!typeSet) {
-          typeSet = new Set();
-          obsTypeSets.set(sys, typeSet);
-        }
-
-        for (let i = 0; i < codes.length; i++) {
-          const code = codes[i]!;
-          const val = values[i] ?? null;
-          typeSet.add(code);
-          if (val !== null) satObs.set(code, val);
-        }
-      },
-    );
-
-    if (!baseHeader) baseHeader = result.header;
-  }
-
-  if (!baseHeader) throw new Error('No observation data found');
-
-  // Sort epochs chronologically
-  const epochs = [...epochMap.values()].sort((a, b) => a.time - b.time);
-
-  // Sort obs types per system
-  const sysOrder = ['G', 'R', 'E', 'C', 'J', 'I', 'S'];
-  const obsTypes = new Map<string, string[]>();
-  for (const sys of sysOrder) {
-    const types = obsTypeSets.get(sys);
-    if (types && types.size > 0) {
-      obsTypes.set(sys, [...types].sort((a, b) => {
-        // Sort by band number, then type letter, then tracking code
-        const bandA = a[1]!, bandB = b[1]!;
-        if (bandA !== bandB) return bandA.localeCompare(bandB);
-        const typeA = a[0]!, typeB = b[0]!;
-        if (typeA !== typeB) return typeA.localeCompare(typeB);
-        return a.localeCompare(b);
-      }));
-    }
-  }
-
-  return { header: baseHeader, epochs, obsTypes };
+export interface CompactEpoch {
+  time: number; // unix ms
+  sats: Map<string, Float64Array>; // PRN → values indexed by obsTypes order
 }
 
 /* ================================================================== */
@@ -108,13 +27,15 @@ export async function collectRawObs(
 /* ================================================================== */
 
 /**
- * Write RINEX 3.04 obs file from collected raw observations.
- * Streams text through gzip compression so we never hold the full
- * uncompressed output in memory. Returns a gzip-compressed Blob.
+ * Write RINEX 3.04 obs file from compact observations.
+ * Streams text through gzip compression to avoid OOM on large datasets.
+ *
+ * The `obsTypes` map defines both the RINEX header declaration order and
+ * the Float64Array index order for each system.
  */
 export async function writeRinexObsBlob(
   header: RinexHeader,
-  epochs: RawEpoch[],
+  epochs: CompactEpoch[],
   obsTypes: Map<string, string[]>,
 ): Promise<Blob> {
   if (epochs.length === 0) return new Blob([], { type: 'application/gzip' });
@@ -255,12 +176,12 @@ export async function writeRinexObsBlob(
       const sysTypes = obsTypes.get(sys);
       if (!sysTypes) continue;
 
-      const satObs = epoch.sats.get(prn)!;
+      const valArr = epoch.sats.get(prn)!;
       let line = prn;
 
-      for (const obsType of sysTypes) {
-        const val = satObs.get(obsType);
-        if (val != null) {
+      for (let i = 0; i < sysTypes.length; i++) {
+        const val = i < valArr.length ? valArr[i]! : NaN;
+        if (!isNaN(val)) {
           line += fmtF(val, 14, 3) + '  ';
         } else {
           line += ' '.repeat(16);
@@ -279,5 +200,3 @@ export async function writeRinexObsBlob(
 
   return new Blob(compressedChunks as BlobPart[], { type: 'application/gzip' });
 }
-
-export { downloadText };

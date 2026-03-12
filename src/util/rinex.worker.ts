@@ -4,6 +4,10 @@
  * Keeps obs + nav data in memory for incremental merging, instant QA,
  * instant export, and automatic orbit recomputation.
  *
+ * Observation values are stored in Float64Arrays (NaN = missing) indexed
+ * by a per-system obs code registry. This uses ~10-15x less memory than
+ * nested Maps, allowing 24h 1s multi-GNSS files without OOM.
+ *
  * Protocol:
  *   add-obs   — parse new obs files, merge into cache, run QA, recompute positions
  *   add-nav   — parse new nav files, merge into cache, recompute positions
@@ -13,8 +17,7 @@
  */
 
 import { parseRinexStream } from './rinex';
-import type { RinexResult, RinexHeader, EpochSummary } from './rinex';
-import { systemCmp } from './rinex';
+import type { RinexHeader, RinexStats } from './rinex';
 import { parseNavFile } from './nav';
 import type { NavResult, Ephemeris } from './nav';
 import { computeAllPositions, navTimesFromEph } from './orbit';
@@ -24,8 +27,11 @@ import { CompletenessAccumulator } from './completeness';
 import { MultipathAccumulator } from './multipath';
 import type { QualityResult } from './quality-analysis';
 import { writeRinexObsBlob } from './obs-writer';
-import type { RawEpoch } from './obs-writer';
+import type { CompactEpoch } from './obs-writer';
 import { writeRinexNav } from './nav-writer';
+import { readFileText } from './read-file-text';
+import { compactToGrid, compactToStats, gridTransferables } from './epoch-grid';
+import type { EpochGrid } from './epoch-grid';
 
 /* ================================================================== */
 /*  Message protocol                                                   */
@@ -48,9 +54,9 @@ export interface ExportNavRequest { type: 'export-nav'; markerName: string }
 export interface ClearRequest { type: 'clear' }
 
 export type WorkerRequest =
-  | AddObsRequest | AddNavRequest
+  (AddObsRequest | AddNavRequest
   | ExportObsRequest | ExportNavRequest
-  | ClearRequest;
+  | ClearRequest) & { requestId?: number };
 
 // ── Responses ──
 
@@ -62,7 +68,11 @@ export interface ProgressMessage {
 
 export interface AddObsResult {
   type: 'add-obs-result';
-  result: RinexResult;
+  /** Header + stats (no epochs — those are in the grid). */
+  header: RinexHeader;
+  stats: RinexStats;
+  /** Columnar epoch data, transferred zero-copy. */
+  grid: EpochGrid;
   qaResult: QualityResult;
   positions: AllPositionsData | null;
   observedPrns: string[][] | null;
@@ -103,13 +113,12 @@ export type WorkerResponse =
 /*  Worker state                                                       */
 /* ================================================================== */
 
-// Observation data
+// Observation data — compact storage
 let obsHeader: RinexHeader | null = null;
-let obsRawEpochs: RawEpoch[] = [];
-let obsEpochMap = new Map<number, RawEpoch>();
-let obsTypeSets = new Map<string, Set<string>>();
-let obsResults: RinexResult[] = [];  // per-file results for merging
-
+let compactEpochs: CompactEpoch[] = [];
+let compactEpochMap = new Map<number, CompactEpoch>();
+let sysCodeList = new Map<string, string[]>();       // sys → codes (defines Float64Array index order)
+let sysCodeIdx = new Map<string, Map<string, number>>(); // sys → code → index
 // Navigation data
 let navHeader: NavResult['header'] | null = null;
 let navEphemerides: Ephemeris[] = [];
@@ -118,129 +127,58 @@ let navEphemerides: Ephemeris[] = [];
 /*  Helpers                                                            */
 /* ================================================================== */
 
-function post(msg: WorkerResponse) { self.postMessage(msg); }
+let currentRequestId: number | undefined;
+
+function post(msg: WorkerResponse, transferables?: Transferable[]) {
+  const out = currentRequestId != null ? { ...msg, requestId: currentRequestId } : msg;
+  if (transferables && transferables.length > 0) {
+    // Worker postMessage with transferables
+    (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(out, transferables);
+  } else {
+    self.postMessage(out);
+  }
+}
 
 function progress(task: string, percent: number) {
   post({ type: 'progress', task, percent });
 }
 
-async function readFileText(file: File): Promise<string> {
-  const name = file.name.toLowerCase();
-  if (name.endsWith('.gz')) {
-    const ds = new DecompressionStream('gzip');
-    const decompressed = file.stream().pipeThrough(ds);
-    const reader = decompressed.getReader();
-    const chunks: Uint8Array[] = [];
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    const decoder = new TextDecoder();
-    return chunks.map(c => decoder.decode(c, { stream: true })).join('') + decoder.decode();
-  }
-  return file.text();
-}
-
-/** Merge multiple RinexResults into one. */
-function mergeRinexResults(results: RinexResult[]): RinexResult {
-  if (results.length === 1) return results[0]!;
-
-  const base = results[0]!.header;
-  const mergedObsTypes: Record<string, string[]> = { ...base.obsTypes };
-  for (const r of results.slice(1)) {
-    for (const [sys, types] of Object.entries(r.header.obsTypes)) {
-      if (!mergedObsTypes[sys]) mergedObsTypes[sys] = [...types];
-      else {
-        const set = new Set(mergedObsTypes[sys]);
-        for (const t of types) set.add(t);
-        mergedObsTypes[sys] = [...set];
-      }
-    }
-  }
-  const mergedHeader: RinexHeader = { ...base, obsTypes: mergedObsTypes };
-
-  const allEpochs: EpochSummary[] = [];
-  const seen = new Set<number>();
-  for (const r of results) {
-    for (const ep of r.epochs) {
-      if (!seen.has(ep.time)) { seen.add(ep.time); allEpochs.push(ep); }
-    }
-  }
-  allEpochs.sort((a, b) => a.time - b.time);
-
-  const systems = new Set<string>();
-  const satsSeen = new Set<string>();
-  const satsPerSystem: Record<string, Set<string>> = {};
-  let snrSum = 0, snrN = 0, satCount = 0;
-
-  for (const ep of allEpochs) {
-    for (const sys of Object.keys(ep.satsPerSystem)) {
-      systems.add(sys);
-      if (!satsPerSystem[sys]) satsPerSystem[sys] = new Set();
-    }
-    for (const prn of Object.keys(ep.snrPerSat)) {
-      satsSeen.add(prn);
-      const sys = prn[0]!;
-      if (!satsPerSystem[sys]) satsPerSystem[sys] = new Set();
-      satsPerSystem[sys]!.add(prn);
-    }
-    satCount += ep.totalSats;
-    if (ep.meanSnr != null) { snrSum += ep.meanSnr * ep.totalSats; snrN += ep.totalSats; }
-  }
-
-  const sortedSystems = [...systems].sort(systemCmp);
-  const startTime = allEpochs.length > 0 ? new Date(allEpochs[0]!.time) : null;
-  const endTime = allEpochs.length > 0 ? new Date(allEpochs[allEpochs.length - 1]!.time) : null;
-  const duration = startTime && endTime ? (endTime.getTime() - startTime.getTime()) / 1000 : null;
-
-  let interval: number | null = null;
-  if (allEpochs.length >= 2) {
-    const gaps: number[] = [];
-    for (let i = 1; i < Math.min(allEpochs.length, 100); i++) {
-      gaps.push((allEpochs[i]!.time - allEpochs[i - 1]!.time) / 1000);
-    }
-    gaps.sort((a, b) => a - b);
-    interval = gaps[Math.floor(gaps.length / 2)]!;
-  }
-
-  return {
-    header: mergedHeader,
-    epochs: allEpochs,
-    stats: {
-      totalEpochs: allEpochs.length, validEpochs: allEpochs.length,
-      duration, startTime, endTime, interval,
-      uniqueSatellites: satsSeen.size,
-      uniqueSatsPerSystem: Object.fromEntries(
-        Object.entries(satsPerSystem).map(([s, set]) => [s, set.size]),
-      ),
-      systems: sortedSystems,
-      meanSatellites: allEpochs.length > 0 ? satCount / allEpochs.length : 0,
-      meanSnr: snrN > 0 ? snrSum / snrN : null,
-    },
-  };
-}
-
-/** Build sorted obs types map from accumulated sets. */
+/** Build obs types map from code registry (in system order). */
 function buildObsTypes(): Map<string, string[]> {
   const sysOrder = ['G', 'R', 'E', 'C', 'J', 'I', 'S'];
   const result = new Map<string, string[]>();
   for (const sys of sysOrder) {
-    const types = obsTypeSets.get(sys);
-    if (types && types.size > 0) {
-      result.set(sys, [...types].sort((a, b) => {
-        const bandA = a[1]!, bandB = b[1]!;
-        if (bandA !== bandB) return bandA.localeCompare(bandB);
-        const typeA = a[0]!, typeB = b[0]!;
-        if (typeA !== typeB) return typeA.localeCompare(typeB);
-        return a.localeCompare(b);
-      }));
+    const codes = sysCodeList.get(sys);
+    if (codes && codes.length > 0) {
+      result.set(sys, [...codes]);
     }
   }
   return result;
 }
 
-/** Run QA over all cached raw epochs. */
+/**
+ * Register an obs code and return its index. If the code already exists,
+ * returns the existing index. If it's new, appends it.
+ */
+function registerCode(sys: string, code: string): number {
+  let codeMap = sysCodeIdx.get(sys);
+  let codeArr = sysCodeList.get(sys);
+  if (!codeMap) {
+    codeMap = new Map();
+    codeArr = [];
+    sysCodeIdx.set(sys, codeMap);
+    sysCodeList.set(sys, codeArr);
+  }
+  let idx = codeMap.get(code);
+  if (idx == null) {
+    idx = codeArr!.length;
+    codeMap.set(code, idx);
+    codeArr!.push(code);
+  }
+  return idx;
+}
+
+/** Run QA over all cached compact epochs. */
 function replayQA(header: RinexHeader): QualityResult {
   const mpAccum = new MultipathAccumulator(header);
   const csAccum = new CycleSlipAccumulator(header, (time, prn, bands) => {
@@ -248,13 +186,21 @@ function replayQA(header: RinexHeader): QualityResult {
   });
   const compAccum = new CompletenessAccumulator(header);
 
-  for (const epoch of obsRawEpochs) {
-    for (const [prn, obsMap] of epoch.sats) {
-      const codes = [...obsMap.keys()];
-      const values = codes.map(c => obsMap.get(c) ?? null);
-      csAccum.onObservation(epoch.time, prn, codes, values);
-      mpAccum.onObservation(epoch.time, prn, codes, values);
-      compAccum.onObservation(epoch.time, prn, codes, values);
+  // Reusable buffer to avoid allocating per sat per epoch
+  const valBuf: (number | null)[] = [];
+
+  for (const epoch of compactEpochs) {
+    for (const [prn, valArr] of epoch.sats) {
+      const sys = prn[0]!;
+      const codes = sysCodeList.get(sys)!;
+      valBuf.length = codes.length;
+      for (let i = 0; i < codes.length; i++) {
+        const v = i < valArr.length ? valArr[i]! : NaN;
+        valBuf[i] = isNaN(v) ? null : v;
+      }
+      csAccum.onObservation(epoch.time, prn, codes, valBuf);
+      mpAccum.onObservation(epoch.time, prn, codes, valBuf);
+      compAccum.onObservation(epoch.time, prn, codes, valBuf);
     }
   }
 
@@ -270,20 +216,19 @@ function replayQA(header: RinexHeader): QualityResult {
  * Returns null if either side is missing.
  */
 function tryComputePositions(): { positions: AllPositionsData; observedPrns: string[][] } | null {
-  const merged = obsResults.length > 0 ? mergeRinexResults(obsResults) : null;
-  if (!merged || navEphemerides.length === 0) return null;
+  if (compactEpochs.length === 0 || navEphemerides.length === 0 || !obsHeader) return null;
 
   const maxEpochs = 500;
-  const step = Math.max(1, Math.ceil(merged.epochs.length / maxEpochs));
+  const step = Math.max(1, Math.ceil(compactEpochs.length / maxEpochs));
   const times: number[] = [];
   const prnsPerEpoch: string[][] = [];
-  for (let i = 0; i < merged.epochs.length; i += step) {
-    const e = merged.epochs[i]!;
+  for (let i = 0; i < compactEpochs.length; i += step) {
+    const e = compactEpochs[i]!;
     times.push(e.time);
-    prnsPerEpoch.push(Object.keys(e.snrPerSat));
+    prnsPerEpoch.push([...e.sats.keys()]);
   }
 
-  const rxPos = merged.header.approxPosition;
+  const rxPos = obsHeader.approxPosition;
   const validRx = rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0) ? rxPos : undefined;
   const positions = computeAllPositions(navEphemerides, times, validRx);
   return { positions, observedPrns: prnsPerEpoch };
@@ -300,60 +245,111 @@ function computeNavOnlyPositions(): AllPositionsData {
 /* ================================================================== */
 
 async function handleAddObs(msg: AddObsRequest) {
-  // Parse only the new files, merge raw data into existing cache
+  // Track which systems got new codes so we can grow existing arrays
+  const grownSystems = new Set<string>();
+
+  // Parse only the new files, merge compact data into existing cache.
+  // workerMode = true: skip EpochSummary construction + setTimeout yields.
+  let hasData = false;
   for (let i = 0; i < msg.files.length; i++) {
     const file = msg.files[i]!;
     const r = await parseRinexStream(file, (p) => {
       const overall = (i + p / 100) / msg.files.length * 100;
       progress('add-obs', Math.round(overall));
     }, undefined, (time, prn, codes, values) => {
-      let epoch = obsEpochMap.get(time);
+      const sys = prn[0]!;
+
+      // Register obs codes, detect growth
+      const prevLen = sysCodeList.get(sys)?.length ?? 0;
+      for (const code of codes) registerCode(sys, code);
+      const stride = sysCodeList.get(sys)!.length;
+      if (stride > prevLen) grownSystems.add(sys);
+
+      // Get or create epoch
+      let epoch = compactEpochMap.get(time);
       if (!epoch) {
         epoch = { time, sats: new Map() };
-        obsEpochMap.set(time, epoch);
+        compactEpochMap.set(time, epoch);
       }
-      let satObs = epoch.sats.get(prn);
-      if (!satObs) { satObs = new Map(); epoch.sats.set(prn, satObs); }
-      const sys = prn[0]!;
-      let typeSet = obsTypeSets.get(sys);
-      if (!typeSet) { typeSet = new Set(); obsTypeSets.set(sys, typeSet); }
-      for (let j = 0; j < codes.length; j++) {
-        typeSet.add(codes[j]!);
-        const val = values[j] ?? null;
-        if (val !== null) satObs.set(codes[j]!, val);
-      }
-    });
 
-    if (r.epochs.length > 0) {
-      obsResults.push(r);
+      // Get or create satellite values array
+      let valArr = epoch.sats.get(prn);
+      if (!valArr || valArr.length < stride) {
+        const newArr = new Float64Array(stride);
+        newArr.fill(NaN);
+        if (valArr) newArr.set(valArr);
+        valArr = newArr;
+        epoch.sats.set(prn, valArr);
+      }
+
+      // Store observation values
+      const codeMap = sysCodeIdx.get(sys)!;
+      for (let j = 0; j < codes.length; j++) {
+        const val = values[j];
+        if (val != null) valArr[codeMap.get(codes[j]!)!] = val;
+      }
+    }, true /* workerMode */);
+
+    // Keep header from first file (or merge obsTypes across files)
+    if (!obsHeader) {
+      obsHeader = r.header;
+    } else {
+      // Merge obsTypes from subsequent files
+      for (const [sys, types] of Object.entries(r.header.obsTypes)) {
+        if (!obsHeader.obsTypes[sys]) obsHeader.obsTypes[sys] = [...types];
+        else {
+          const set = new Set(obsHeader.obsTypes[sys]);
+          for (const t of types) set.add(t);
+          obsHeader.obsTypes[sys] = [...set];
+        }
+      }
     }
+    hasData = true;
   }
 
-  if (obsResults.length === 0) {
+  if (!hasData || compactEpochMap.size === 0) {
     post({ type: 'error', task: 'add-obs', message: 'No valid observation epochs found in the file(s).' });
     return;
   }
 
-  // Rebuild sorted raw epochs from the accumulated epoch map
-  obsRawEpochs = [...obsEpochMap.values()].sort((a, b) => a.time - b.time);
+  // Grow any undersized Float64Arrays for systems that got new codes
+  for (const sys of grownSystems) {
+    const stride = sysCodeList.get(sys)!.length;
+    for (const epoch of compactEpochMap.values()) {
+      for (const [prn, valArr] of epoch.sats) {
+        if (prn[0] === sys && valArr.length < stride) {
+          const newArr = new Float64Array(stride);
+          newArr.fill(NaN);
+          newArr.set(valArr);
+          epoch.sats.set(prn, newArr);
+        }
+      }
+    }
+  }
 
-  // Merge all RinexResults
-  const merged = mergeRinexResults(obsResults);
-  obsHeader = merged.header;
+  // Rebuild sorted epoch list
+  compactEpochs = [...compactEpochMap.values()].sort((a, b) => a.time - b.time);
+
+  // Build grid + stats directly from compact data (no EpochSummary)
+  const grid = compactToGrid(compactEpochs, sysCodeList);
+  const stats = compactToStats(compactEpochs, sysCodeList, obsHeader!);
+  const transfers = gridTransferables(grid);
 
   // QA over full dataset
-  const qaResult = replayQA(merged.header);
+  const qaResult = replayQA(obsHeader!);
 
   // Auto-compute positions if nav is available
   const posData = tryComputePositions();
 
   post({
     type: 'add-obs-result',
-    result: merged,
+    header: obsHeader!,
+    stats,
+    grid,
     qaResult,
     positions: posData?.positions ?? null,
     observedPrns: posData?.observedPrns ?? null,
-  });
+  }, transfers);
 }
 
 async function handleAddNav(msg: AddNavRequest) {
@@ -395,21 +391,21 @@ async function handleAddNav(msg: AddNavRequest) {
 }
 
 async function handleExportObs() {
-  if (!obsHeader || obsRawEpochs.length === 0) {
+  if (!obsHeader || compactEpochs.length === 0) {
     post({ type: 'error', task: 'export-obs', message: 'No observation data to export.' });
     return;
   }
   const obsTypes = buildObsTypes();
-  const blob = await writeRinexObsBlob(obsHeader, obsRawEpochs, obsTypes);
+  const blob = await writeRinexObsBlob(obsHeader, compactEpochs, obsTypes);
 
   post({
     type: 'obs-export-result', blob,
     filename: {
       markerName: obsHeader.markerName || '',
-      startTime: new Date(obsRawEpochs[0]!.time).toISOString(),
-      durationSec: (obsRawEpochs[obsRawEpochs.length - 1]!.time - obsRawEpochs[0]!.time) / 1000,
-      intervalSec: obsRawEpochs.length >= 2
-        ? (obsRawEpochs[1]!.time - obsRawEpochs[0]!.time) / 1000 : null,
+      startTime: new Date(compactEpochs[0]!.time).toISOString(),
+      durationSec: (compactEpochs[compactEpochs.length - 1]!.time - compactEpochs[0]!.time) / 1000,
+      intervalSec: compactEpochs.length >= 2
+        ? (compactEpochs[1]!.time - compactEpochs[0]!.time) / 1000 : null,
     },
   });
 }
@@ -441,10 +437,10 @@ function handleExportNav(msg: ExportNavRequest) {
 
 function handleClear() {
   obsHeader = null;
-  obsRawEpochs = [];
-  obsEpochMap = new Map();
-  obsTypeSets = new Map();
-  obsResults = [];
+  compactEpochs = [];
+  compactEpochMap = new Map();
+  sysCodeList = new Map();
+  sysCodeIdx = new Map();
   navHeader = null;
   navEphemerides = [];
 }
@@ -455,6 +451,7 @@ function handleClear() {
 
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const msg = e.data;
+  currentRequestId = msg.requestId;
   try {
     switch (msg.type) {
       case 'add-obs': return await handleAddObs(msg);

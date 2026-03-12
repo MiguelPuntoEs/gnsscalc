@@ -34,7 +34,7 @@ export async function analyzeQuality(
     csAccum.onObservation(time, prn, codes, values);
     mpAccum.onObservation(time, prn, codes, values);
     compAccum.onObservation(time, prn, codes, values);
-  });
+  }, true /* workerMode: skip EpochSummary construction */);
 
   return {
     cycleSlips: csAccum.finalize(),

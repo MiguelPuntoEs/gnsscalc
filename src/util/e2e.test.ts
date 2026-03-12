@@ -2,7 +2,7 @@
  * End-to-end tests using real GNSS station data from BKG.
  * Run `scripts/fetch-e2e-data.sh` to download the test fixtures.
  *
- * Fixtures (in data/e2e/):
+ * Fixtures (in test-fixtures/):
  *  - ABMF.crx  — CRX 3.0 obs from ABMF (Guadeloupe), full day 30s (2024/001)
  *  - ALBH.crx  — CRX 3.0 obs from ALBH (Victoria, Canada), full day 30s (2024/001)
  *  - BRDC.nav  — RINEX 3.04 mixed nav from IGS, full day (2024/001)
@@ -16,7 +16,7 @@ import { parseNavFile } from './nav';
 import { computeAllPositions, navTimesFromEph, computeDop } from './orbit';
 import { analyzeQuality } from './quality-analysis';
 
-const E2E = join(__dirname, '../../data/e2e');
+const E2E = join(__dirname, '../../test-fixtures');
 const HAS_DATA = existsSync(join(E2E, 'ABMF.crx'));
 
 function fileFrom(buf: Buffer, name: string): File {

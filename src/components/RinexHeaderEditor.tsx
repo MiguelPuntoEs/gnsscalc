@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import type { EditableHeaderFields, RawRinexFile } from '../util/rinex-header-edit';
 import { extractEditableFields, splitRinexFile, reconstructFile } from '../util/rinex-header-edit';
-import type { RinexResult } from '../util/rinex';
+import type { RinexHeader, RinexStats } from '../util/rinex';
 import InlineField from './InlineField';
 import ObsTypeMatrix from './ObsTypeMatrix';
 import { PencilIcon, DownloadIcon, UndoIcon, ChevronIcon } from './HeaderEditorIcons';
@@ -28,17 +28,18 @@ function numStr(v: number): string {
 }
 
 export interface RinexHeaderEditorProps {
-  result: RinexResult;
+  header: RinexHeader;
+  stats: RinexStats;
   file: File;
   readFileText: (file: File) => Promise<string>;
 }
 
 export default function RinexHeaderEditor({
-  result,
+  header,
+  stats,
   file,
   readFileText,
 }: RinexHeaderEditorProps) {
-  const { header, stats } = result;
 
   const [rawFile, setRawFile] = useState<RawRinexFile | null>(null);
   const [fields, setFields] = useState<EditableHeaderFields | null>(null);

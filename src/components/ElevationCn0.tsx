@@ -11,7 +11,8 @@ import {
 } from 'recharts';
 import type { EpochSkyData } from '../util/orbit';
 import { systemName, systemCmp } from '../util/rinex';
-import type { EpochSummary } from '../util/rinex';
+import type { EpochGrid } from '../util/epoch-grid';
+import { gridTimeIndex, gridSnrPerSatBandAt, gridBands } from '../util/epoch-grid';
 import { systemColor } from '../util/gnss-constants';
 import { useChartTheme } from '../hooks/useChartTheme';
 
@@ -30,27 +31,17 @@ const COMMON_BAND: Record<string, string> = {
   '6': 'E6/B3/L6', '7': 'E5b/B2b', '8': 'E5/B2',
 };
 
-export default function ElevationCn0({ epochSkyData, epochs }: { epochSkyData: EpochSkyData[]; epochs: EpochSummary[] }) {
+export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: EpochSkyData[]; grid: EpochGrid }) {
   const theme = useChartTheme();
   const data = useMemo(() => {
-    const epochByTime = new Map<number, EpochSummary>();
-    for (const e of epochs) epochByTime.set(e.time, e);
-
-    const bandSet = new Set<string>();
-    for (const e of epochs) {
-      if (!e.snrPerSatBand) continue;
-      for (const key of Object.keys(e.snrPerSatBand)) {
-        const colon = key.indexOf(':');
-        if (colon !== -1) bandSet.add(key.substring(colon + 1));
-      }
-    }
-    const bands = [...bandSet].sort();
+    const timeIdx = gridTimeIndex(grid);
+    const bands = gridBands(grid);
     if (bands.length === 0) return null;
 
     const pairs = new Map<string, { elSum: number; cn0Sum: number; n: number }[]>();
 
     for (const sky of epochSkyData) {
-      const snrBand = epochByTime.get(sky.time)?.snrPerSatBand;
+      const snrBand = gridSnrPerSatBandAt(grid, timeIdx, sky.time);
       if (!snrBand) continue;
       for (const sat of sky.satellites) {
         const sys = sat.prn[0]!;
@@ -119,7 +110,7 @@ export default function ElevationCn0({ epochSkyData, epochs }: { epochSkyData: E
     }
 
     return charts.length > 0 ? charts : null;
-  }, [epochSkyData, epochs]);
+  }, [epochSkyData, grid]);
 
   if (!data || data.length === 0) return null;
 

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import type { RinexResult } from '../util/rinex';
+import type { RinexHeader, RinexStats } from '../util/rinex';
 import type { QualityResult } from '../util/quality-analysis';
+import type { EpochGrid } from '../util/epoch-grid';
 import { systemName, systemCmp } from '../util/rinex';
 import { CONSTELLATION_COLORS } from '../util/gnss-constants';
 import ConstellationBadges from './ConstellationBadges';
@@ -79,23 +80,7 @@ async function sniffFileType(file: File): Promise<'nav' | 'obs' | 'unknown'> {
   return 'unknown';
 }
 
-async function readFileText(file: File): Promise<string> {
-  const name = file.name.toLowerCase();
-  if (name.endsWith('.gz')) {
-    const ds = new DecompressionStream('gzip');
-    const decompressed = file.stream().pipeThrough(ds);
-    const reader = decompressed.getReader();
-    const chunks: Uint8Array[] = [];
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    const decoder = new TextDecoder();
-    return chunks.map(c => decoder.decode(c, { stream: true })).join('') + decoder.decode();
-  }
-  return file.text();
-}
+import { readFileText } from '../util/read-file-text';
 
 /** Guess constellation from a nav file name. Returns system letter (G/R/E/C/J/I/S) or null. */
 function navFileConstellation(name: string): string | null {
@@ -162,11 +147,7 @@ function SpinnerIcon({ className }: { className?: string }) {
 function UploadDropZone({
   isDragging,
   loading,
-  fileName,
-  fileIndex,
-  fileTotal,
   progress,
-  fileSize,
   navFileNames,
   navLoading,
   onDrop,
@@ -176,11 +157,7 @@ function UploadDropZone({
 }: {
   isDragging: boolean;
   loading: boolean;
-  fileName: string | null;
-  fileIndex: number | null;
-  fileTotal: number | null;
   progress: number;
-  fileSize: number;
   navFileNames: string[];
   navLoading: boolean;
   onDrop: (e: React.DragEvent) => void;
@@ -202,12 +179,9 @@ function UploadDropZone({
         <div className="text-center">
           <p className="text-sm text-fg/60 mb-0.5">
             {loading
-              ? fileIndex != null && fileTotal != null && fileTotal > 1
-                ? `Parsing obs ${fileIndex + 1}/${fileTotal}… ${progress > 0 ? `${progress}%` : ''}`
-                : `Parsing${fileName ? ` ${fileName}` : ''}… ${progress > 0 ? `${progress}%` : ''}`
+              ? `Parsing… ${progress > 0 ? `${progress}%` : ''}`
               : 'Loading navigation…'}
           </p>
-          {loading && fileSize > 0 && <p className="text-[10px] text-fg/25 mb-0">{formatFileSize(fileSize)}</p>}
           {navFileNames.length > 0 && (
             <p className="text-[10px] text-fg/25 mt-1 mb-0">
               + {navFileNames.length} nav file{navFileNames.length > 1 ? 's' : ''}
@@ -592,7 +566,9 @@ export default function RinexReaderPage() {
   const [staged, setStaged] = useState<StagedFile[]>([]);
 
   // Parsed results
-  const [result, setResult] = useState<RinexResult | null>(null);
+  const [header, setHeader] = useState<RinexHeader | null>(null);
+  const [stats, setStats] = useState<RinexStats | null>(null);
+  const [grid, setGrid] = useState<EpochGrid | null>(null);
   const [obsFiles, setObsFiles] = useState<File[]>([]);
   const [obsFileNames, setObsFileNames] = useState<string[]>([]);
   const [navResult, setNavResult] = useState<NavResult | null>(null);
@@ -607,16 +583,10 @@ export default function RinexReaderPage() {
   const [loading, setLoading] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [loadingFileName, setLoadingFileName] = useState<string | null>(null);
-  const [loadingFileIndex, setLoadingFileIndex] = useState<number | null>(null);
-  const [loadingFileTotal, setLoadingFileTotal] = useState<number | null>(null);
   const [computing, setComputing] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
   const addFilesInputRef = useRef<HTMLInputElement>(null);
 
   const [qaResult, setQaResult] = useState<QualityResult | null>(null);
-  const [qaLoading, setQaLoading] = useState(false);
-  const [qaProgress, setQaProgress] = useState(0);
 
 
   /** Classify files and add to staged manifest */
@@ -652,11 +622,6 @@ export default function RinexReaderPage() {
     }
   }, [staged]);
 
-  /** Remove a file from the staged manifest */
-  const unstageFile = useCallback((name: string) => {
-    setStaged(prev => prev.filter(s => s.name !== name));
-  }, []);
-
   /** Process all staged files — parse obs and nav */
   const processStaged = useCallback(async () => {
     const obsEntries = staged.filter(s => s.type === 'obs');
@@ -673,14 +638,14 @@ export default function RinexReaderPage() {
       if (newObsEntries.length > 0) {
         setLoading(true);
         setProgress(0);
-        setLoadingFileIndex(null);
-        setLoadingFileTotal(newObsEntries.length);
 
         try {
-          const { result: merged, qaResult, positions, observedPrns: prns } =
+          const { header: h, stats: s, grid: g, qaResult: qa, positions, observedPrns: prns } =
             await addObsFiles(newObsEntries.map(e => e.file), setProgress);
-          setResult(merged);
-          setQaResult(qaResult);
+          setHeader(h);
+          setStats(s);
+          setGrid(g);
+          setQaResult(qa);
           setObsFiles(prev => [...prev, ...newObsEntries.map(e => e.file)]);
           setObsFileNames(prev => [...prev, ...newObsEntries.map(e => e.name)]);
           if (positions) { setAllPositions(positions); setObservedPrns(prns); }
@@ -688,9 +653,6 @@ export default function RinexReaderPage() {
           setError(e instanceof Error ? e.message : 'Failed to parse observation file(s).');
         } finally {
           setLoading(false);
-          setLoadingFileName(null);
-          setLoadingFileIndex(null);
-          setLoadingFileTotal(null);
         }
       }
     }
@@ -759,14 +721,11 @@ export default function RinexReaderPage() {
   }, []);
 
   const handleReset = useCallback(() => {
-    abortRef.current?.abort();
-    setStaged([]); setResult(null); setNavResult(null);
-    setAllPositions(null); setObservedPrns(null);
+    setStaged([]); setHeader(null); setStats(null); setGrid(null);
+    setNavResult(null); setAllPositions(null); setObservedPrns(null);
     setError(null); setObsFiles([]); setObsFileNames([]);
     setNavFileNames([]); setLoadedFiles([]);
-    setProgress(0); setLoadingFileName(null);
-    setLoadingFileIndex(null); setLoadingFileTotal(null);
-    setQaResult(null); setQaLoading(false); setQaProgress(0);
+    setProgress(0); setQaResult(null);
     clearWorker();
   }, []);
 
@@ -775,18 +734,18 @@ export default function RinexReaderPage() {
     if (!navResult) return;
     setNavExporting(true);
     try {
-      await exportNav(result?.header.markerName || '');
+      await exportNav(header?.markerName || '');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to export navigation file.');
     } finally {
       setNavExporting(false);
     }
-  }, [navResult, result]);
+  }, [navResult, header]);
 
   const [obsExporting, setObsExporting] = useState(false);
   const [obsExportProgress, setObsExportProgress] = useState(0);
   const handleDownloadObs = useCallback(async () => {
-    if (!result) return;
+    if (!header) return;
     setObsExporting(true);
     setObsExportProgress(0);
     try {
@@ -796,22 +755,17 @@ export default function RinexReaderPage() {
     } finally {
       setObsExporting(false);
     }
-  }, [result]);
+  }, [header]);
 
-  const { header, stats } = result ?? {};
-
-  /* ─── Initial upload state ──────────────────────────────────── */
-  if (!result && !loading && !navLoading) {
+  /* ─── Initial upload state (nothing loaded yet) ─────────────── */
+  const hasAnyData = !!header || !!navResult;
+  if (!hasAnyData && !loading && !navLoading) {
     return (
       <section className="flex flex-col gap-4">
         <UploadDropZone
           isDragging={isDragging}
           loading={loading}
-          fileName={loadingFileName}
-          fileIndex={loadingFileIndex}
-          fileTotal={loadingFileTotal}
           progress={progress}
-          fileSize={0}
           navFileNames={navFileNames}
           navLoading={navLoading}
           onDrop={handleGlobalDrop}
@@ -823,32 +777,12 @@ export default function RinexReaderPage() {
         {error && (
           <div className="card border-red-500/40 bg-red-500/10 text-red-400 text-sm">{error}</div>
         )}
-
-        {navResult && <NavSummary navResult={navResult} />}
-
-        {allPositions && (
-          <ErrorBoundary>
-            <Suspense fallback={
-              <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-                <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                <div className="flex items-center justify-center" style={{ height: 360 }}>
-                  <SpinnerIcon className="size-5 animate-spin text-fg/20" />
-                </div>
-              </div>
-            }>
-              <SkyPlotCharts allPositions={allPositions} />
-            </Suspense>
-          </ErrorBoundary>
-        )}
       </section>
     );
   }
 
   /* ─── Loaded / loading state ────────────────────────────────── */
   const obsLabel = obsFileNames.length > 1 ? `${obsFileNames.length} obs files` : obsFileNames[0] ?? null;
-  const navLabel = navFileNames.length > 0
-    ? navFileNames.map(n => { const c = navFileConstellation(n); return c ? constellationLabel(c) : n; }).join(', ')
-    : null;
 
   return (
     <section className="flex flex-col gap-4">
@@ -861,7 +795,7 @@ export default function RinexReaderPage() {
       >
         {/* Row 1: marker name + constellation badges + actions */}
         <div className="flex items-center gap-3 min-w-0">
-          {result && header ? (
+          {header ? (
             <>
               <span className="text-sm font-semibold text-fg truncate shrink min-w-0" title={header.markerName || obsLabel || undefined}>
                 {header.markerName || obsLabel}
@@ -869,14 +803,19 @@ export default function RinexReaderPage() {
               <span className="text-[10px] text-fg/30 shrink-0">v{header.version.toFixed(0)}</span>
               <ConstellationBadges activeSystems={stats?.systems ?? []} />
             </>
+          ) : navResult ? (
+            <>
+              <span className="text-sm font-semibold text-fg truncate shrink min-w-0">
+                Navigation Data
+              </span>
+              <span className="text-[10px] text-fg/30 shrink-0">v{navResult.header.version.toFixed(0)}</span>
+            </>
           ) : (
             <div className="flex items-center gap-2">
               <SpinnerIcon className="size-3.5 animate-spin text-accent" />
               <span className="text-xs text-fg/50">
                 {loading
-                  ? loadingFileIndex != null && loadingFileTotal != null && loadingFileTotal > 1
-                    ? `Parsing obs ${loadingFileIndex + 1}/${loadingFileTotal}… ${progress > 0 ? `${progress}%` : ''}`
-                    : `Parsing${loadingFileName ? ` ${loadingFileName}` : ''}… ${progress > 0 ? `${progress}%` : ''}`
+                  ? `Parsing… ${progress > 0 ? `${progress}%` : ''}`
                   : 'Loading navigation…'}
               </span>
             </div>
@@ -896,7 +835,7 @@ export default function RinexReaderPage() {
         </div>
 
         {/* Row 2: key stats as compact pills */}
-        {result && stats && (
+        {stats && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 pt-2 border-t border-border/20">
             {stats.startTime && (
               <StatPill label="Start" value={formatTime(stats.startTime)} />
@@ -921,7 +860,7 @@ export default function RinexReaderPage() {
           loading={loading}
           navLoading={navLoading}
           computing={computing}
-          hasObs={!!result && obsFileNames.length > 0}
+          hasObs={!!header && obsFileNames.length > 0}
           hasNav={!!navResult}
           obsExporting={obsExporting}
           obsExportProgress={obsExportProgress}
@@ -952,7 +891,7 @@ export default function RinexReaderPage() {
         <div className="card border-red-500/40 bg-red-500/10 text-red-400 text-sm">{error}</div>
       )}
 
-      {result && header && stats && (
+      {header && stats && grid && (
         <>
           {/* ── Charts (the main content — immediately visible) ── */}
           <ErrorBoundary>
@@ -970,22 +909,11 @@ export default function RinexReaderPage() {
                 </div>
               }
             >
-              <RinexCharts epochs={result.epochs} systems={stats.systems} />
+              <RinexCharts grid={grid} systems={stats.systems} />
             </Suspense>
           </ErrorBoundary>
 
           {/* ── Signal quality analysis (multipath + cycle slips + completeness) ── */}
-          {qaLoading && (
-            <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4 flex items-center gap-3">
-              <SpinnerIcon className="size-4 animate-spin text-accent shrink-0" />
-              <span className="text-xs text-fg/50">Analyzing quality… {qaProgress > 0 && `${qaProgress}%`}</span>
-              {qaProgress > 0 && (
-                <div className="w-24 h-1 bg-border/40 rounded-full overflow-hidden">
-                  <div className="h-full bg-accent rounded-full transition-all duration-300" style={{ width: `${qaProgress}%` }} />
-                </div>
-              )}
-            </div>
-          )}
           {qaResult && (
             <ErrorBoundary>
               <Suspense fallback={
@@ -1016,7 +944,7 @@ export default function RinexReaderPage() {
                   </div>
                 }
               >
-                <SkyPlotCharts allPositions={allPositions} observedPrns={observedPrns} rxPos={result.header.approxPosition ?? undefined} epochs={result.epochs} />
+                <SkyPlotCharts allPositions={allPositions} observedPrns={observedPrns} rxPos={header.approxPosition ?? undefined} grid={grid} />
               </Suspense>
             </ErrorBoundary>
           )}
@@ -1025,7 +953,30 @@ export default function RinexReaderPage() {
           {obsFiles.length > 0 && (
             <ErrorBoundary>
               <Suspense fallback={null}>
-                <RinexHeaderEditor result={result} file={obsFiles[0]!} readFileText={readFileText} />
+                <RinexHeaderEditor header={header} stats={stats} file={obsFiles[0]!} readFileText={readFileText} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+        </>
+      )}
+
+      {/* ── Nav-only: sky plot + nav summary ──────────────────── */}
+      {!header && navResult && (
+        <>
+          <NavSummary navResult={navResult} />
+          {allPositions && (
+            <ErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
+                    <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
+                    <div className="flex items-center justify-center" style={{ height: 360 }}>
+                      <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+                    </div>
+                  </div>
+                }
+              >
+                <SkyPlotCharts allPositions={allPositions} />
               </Suspense>
             </ErrorBoundary>
           )}

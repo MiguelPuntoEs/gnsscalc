@@ -13,10 +13,11 @@ import type {
   ObsExportResult,
   NavExportResult,
 } from './rinex.worker';
-import type { RinexResult } from './rinex';
+import type { RinexHeader, RinexStats } from './rinex';
 import type { NavResult } from './nav';
 import type { QualityResult } from './quality-analysis';
 import type { AllPositionsData } from './orbit';
+import type { EpochGrid } from './epoch-grid';
 
 /* ================================================================== */
 /*  Singleton worker                                                   */
@@ -38,15 +39,19 @@ function getWorker(): Worker {
 /*  Internal helpers                                                   */
 /* ================================================================== */
 
+let nextRequestId = 1;
+
 function request<T extends WorkerResponse>(
   req: WorkerRequest,
   resultType: T['type'],
   onProgress?: (percent: number) => void,
 ): Promise<T> {
   const w = getWorker();
+  const id = nextRequestId++;
   return new Promise<T>((resolve, reject) => {
     const handler = (ev: MessageEvent<WorkerResponse>) => {
       const msg = ev.data;
+      if ('requestId' in msg && msg.requestId !== id) return; // not ours
       if (msg.type === 'progress') {
         onProgress?.(msg.percent);
       } else if (msg.type === resultType) {
@@ -58,7 +63,7 @@ function request<T extends WorkerResponse>(
       }
     };
     w.addEventListener('message', handler);
-    w.postMessage(req);
+    w.postMessage({ ...req, requestId: id });
   });
 }
 
@@ -117,7 +122,9 @@ function rinex3Filename(
 /* ================================================================== */
 
 export interface ObsParseResult {
-  result: RinexResult;
+  header: RinexHeader;
+  stats: RinexStats;
+  grid: EpochGrid;
   qaResult: QualityResult;
   positions: AllPositionsData | null;
   observedPrns: Set<string>[] | null;
@@ -143,7 +150,9 @@ export async function addObsFiles(
     onProgress,
   );
   return {
-    result: r.result,
+    header: r.header,
+    stats: r.stats,
+    grid: r.grid,
     qaResult: r.qaResult,
     positions: r.positions,
     observedPrns: r.observedPrns?.map(arr => new Set(arr)) ?? null,

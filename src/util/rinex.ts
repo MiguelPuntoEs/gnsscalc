@@ -7,10 +7,13 @@ import { crxRepair, parseCrxDataLine, crxDecompress } from './crx';
 import type { DiffState } from './crx';
 import { SYSTEM_NAMES } from './gnss-constants';
 
-const CHUNK_SIZE = 512 * 1024; // 512 KB — small enough to yield between chunks
+const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB per chunk
 
 /** Yield to the browser so the UI stays responsive during long parses. */
 const yieldToMain = (): Promise<void> => new Promise(r => setTimeout(r, 0));
+
+/** No-op yield for Web Worker context (no UI to keep responsive). */
+const noYield = (): Promise<void> => Promise.resolve();
 
 /* ================================================================== */
 /*  Public types                                                       */
@@ -333,12 +336,23 @@ export type SatObsCallback = (
   values: (number | null)[],
 ) => void;
 
+export interface ParseOptions {
+  onProgress?: (percent: number) => void;
+  signal?: AbortSignal;
+  onSatObs?: SatObsCallback;
+  /** Skip EpochSummary construction and setTimeout yields (for Web Worker). */
+  workerMode?: boolean;
+}
+
 export async function parseRinexStream(
   file: File,
   onProgress?: (percent: number) => void,
   signal?: AbortSignal,
   onSatObs?: SatObsCallback,
+  workerMode?: boolean,
 ): Promise<RinexResult> {
+  const skipEpochs = !!workerMode;
+  const yield_ = workerMode ? noYield : yieldToMain;
   const decoder = new TextDecoder('ascii');
   let buffer = '';
   let header: RinexHeader | null = null;
@@ -383,6 +397,7 @@ export async function parseRinexStream(
   }
 
   function pushSnr(sys: string, prn: string, val: number, band?: string) {
+    if (skipEpochs) return;
     snrValues.push(val);
     if (!snrPerSystemAccum[sys]) snrPerSystemAccum[sys] = [];
     snrPerSystemAccum[sys]!.push(val);
@@ -397,26 +412,28 @@ export async function parseRinexStream(
 
   function finishEpoch() {
     if (!epochInfo) return;
-    const snrBySys: Record<string, number> = {};
-    for (const [sys, vals] of Object.entries(snrPerSystemAccum)) {
-      if (vals.length > 0) snrBySys[sys] = vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (!skipEpochs) {
+      const snrBySys: Record<string, number> = {};
+      for (const [sys, vals] of Object.entries(snrPerSystemAccum)) {
+        if (vals.length > 0) snrBySys[sys] = vals.reduce((a, b) => a + b, 0) / vals.length;
+      }
+      const meanSnr = snrValues.length > 0
+        ? snrValues.reduce((a, b) => a + b, 0) / snrValues.length : null;
+      const snrPerSat: Record<string, number> = {};
+      for (const [prn, vals] of Object.entries(snrPerSatAccum)) {
+        if (vals.length > 0) snrPerSat[prn] = vals.reduce((a, b) => a + b, 0) / vals.length;
+      }
+      const snrPerSatBand: Record<string, number> = {};
+      for (const [key, vals] of Object.entries(snrPerSatBandAccum)) {
+        if (vals.length > 0) snrPerSatBand[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
+      }
+      epochs.push({
+        time: epochInfo.time,
+        totalSats: Object.values(satsPerSystem).reduce((a, b) => a + b, 0),
+        satsPerSystem: { ...satsPerSystem },
+        meanSnr, snrPerSystem: snrBySys, snrPerSat, snrPerSatBand,
+      });
     }
-    const meanSnr = snrValues.length > 0
-      ? snrValues.reduce((a, b) => a + b, 0) / snrValues.length : null;
-    const snrPerSat: Record<string, number> = {};
-    for (const [prn, vals] of Object.entries(snrPerSatAccum)) {
-      if (vals.length > 0) snrPerSat[prn] = vals.reduce((a, b) => a + b, 0) / vals.length;
-    }
-    const snrPerSatBand: Record<string, number> = {};
-    for (const [key, vals] of Object.entries(snrPerSatBandAccum)) {
-      if (vals.length > 0) snrPerSatBand[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
-    }
-    epochs.push({
-      time: epochInfo.time,
-      totalSats: Object.values(satsPerSystem).reduce((a, b) => a + b, 0),
-      satsPerSystem: { ...satsPerSystem },
-      meanSnr, snrPerSystem: snrBySys, snrPerSat, snrPerSatBand,
-    });
     epochInfo = null;
     satsPerSystem = {};
     snrValues = [];
@@ -436,21 +453,41 @@ export async function parseRinexStream(
 
   /* -------- RINEX 3 (non-CRX) -------- */
 
+  // Per-system SNR index cache (built once per system on first encounter)
+  const snrCache = new Map<string, { idx: number; band: string }[]>();
+  function getSnrIndices(sys: string): { idx: number; band: string }[] {
+    let cached = snrCache.get(sys);
+    if (!cached) {
+      cached = snrIndicesWithBand(header!.obsTypes, sys);
+      snrCache.set(sys, cached);
+    }
+    return cached;
+  }
+
   function processSatLineV3(line: string) {
     if (!header || line.length < 3) return;
     const sys = line[0]!;
     const prn = line.substring(0, 3);
     trackSat(sys, prn);
     const obsLine = line.substring(3);
-    for (const { idx, band } of snrIndicesWithBand(header.obsTypes, sys)) {
-      const val = readObsValue(obsLine, idx);
-      if (val !== null && val > 0) pushSnr(sys, prn, val, band);
-    }
+    const codes = header.obsTypes[sys] ?? [];
+
     if (onSatObs && epochInfo) {
-      const codes = header.obsTypes[sys] ?? [];
+      // Read all values once, use for both SNR and callback
       const values: (number | null)[] = new Array(codes.length);
       for (let i = 0; i < codes.length; i++) values[i] = readObsValue(obsLine, i);
+      if (!skipEpochs) {
+        for (const { idx, band } of getSnrIndices(sys)) {
+          const val = values[idx] ?? null;
+          if (val !== null && val > 0) pushSnr(sys, prn, val, band);
+        }
+      }
       onSatObs(epochInfo.time, prn, codes, values);
+    } else if (!skipEpochs) {
+      for (const { idx, band } of getSnrIndices(sys)) {
+        const val = readObsValue(obsLine, idx);
+        if (val !== null && val > 0) pushSnr(sys, prn, val, band);
+      }
     }
   }
 
@@ -519,11 +556,13 @@ export async function parseRinexStream(
     }
     while (states.length < ntype) states.push(null);
 
-    // Determine which obs indices are SNR (with band info)
-    const sBand = header.version >= 3
-      ? snrIndicesWithBand(header.obsTypes, sys)
-      : snrIndicesWithBandV2(header.obsTypes);
-    const sBandMap = new Map(sBand.map(s => [s.idx, s.band]));
+    // Determine which obs indices are SNR (with band info) — only needed for EpochSummary
+    const sBandMap = skipEpochs ? null : new Map(
+      (header.version >= 3
+        ? getSnrIndices(sys)
+        : snrIndicesWithBandV2(header.obsTypes)
+      ).map(s => [s.idx, s.band]),
+    );
 
     // Decompress each observation, collecting values for callback
     const obsValues: (number | null)[] = onSatObs ? new Array(ntype).fill(null) : [];
@@ -537,10 +576,12 @@ export async function parseRinexStream(
 
       if (onSatObs) obsValues[j] = result / 1000;
 
-      const band = sBandMap.get(j);
-      if (band !== undefined) {
-        const snrFloat = result / 1000;
-        if (snrFloat > 0) pushSnr(sys, prn, snrFloat, band);
+      if (sBandMap) {
+        const band = sBandMap.get(j);
+        if (band !== undefined) {
+          const snrFloat = result / 1000;
+          if (snrFloat > 0) pushSnr(sys, prn, snrFloat, band);
+        }
       }
     }
 
@@ -796,7 +837,7 @@ export async function parseRinexStream(
       processChunkText(decoder.decode(value, { stream: true }), false);
       // Progress based on compressed bytes is not exact, estimate from decompressed
       onProgress?.(Math.min(99, Math.round((bytesRead / (file.size * 4)) * 100)));
-      await yieldToMain();
+      await yield_();
     }
     processChunkText(decoder.decode(), true);
   } else {
@@ -809,7 +850,7 @@ export async function parseRinexStream(
       const arrayBuf = await slice.arrayBuffer();
       processChunkText(decoder.decode(arrayBuf, { stream: end < file.size }), false);
       onProgress?.(Math.min(99, Math.round((end / file.size) * 100)));
-      await yieldToMain();
+      await yield_();
     }
 
     // Process remaining buffer
@@ -867,64 +908,3 @@ function computeStats(
   };
 }
 
-/* ================================================================== */
-/*  Chart downsampling                                                 */
-/* ================================================================== */
-
-const MAX_CHART_POINTS = 2000;
-
-export function downsampleEpochs(epochs: EpochSummary[]): EpochSummary[] {
-  if (epochs.length <= MAX_CHART_POINTS) return epochs;
-
-  const groupSize = Math.ceil(epochs.length / MAX_CHART_POINTS);
-  const result: EpochSummary[] = [];
-
-  for (let i = 0; i < epochs.length; i += groupSize) {
-    const group = epochs.slice(i, i + groupSize);
-    const gn = group.length;
-
-    const allSystems = new Set<string>();
-    for (const e of group) for (const sys of Object.keys(e.satsPerSystem)) allSystems.add(sys);
-    const satsPerSystem: Record<string, number> = {};
-    for (const sys of allSystems) {
-      satsPerSystem[sys] = Math.round(group.reduce((s, e) => s + (e.satsPerSystem[sys] ?? 0), 0) / gn);
-    }
-
-    const snrSystems = new Set<string>();
-    for (const e of group) for (const sys of Object.keys(e.snrPerSystem)) snrSystems.add(sys);
-    const snrPerSystem: Record<string, number> = {};
-    for (const sys of snrSystems) {
-      const vals = group.map(e => e.snrPerSystem[sys]).filter((v): v is number => v != null);
-      if (vals.length > 0) snrPerSystem[sys] = vals.reduce((a, b) => a + b, 0) / vals.length;
-    }
-
-    const snrVals = group.map(e => e.meanSnr).filter((v): v is number => v !== null);
-
-    const allPrns = new Set<string>();
-    for (const e of group) for (const prn of Object.keys(e.snrPerSat)) allPrns.add(prn);
-    const snrPerSat: Record<string, number> = {};
-    for (const prn of allPrns) {
-      const vals = group.map(e => e.snrPerSat[prn]).filter((v): v is number => v != null);
-      if (vals.length > 0) snrPerSat[prn] = vals.reduce((a, b) => a + b, 0) / vals.length;
-    }
-
-    const allBandKeys = new Set<string>();
-    for (const e of group) if (e.snrPerSatBand) for (const k of Object.keys(e.snrPerSatBand)) allBandKeys.add(k);
-    const snrPerSatBand: Record<string, number> = {};
-    for (const k of allBandKeys) {
-      const vals = group.map(e => e.snrPerSatBand?.[k]).filter((v): v is number => v != null);
-      if (vals.length > 0) snrPerSatBand[k] = vals.reduce((a, b) => a + b, 0) / vals.length;
-    }
-
-    result.push({
-      time: group[Math.floor(gn / 2)]!.time,
-      totalSats: Math.round(group.reduce((s, e) => s + e.totalSats, 0) / gn),
-      satsPerSystem,
-      meanSnr: snrVals.length > 0 ? snrVals.reduce((a, b) => a + b, 0) / snrVals.length : null,
-      snrPerSystem,
-      snrPerSat,
-      snrPerSatBand: allBandKeys.size > 0 ? snrPerSatBand : undefined,
-    });
-  }
-  return result;
-}
