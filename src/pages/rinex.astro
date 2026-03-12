@@ -12,7 +12,9 @@ const rinexFaq = [
   { question: 'What is C/N0?', answer: 'C/N0 (carrier-to-noise density ratio) is a measure of signal quality expressed in dB-Hz. Higher values indicate a stronger, cleaner signal. Typical values range from 20 dB-Hz (weak) to 50+ dB-Hz (strong, open sky).' },
   { question: 'Can this tool handle large files?', answer: 'Yes. The parser reads the file in small chunks using streaming, so even multi-gigabyte RINEX files can be processed without exceeding browser memory. Nothing is uploaded — all processing happens locally in your browser.' },
   { question: 'What constellations are supported?', answer: 'All standard GNSS constellations: GPS (G), GLONASS (R), Galileo (E), BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S). GLONASS FDMA frequencies are computed per-satellite from the channel numbers in the RINEX header.' },
-  { question: 'Can I load a navigation file?', answer: 'Yes. Drop a RINEX navigation file alongside the observation file to compute satellite orbits, sky plots, elevation angles and DOP values. Multipath vs elevation charts are also available when orbit data is present.' },
+  { question: 'Can I load a navigation file?', answer: 'Yes. Drop a RINEX navigation file alongside the observation file to compute satellite orbits, sky plots, elevation angles and DOP values. Multipath vs elevation charts are also available when orbit data is present. You can load multiple constellation-specific nav files at once (e.g. .26n + .26g + .26l) and they will be merged automatically.' },
+  { question: 'What do the legacy RINEX file extensions mean?', answer: 'Legacy (RINEX 2) extensions follow the pattern .YYx, where YY is the two-digit year and x indicates the file type: n = GPS nav, g = GLONASS nav, l = Galileo nav, f = BeiDou nav, h = SBAS/geostationary nav, q = QZSS nav, i = NavIC/IRNSS nav, p = mixed nav, o = observation, d = Hatanaka-compressed observation, m = meteorological. For example, .26n is a GPS navigation file from 2026 and .24o is an observation file from 2024.' },
+  { question: 'How does RINEX 3+ long-name file naming work?', answer: 'RINEX 3+ uses a structured long filename: XXXXMRCCC_K_YYYYDDDHHMM_PER_INT_TT.FMT(.gz), where XXXX = station (4 char), M = monument number, R = receiver number, CCC = country ISO code, K = data source (R=receiver, S=stream, U=unknown), YYYYDDD = year and day-of-year, HHMM = start time, PER = file period (e.g. 01D = 1 day, 01H = 1 hour), INT = sample interval (e.g. 30S, 01S), TT = file type (MO=mixed obs, GO/RO/EO/CO/JO/IO/SO=per-system obs, MN=mixed nav, GN/RN/EN/CN/JN/IN/SN=per-system nav), and FMT = format (rnx or crx). Example: BRUX00BEL_R_20260120000_01D_30S_MO.rnx.gz is a 1-day, 30s mixed observation file from Brussels.' },
 ];
 ---
 
@@ -92,10 +94,10 @@ const rinexFaq = [
   <section>
     <h2>Related Tools</h2>
     <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
-      <li><a href="/ntrip" class="text-accent hover:text-white">NTRIP Client</a> — record live RINEX observations from GNSS correction streams</li>
-      <li><a href="/nmea" class="text-accent hover:text-white">NMEA Log Viewer</a> — parse NMEA logs and plot tracks on a map</li>
-      <li><a href="/" class="text-accent hover:text-white">GPS Time Converter</a> — convert GPS week, TOW, Julian Date and other time scales</li>
-      <li><a href="/spectrum" class="text-accent hover:text-white">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>
+      <li><a href="/ntrip" class="text-accent hover:text-fg">NTRIP Client</a> — record live RINEX observations from GNSS correction streams</li>
+      <li><a href="/nmea" class="text-accent hover:text-fg">NMEA Log Viewer</a> — parse NMEA logs and plot tracks on a map</li>
+      <li><a href="/" class="text-accent hover:text-fg">GPS Time Converter</a> — convert GPS week, TOW, Julian Date and other time scales</li>
+      <li><a href="/spectrum" class="text-accent hover:text-fg">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>
     </ul>
   </section>
 
@@ -170,7 +172,78 @@ const rinexFaq = [
         Yes. Drop a RINEX navigation file alongside the observation file to
         compute satellite orbits, sky plots, elevation angles and DOP values.
         Multipath vs elevation charts are also available when orbit data is
-        present.
+        present. You can load multiple constellation-specific nav files at once
+        (e.g.&nbsp;.26n + .26g + .26l) and they will be merged automatically.
+      </dd>
+      <dt>What do the legacy RINEX file extensions mean?</dt>
+      <dd>
+        <p>
+          Legacy (RINEX&nbsp;2) extensions follow the pattern <code>.YYx</code>,
+          where <code>YY</code> is the two-digit year and <code>x</code> indicates
+          the file type:
+        </p>
+        <table class="text-sm mt-2 mb-2">
+          <thead>
+            <tr>
+              <th class="pr-4 text-left font-medium text-fg/70">Ext</th>
+              <th class="text-left font-medium text-fg/70">Type</th>
+            </tr>
+          </thead>
+          <tbody class="text-fg/50">
+            <tr><td class="pr-4"><code>.YYo</code></td><td>Observation data</td></tr>
+            <tr><td class="pr-4"><code>.YYd</code></td><td>Hatanaka-compressed observation</td></tr>
+            <tr><td class="pr-4"><code>.YYn</code></td><td>GPS navigation</td></tr>
+            <tr><td class="pr-4"><code>.YYg</code></td><td>GLONASS navigation</td></tr>
+            <tr><td class="pr-4"><code>.YYl</code></td><td>Galileo navigation</td></tr>
+            <tr><td class="pr-4"><code>.YYf</code></td><td>BeiDou navigation</td></tr>
+            <tr><td class="pr-4"><code>.YYh</code></td><td>SBAS / geostationary navigation</td></tr>
+            <tr><td class="pr-4"><code>.YYq</code></td><td>QZSS navigation</td></tr>
+            <tr><td class="pr-4"><code>.YYi</code></td><td>NavIC / IRNSS navigation</td></tr>
+            <tr><td class="pr-4"><code>.YYp</code></td><td>Mixed navigation (all constellations)</td></tr>
+            <tr><td class="pr-4"><code>.YYm</code></td><td>Meteorological data</td></tr>
+          </tbody>
+        </table>
+        <p>
+          For example, <code>.26n</code> is a GPS navigation file from 2026
+          and <code>.24o</code> is an observation file from 2024.
+        </p>
+      </dd>
+      <dt>How does RINEX 3+ long-name file naming work?</dt>
+      <dd>
+        <p>
+          RINEX&nbsp;3+ uses a structured long filename with fixed fields:
+        </p>
+        <p class="text-sm mt-1 mb-1">
+          <code>XXXXMRCCC_K_YYYYDDDHHMM_PER_INT_TT.FMT(.gz)</code>
+        </p>
+        <table class="text-sm mt-2 mb-2">
+          <thead>
+            <tr>
+              <th class="pr-4 text-left font-medium text-fg/70">Field</th>
+              <th class="text-left font-medium text-fg/70">Meaning</th>
+            </tr>
+          </thead>
+          <tbody class="text-fg/50">
+            <tr><td class="pr-4"><code>XXXX</code></td><td>Station name (4 char)</td></tr>
+            <tr><td class="pr-4"><code>M</code></td><td>Monument number (0–9)</td></tr>
+            <tr><td class="pr-4"><code>R</code></td><td>Receiver number (0–9)</td></tr>
+            <tr><td class="pr-4"><code>CCC</code></td><td>Country ISO 3166-1 code</td></tr>
+            <tr><td class="pr-4"><code>K</code></td><td>Data source — R=receiver, S=stream, U=unknown</td></tr>
+            <tr><td class="pr-4"><code>YYYYDDD</code></td><td>Year and day-of-year</td></tr>
+            <tr><td class="pr-4"><code>HHMM</code></td><td>Start hour and minute (UTC)</td></tr>
+            <tr><td class="pr-4"><code>PER</code></td><td>File period — 15M, 01H, 01D, 01Y…</td></tr>
+            <tr><td class="pr-4"><code>INT</code></td><td>Sample interval — 01S, 30S, 05M…</td></tr>
+            <tr><td class="pr-4"><code>TT</code></td><td>File type — MO/GO/EO/CO…&nbsp;(obs), MN/GN/EN/CN…&nbsp;(nav)</td></tr>
+            <tr><td class="pr-4"><code>FMT</code></td><td>Format — rnx or crx (Hatanaka)</td></tr>
+          </tbody>
+        </table>
+        <p>
+          The two-letter type code combines the system letter (G=GPS, R=GLONASS,
+          E=Galileo, C=BeiDou, J=QZSS, I=NavIC, S=SBAS, M=mixed) with O for
+          observation or N for navigation. Example:
+          <code>BRUX00BEL_R_20260120000_01D_30S_MO.rnx.gz</code> is a 1-day,
+          30&thinsp;s mixed observation file from Brussels.
+        </p>
       </dd>
     </dl>
   </section>

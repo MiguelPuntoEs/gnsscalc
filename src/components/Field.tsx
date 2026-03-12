@@ -9,6 +9,7 @@ export type FieldProps = {
   numeric?: boolean;
   disabled?: boolean;
   readOnly?: boolean;
+  validate?: (value: string) => string | null;
 };
 
 export default function Field({
@@ -18,9 +19,10 @@ export default function Field({
   numeric,
   disabled,
   readOnly,
+  validate,
 }: FieldProps) {
   const id = useId();
-  const edit = useEditableValue(value, onCommit);
+  const edit = useEditableValue(value, onCommit, validate);
   const getValue = useCallback(() => edit.value, [edit.value]);
   const { copied, copy } = useCopyFeedback(getValue);
 
@@ -41,6 +43,11 @@ export default function Field({
           className={`w-full ${edit.error ? 'border-2 border-red-500 text-red-500' : ''}`}
         />
         <CopyIcon copied={copied} onCopy={copy} />
+        {edit.errorMessage && (
+          <span className="absolute left-0 top-full mt-0.5 text-[10px] text-red-400 whitespace-nowrap">
+            {edit.errorMessage}
+          </span>
+        )}
       </span>
     </>
   );

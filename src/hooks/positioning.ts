@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { AERResult, CoordinateFormats, DistanceResult, ENUResult, PositionResult } from '@/types/position';
-import { car2geo, getAer, getEnuDifference } from '@/util/positioning';
-import { geo2utm, geo2maidenhead, geo2geohash } from '@/util/coordinates';
+import { ecefToGeodetic, getAer, getEnuDifference } from '@/util/positioning';
+import { geodeticToUtm, geodeticToMaidenhead, geodeticToGeohash } from '@/util/coordinates';
 import { vincenty, rhumbLine, euclidean3D, greatCircleMidpoint, horizonDistance } from '@/util/geodesy';
 import { deg2hms, rad2deg } from '../util/units';
 
@@ -9,7 +9,7 @@ export function usePositionCalculator(
   position: [number, number, number]
 ): PositionResult {
   return useMemo(() => {
-    const [latitude, longitude, height] = car2geo(
+    const [latitude, longitude, height] = ecefToGeodetic(
       position[0],
       position[1],
       position[2]
@@ -92,8 +92,8 @@ export function useDistanceCalculator(
   refPosition: [number, number, number]
 ): DistanceResult {
   return useMemo(() => {
-    const [lat1, lon1, h1] = car2geo(refPosition[0], refPosition[1], refPosition[2]);
-    const [lat2, lon2, h2] = car2geo(position[0], position[1], position[2]);
+    const [lat1, lon1, h1] = ecefToGeodetic(refPosition[0], refPosition[1], refPosition[2]);
+    const [lat2, lon2, h2] = ecefToGeodetic(position[0], position[1], position[2]);
 
     const { distance: orthodromic, initialBearing, finalBearing } = vincenty(lat1, lon1, lat2, lon2);
     const { distance: loxodromic, bearing: rhumbBearing } = rhumbLine(lat1, lon1, lat2, lon2);
@@ -122,12 +122,12 @@ export function useCoordinateFormats(
   position: [number, number, number]
 ): CoordinateFormats {
   return useMemo(() => {
-    const [lat, lon] = car2geo(position[0], position[1], position[2]);
+    const [lat, lon] = ecefToGeodetic(position[0], position[1], position[2]);
 
     return {
-      utm: geo2utm(lat, lon),
-      maidenhead: geo2maidenhead(lat, lon),
-      geohash: geo2geohash(lat, lon),
+      utm: geodeticToUtm(lat, lon),
+      maidenhead: geodeticToMaidenhead(lat, lon),
+      geohash: geodeticToGeohash(lat, lon),
     };
   }, [position[0], position[1], position[2]]);
 }

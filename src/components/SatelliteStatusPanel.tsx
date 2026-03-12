@@ -396,7 +396,7 @@ export default function SatelliteStatusPanel({ satellites, ephemerides }: Props)
         {/* Legend */}
         <div className="flex items-center gap-3 text-[9px] text-fg/25">
           <span className="flex items-center gap-1">
-            <span className="inline-block size-2 rounded-sm border border-white/10 bg-white/[0.02]" />
+            <span className="inline-block size-2 rounded-sm border border-fg/10 bg-fg/[0.02]" />
             Not seen
           </span>
           <span className="flex items-center gap-1">

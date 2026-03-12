@@ -7,6 +7,7 @@ export function deg2rad(degrees: number): number {
 }
 
 export function deg2hms(deg: number): [number, number, number] {
+  deg = Math.abs(deg);
   let h = Math.floor(deg);
   let m = Math.floor(deg * 60) % 60;
   let s = (deg * 3600) % 60;

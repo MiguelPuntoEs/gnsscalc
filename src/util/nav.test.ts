@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseNavFile } from './nav';
-import { keplerPosition, ecefToAzEl, ecefToGeodetic, computeDop } from './orbit';
+import { keplerPosition, ecefToAzEl, computeDop } from './orbit';
+import { ecefToGeodetic } from './positioning';
 import type { KeplerEphemeris } from './nav';
 
 const NAV_FILE = join(__dirname, '../../data/rinex/navigation/ABMF00GLP_R_20260010000_01D_MN.rnx');
@@ -73,13 +74,13 @@ describe('Orbit computation', () => {
 
   it('converts ECEF to geodetic', () => {
     // Point on equator at prime meridian
-    const { lat, lon } = ecefToGeodetic(6378137, 0, 0);
+    const [lat, lon] = ecefToGeodetic(6378137, 0, 0);
     expect(lat).toBeCloseTo(0, 5);
     expect(lon).toBeCloseTo(0, 5);
 
     // North pole
-    const np = ecefToGeodetic(0, 0, 6356752.314);
-    expect(np.lat).toBeCloseTo(Math.PI / 2, 3);
+    const [npLat] = ecefToGeodetic(0, 0, 6356752.314);
+    expect(npLat).toBeCloseTo(Math.PI / 2, 3);
   });
 
   it('computes DOP from satellite geometry', () => {

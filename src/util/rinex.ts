@@ -5,6 +5,7 @@
 
 import { crxRepair, parseCrxDataLine, crxDecompress } from './crx';
 import type { DiffState } from './crx';
+import { SYSTEM_NAMES } from './gnss-constants';
 
 const CHUNK_SIZE = 512 * 1024; // 512 KB — small enough to yield between chunks
 
@@ -75,10 +76,7 @@ export interface RinexResult {
 /*  System labels                                                      */
 /* ================================================================== */
 
-const SYSTEM_NAMES: Record<string, string> = {
-  G: 'GPS', R: 'GLONASS', E: 'Galileo', C: 'BeiDou',
-  J: 'QZSS', I: 'NavIC', S: 'SBAS',
-};
+// SYSTEM_NAMES imported from gnss-constants.ts
 
 /** Canonical constellation display order: GPS → GLONASS → Galileo → BeiDou → QZSS → NavIC → SBAS */
 export const SYSTEM_ORDER = ['G', 'R', 'E', 'C', 'J', 'I', 'S'] as const;

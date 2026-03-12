@@ -53,11 +53,11 @@ describe('parseNmeaFile', () => {
     const content = '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*76';
     const { fixes, stats } = parseNmeaFile(content);
     expect(fixes).toHaveLength(1);
-    expect(fixes[0].lat).toBeCloseTo(53.36134, 4);
-    expect(fixes[0].lon).toBeCloseTo(-6.50562, 4);
-    expect(fixes[0].alt).toBeCloseTo(61.7, 1);
-    expect(fixes[0].satellites).toBe(8);
-    expect(fixes[0].fixQuality).toBe(1);
+    expect(fixes[0]!.lat).toBeCloseTo(53.36134, 4);
+    expect(fixes[0]!.lon).toBeCloseTo(-6.50562, 4);
+    expect(fixes[0]!.alt).toBeCloseTo(61.7, 1);
+    expect(fixes[0]!.satellites).toBe(8);
+    expect(fixes[0]!.fixQuality).toBe(1);
     expect(stats.validFixes).toBe(1);
   });
 
@@ -65,14 +65,14 @@ describe('parseNmeaFile', () => {
     const content = '$GPRMC,092750.000,A,5321.6802,N,00630.3372,W,0.02,31.66,280511,,,A*43';
     const { fixes } = parseNmeaFile(content);
     expect(fixes).toHaveLength(1);
-    expect(fixes[0].lat).toBeCloseTo(53.36134, 4);
-    expect(fixes[0].speed).toBeCloseTo(0.02, 2);
-    expect(fixes[0].course).toBeCloseTo(31.66, 2);
+    expect(fixes[0]!.lat).toBeCloseTo(53.36134, 4);
+    expect(fixes[0]!.speed).toBeCloseTo(0.02, 2);
+    expect(fixes[0]!.course).toBeCloseTo(31.66, 2);
     // RMC has date
-    expect(fixes[0].time).not.toBeNull();
-    expect(fixes[0].time!.getUTCFullYear()).toBe(2011);
-    expect(fixes[0].time!.getUTCMonth()).toBe(4); // May = 4
-    expect(fixes[0].time!.getUTCDate()).toBe(28);
+    expect(fixes[0]!.time).not.toBeNull();
+    expect(fixes[0]!.time!.getUTCFullYear()).toBe(2011);
+    expect(fixes[0]!.time!.getUTCMonth()).toBe(4); // May = 4
+    expect(fixes[0]!.time!.getUTCDate()).toBe(28);
   });
 
   it('merges GGA and RMC from same epoch', () => {
@@ -82,10 +82,10 @@ describe('parseNmeaFile', () => {
     ].join('\n');
     const { fixes } = parseNmeaFile(content);
     expect(fixes).toHaveLength(1);
-    expect(fixes[0].alt).toBeCloseTo(61.7, 1);
-    expect(fixes[0].satellites).toBe(8);
-    expect(fixes[0].speed).toBeCloseTo(0.02, 2);
-    expect(fixes[0].time!.getUTCFullYear()).toBe(2011);
+    expect(fixes[0]!.alt).toBeCloseTo(61.7, 1);
+    expect(fixes[0]!.satellites).toBe(8);
+    expect(fixes[0]!.speed).toBeCloseTo(0.02, 2);
+    expect(fixes[0]!.time!.getUTCFullYear()).toBe(2011);
   });
 
   it('skips invalid GGA (fix quality 0)', () => {
@@ -104,7 +104,7 @@ describe('parseNmeaFile', () => {
     const content = '$GNGGA,092750.000,5321.6802,N,00630.3372,W,1,12,0.80,61.7,M,55.2,M,,*59';
     const { fixes } = parseNmeaFile(content);
     expect(fixes).toHaveLength(1);
-    expect(fixes[0].satellites).toBe(12);
+    expect(fixes[0]!.satellites).toBe(12);
   });
 
   it('rejects lines with bad checksum', () => {

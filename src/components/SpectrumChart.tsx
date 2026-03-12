@@ -7,6 +7,7 @@ import {
 } from '../util/gnss-signals';
 import { BDS_SATELLITES } from '../util/gnss-constants';
 import { phiBPSK, phiBOCs, phiBOCc, phiAltBOC, computePsdDb } from '../util/psd';
+import { useChartTheme, getChartTheme } from '../hooks/useChartTheme';
 
 const F0 = 1.023e6;
 const HZ_IN_MHZ = 1e6;
@@ -24,23 +25,23 @@ function makePsdFn(sig: SignalDef): (fHz: number) => number {
     return (fHz: number) => {
       let sum = 0;
       for (let i = 0; i < weights.length; i++) {
-        const mod = modulations[i];
-        const ps = paramSets[i];
+        const mod = modulations[i]!;
+        const ps = paramSets[i]!;
         let val = 0;
-        if (mod === 'BOCs') val = phiBOCs(fHz, F0, ps[0], ps[1]);
-        else if (mod === 'BOCc') val = phiBOCc(fHz, F0, ps[0], ps[1]);
-        else if (mod === 'BPSK') val = phiBPSK(fHz, F0, ps[0]);
-        sum += weights[i] * val;
+        if (mod === 'BOCs') val = phiBOCs(fHz, F0, ps[0]!, ps[1]!);
+        else if (mod === 'BOCc') val = phiBOCc(fHz, F0, ps[0]!, ps[1]!);
+        else if (mod === 'BPSK') val = phiBPSK(fHz, F0, ps[0]!);
+        sum += weights[i]! * val;
       }
       return sum;
     };
   }
   const p = sig.params;
   switch (sig.modulation) {
-    case 'BPSK': return (fHz: number) => phiBPSK(fHz, F0, p[0]);
-    case 'BOCs': return (fHz: number) => phiBOCs(fHz, F0, p[0], p[1]);
-    case 'BOCc': return (fHz: number) => phiBOCc(fHz, F0, p[0], p[1]);
-    case 'AltBOC': return (fHz: number) => phiAltBOC(fHz, F0, p[0], p[1]);
+    case 'BPSK': return (fHz: number) => phiBPSK(fHz, F0, p[0]!);
+    case 'BOCs': return (fHz: number) => phiBOCs(fHz, F0, p[0]!, p[1]!);
+    case 'BOCc': return (fHz: number) => phiBOCc(fHz, F0, p[0]!, p[1]!);
+    case 'AltBOC': return (fHz: number) => phiAltBOC(fHz, F0, p[0]!, p[1]!);
     default: return () => 0;
   }
 }
@@ -98,6 +99,7 @@ const BDS_GROUPS = (() => {
 })();
 
 export default function SpectrumChart() {
+  const theme = useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -110,7 +112,7 @@ export default function SpectrumChart() {
   const [canvasWidth, setCanvasWidth] = useState(900);
   const [showBdsTable, setShowBdsTable] = useState(true);
 
-  const band = BAND_PRESETS[bandIdx];
+  const band = BAND_PRESETS[bandIdx]!;
   const visibleRows = useMemo(
     () => CONSTELLATIONS.filter((c) => enabled[c.key]),
     [enabled],
@@ -133,6 +135,7 @@ export default function SpectrumChart() {
 
   const draw = useCallback(
     (canvas: HTMLCanvasElement) => {
+      const t = getChartTheme();
       const dpr = window.devicePixelRatio || 1;
       const w = canvasWidth;
       const h = canvasHeight;
@@ -208,9 +211,9 @@ export default function SpectrumChart() {
           const path = new Path2D();
           let started = false;
           for (let i = 0; i < freqsMHz.length; i++) {
-            const xBase = toX(freqsMHz[i]);
+            const xBase = toX(freqsMHz[i]!);
             if (xBase < plotLeft - 10 || xBase > plotRight + 10) continue;
-            const dbVal = psdDb[i] + PSD_OFFSET;
+            const dbVal = psdDb[i]! + PSD_OFFSET;
             if (dbVal < dbMin) continue;
             const amp = toAmp(dbVal);
             const [px, py] = toXY(xBase, amp);
@@ -224,9 +227,9 @@ export default function SpectrumChart() {
           }
           if (started) {
             for (let i = freqsMHz.length - 1; i >= 0; i--) {
-              const xBase = toX(freqsMHz[i]);
+              const xBase = toX(freqsMHz[i]!);
               if (xBase < plotLeft - 10 || xBase > plotRight + 10) continue;
-              const dbVal = psdDb[i] + PSD_OFFSET;
+              const dbVal = psdDb[i]! + PSD_OFFSET;
               if (dbVal < dbMin) continue;
               path.lineTo(xBase, baseline);
               break;
@@ -243,13 +246,13 @@ export default function SpectrumChart() {
             ctx.lineWidth = 1;
             ctx.beginPath();
             for (let i = 0; i < freqsMHz.length; i++) {
-              const xBase = toX(freqsMHz[i]);
+              const xBase = toX(freqsMHz[i]!);
               if (xBase < plotLeft - 10 || xBase > plotRight + 10) continue;
-              const dbVal = psdDb[i] + PSD_OFFSET;
+              const dbVal = psdDb[i]! + PSD_OFFSET;
               if (dbVal < dbMin) continue;
               const amp = toAmp(dbVal);
               const [px, py] = toXY(xBase, amp);
-              if (i === 0 || toX(freqsMHz[i - 1]) < plotLeft - 10) ctx.moveTo(px, py);
+              if (i === 0 || toX(freqsMHz[i - 1]!) < plotLeft - 10) ctx.moveTo(px, py);
               else ctx.lineTo(px, py);
             }
             ctx.stroke();
@@ -272,7 +275,7 @@ export default function SpectrumChart() {
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.lineWidth = 1;
       ctx.font = '9px Inter, system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(208,208,211,0.35)';
+      ctx.fillStyle = t.labelFill;
       ctx.textAlign = 'center';
       for (const freq of refFreqs) {
         const x = toX(freq);
@@ -288,7 +291,7 @@ export default function SpectrumChart() {
 
       // X-axis labels
       ctx.font = '10px Inter, system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = t.canvasText + '0.5)';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       const tickStep = maxMHz - minMHz > 200 ? 50 : maxMHz - minMHz > 80 ? 20 : 10;
@@ -302,7 +305,7 @@ export default function SpectrumChart() {
         ctx.lineTo(x, bottomY + 4);
         ctx.stroke();
       }
-      ctx.fillStyle = 'rgba(208,208,211,0.4)';
+      ctx.fillStyle = t.canvasText + '0.4)';
       ctx.font = '10px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Frequency [MHz]', (plotLeft + plotRight) / 2, bottomY + 20);
@@ -389,7 +392,7 @@ export default function SpectrumChart() {
                 onClick={() => setBandIdx(i)}
                 className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
                   i === bandIdx
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent text-fg-strong'
                     : 'bg-bg-raised/60 text-fg/60 hover:text-fg/80 border border-border/30'
                 }`}
               >
@@ -415,7 +418,7 @@ export default function SpectrumChart() {
             <span
               className="inline-block w-2.5 h-2.5 rounded-sm"
               style={{
-                backgroundColor: enabled[c.key] ? c.color : 'rgba(255,255,255,0.1)',
+                backgroundColor: enabled[c.key] ? c.color : 'rgba(var(--color-fg) / 0.1)',
               }}
             />
             {c.label}
@@ -439,9 +442,9 @@ export default function SpectrumChart() {
             style={{
               left: tooltip.x + 12,
               top: tooltip.y - 40,
-              backgroundColor: '#32323f',
-              border: '1px solid rgba(74,74,90,0.6)',
-              color: '#d0d0d3',
+              backgroundColor: theme.tooltipBg,
+              border: theme.tooltipBorder,
+              color: theme.tooltipFg,
               whiteSpace: 'nowrap',
             }}
           >

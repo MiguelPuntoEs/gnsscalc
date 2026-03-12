@@ -5,6 +5,8 @@
 
 import type { KeplerEphemeris, GlonassEphemeris, Ephemeris } from './nav';
 import type { EphemerisInfo } from './ntrip';
+import { ecefToGeodetic } from './positioning';
+export { geodeticToEcef, ecefToGeodetic } from './positioning';
 
 /* ================================================================== */
 /*  Constants                                                          */
@@ -244,52 +246,12 @@ export function glonassPosition(eph: GlonassEphemeris, tUtc: number): SatPositio
 /*  Coordinate transforms                                              */
 /* ================================================================== */
 
-/** Convert ECEF (x,y,z) in meters to geodetic (lat, lon) in radians. */
-export function ecefToGeodetic(x: number, y: number, z: number): { lat: number; lon: number; alt: number } {
-  const a = 6378137.0;
-  const f = 1 / 298.257223563;
-  const b = a * (1 - f);
-  const e2 = 2 * f - f * f;
-  const ep2 = (a * a - b * b) / (b * b);
-
-  const lon = Math.atan2(y, x);
-  const p = Math.sqrt(x * x + y * y);
-
-  // Iterative latitude
-  let lat = Math.atan2(z, p * (1 - e2));
-  for (let i = 0; i < 5; i++) {
-    const sinLat = Math.sin(lat);
-    const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
-    lat = Math.atan2(z + e2 * N * sinLat, p);
-  }
-  const sinLat = Math.sin(lat);
-  const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
-  const alt = p / Math.cos(lat) - N;
-
-  return { lat, lon, alt };
-}
-
-/** Convert geodetic (lat, lon in radians, alt in meters) to ECEF. */
-export function geodeticToEcef(lat: number, lon: number, alt: number): [number, number, number] {
-  const a = 6378137.0;
-  const f = 1 / 298.257223563;
-  const e2 = 2 * f - f * f;
-  const sinLat = Math.sin(lat);
-  const cosLat = Math.cos(lat);
-  const N = a / Math.sqrt(1 - e2 * sinLat * sinLat);
-  return [
-    (N + alt) * cosLat * Math.cos(lon),
-    (N + alt) * cosLat * Math.sin(lon),
-    (N * (1 - e2) + alt) * sinLat,
-  ];
-}
-
 /** Compute azimuth and elevation from receiver ECEF to satellite ECEF. */
 export function ecefToAzEl(
   rxX: number, rxY: number, rxZ: number,
   satX: number, satY: number, satZ: number,
 ): { az: number; el: number } {
-  const { lat, lon } = ecefToGeodetic(rxX, rxY, rxZ);
+  const [lat, lon] = ecefToGeodetic(rxX, rxY, rxZ);
 
   // ENU rotation
   const dx = satX - rxX;
@@ -513,8 +475,8 @@ export function computeAllPositions(
     const [rxX, rxY, rxZ] = rxPos;
     if (rxX !== 0 || rxY !== 0 || rxZ !== 0) {
       hasRx = true;
-      const g = ecefToGeodetic(rxX, rxY, rxZ);
-      rxLat = g.lat; rxLon = g.lon;
+      const [gLat, gLon] = ecefToGeodetic(rxX, rxY, rxZ);
+      rxLat = gLat; rxLon = gLon;
       sinLat = Math.sin(rxLat); cosLat = Math.cos(rxLat);
       sinLon = Math.sin(rxLon); cosLon = Math.cos(rxLon);
     }
@@ -526,7 +488,7 @@ export function computeAllPositions(
       if (!eph) { positions[prn]!.push(null); continue; }
 
       const pos = computeSatPosition(eph, t);
-      const geo = ecefToGeodetic(pos.x, pos.y, pos.z);
+      const [geoLat, geoLon] = ecefToGeodetic(pos.x, pos.y, pos.z);
 
       let az = 0, el = 0;
       if (hasRx) {
@@ -540,7 +502,7 @@ export function computeAllPositions(
         el = Math.atan2(up, Math.sqrt(east * east + north * north));
       }
 
-      positions[prn]!.push({ lat: geo.lat, lon: geo.lon, az, el });
+      positions[prn]!.push({ lat: geoLat, lon: geoLon, az, el });
     }
   }
 
@@ -661,7 +623,7 @@ export function computeLiveSkyPositions(
   const [rxX, rxY, rxZ] = rxPos;
 
   // Precompute receiver geodetic for ENU transform
-  const { lat: rxLat, lon: rxLon } = ecefToGeodetic(rxX, rxY, rxZ);
+  const [rxLat, rxLon] = ecefToGeodetic(rxX, rxY, rxZ);
   const sinRxLat = Math.sin(rxLat), cosRxLat = Math.cos(rxLat);
   const sinRxLon = Math.sin(rxLon), cosRxLon = Math.cos(rxLon);
 
@@ -671,7 +633,7 @@ export function computeLiveSkyPositions(
 
     try {
       const pos = computeSatPosition(eph, now);
-      const geo = ecefToGeodetic(pos.x, pos.y, pos.z);
+      const [satLat, satLon] = ecefToGeodetic(pos.x, pos.y, pos.z);
 
       // Inline az/el (avoid extra ecefToGeodetic call for rx)
       const dx = pos.x - rxX, dy = pos.y - rxY, dz = pos.z - rxZ;
@@ -685,8 +647,8 @@ export function computeLiveSkyPositions(
         result.push({
           prn: info.prn,
           az, el,
-          lat: geo.lat,
-          lon: geo.lon,
+          lat: satLat,
+          lon: satLon,
           cn0: cn0Map?.get(info.prn),
         });
       }

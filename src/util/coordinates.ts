@@ -8,10 +8,14 @@ const k0 = 0.9996;
 /**
  * Convert geodetic coordinates (radians) to UTM.
  */
-export function geo2utm(
+export function geodeticToUtm(
   lat: number,
   lon: number
 ): { easting: number; northing: number; zone: number; hemisphere: 'N' | 'S' } {
+  // UTM is undefined beyond ±84°/80°; clamp to avoid tan(±π/2) = ∞
+  const MAX_UTM_LAT = 84 * (Math.PI / 180);
+  lat = Math.max(-MAX_UTM_LAT, Math.min(MAX_UTM_LAT, lat));
+
   const latDeg = (lat * 180) / Math.PI;
   const lonDeg = (lon * 180) / Math.PI;
 
@@ -61,27 +65,29 @@ export function geo2utm(
 /**
  * Maidenhead grid locator (6 characters) from geodetic coordinates in radians.
  */
-export function geo2maidenhead(lat: number, lon: number): string {
-  const latDeg = (lat * 180) / Math.PI + 90;
-  const lonDeg = (lon * 180) / Math.PI + 180;
+export function geodeticToMaidenhead(lat: number, lon: number): string {
+  // Clamp to valid range to avoid out-of-bounds indices
+  const latDeg = Math.max(0, Math.min(179.999999, (lat * 180) / Math.PI + 90));
+  const lonDeg = Math.max(0, Math.min(359.999999, (lon * 180) / Math.PI + 180));
 
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWX';
 
-  const a1 = chars[Math.floor(lonDeg / 20)];
-  const a2 = chars[Math.floor(latDeg / 10)];
+  const idx = (i: number) => Math.max(0, Math.min(23, i));
+  const a1 = chars[idx(Math.floor(lonDeg / 20))];
+  const a2 = chars[idx(Math.floor(latDeg / 10))];
   const a3 = Math.floor((lonDeg % 20) / 2);
   const a4 = Math.floor(latDeg % 10);
-  const a5 = chars[Math.floor(((lonDeg % 2) * 12))] ?? 'A';
-  const a6 = chars[Math.floor(((latDeg % 1) * 24))] ?? 'A';
+  const a5 = chars[idx(Math.floor((lonDeg % 2) * 12))];
+  const a6 = chars[idx(Math.floor((latDeg % 1) * 24))];
 
-  return `${a1}${a2}${a3}${a4}${a5.toLowerCase()}${a6.toLowerCase()}`;
+  return `${a1}${a2}${a3}${a4}${a5!.toLowerCase()}${a6!.toLowerCase()}`;
 }
 
 /**
  * Geohash encoding from geodetic coordinates in radians.
  * Returns a geohash string of the given precision (default 8).
  */
-export function geo2geohash(lat: number, lon: number, precision = 8): string {
+export function geodeticToGeohash(lat: number, lon: number, precision = 8): string {
   const latDeg = (lat * 180) / Math.PI;
   const lonDeg = (lon * 180) / Math.PI;
 

@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Position } from '../types/position';
-import { car2geo } from '../util/positioning';
+import { ecefToGeodetic } from '../util/positioning';
 import { rad2deg, deg2rad } from '../util/units';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -33,7 +33,7 @@ const redIcon = new L.Icon({
 
 
 function toLatLng(position: Position): [number, number] {
-  const [lat, lon] = car2geo(position[0], position[1], position[2]);
+  const [lat, lon] = ecefToGeodetic(position[0], position[1], position[2]);
   return [rad2deg(lat), rad2deg(lon)];
 }
 
@@ -46,13 +46,12 @@ function greatCirclePoints(
   const lat1 = deg2rad(lat1Deg), lon1 = deg2rad(lon1Deg);
   const lat2 = deg2rad(lat2Deg), lon2 = deg2rad(lon2Deg);
 
-  const d = Math.acos(
-    Math.sin(lat1) * Math.sin(lat2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1)
-  );
+  const cosD = Math.sin(lat1) * Math.sin(lat2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+  const d = Math.acos(Math.max(-1, Math.min(1, cosD)));
 
   // If points are coincident or antipodal, just return the two endpoints
-  if (d < 1e-10 || isNaN(d)) {
+  if (d < 1e-10) {
     return [[lat1Deg, lon1Deg], [lat2Deg, lon2Deg]];
   }
 

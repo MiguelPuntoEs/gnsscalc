@@ -30,18 +30,17 @@ function MaskedField({
 }: {
   label: string;
   value: string;
-  onCommit: (value: string) => unknown;
+  onCommit: (value: string) => string | null;
   mask: string;
 }) {
   const id = useId();
-  const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
   const displayRef = useRef(value);
 
   const commit = () => {
-    const result = onCommit(displayRef.current);
-    setError(result === undefined);
+    setErrorMessage(onCommit(displayRef.current));
   };
 
   const getValue = useCallback(() => displayRef.current, []);
@@ -60,16 +59,21 @@ function MaskedField({
           value={value}
           onAccept={(val: string) => {
             displayRef.current = val;
-            if (error) setError(false);
+            if (errorMessage) setErrorMessage(null);
           }}
           onKeyDown={(e: React.KeyboardEvent) => {
             if (e.key === 'Enter') commit();
           }}
           onBlur={commit}
-          aria-invalid={error || undefined}
-          className={`w-full ${error ? 'border-2 border-red-500 text-red-500' : ''}`}
+          aria-invalid={!!errorMessage || undefined}
+          className={`w-full ${errorMessage ? 'border-2 border-red-500 text-red-500' : ''}`}
         />
         <CopyIcon copied={copied} onCopy={copy} />
+        {errorMessage && (
+          <span className="absolute left-0 top-full mt-0.5 text-[10px] text-red-400 whitespace-nowrap">
+            {errorMessage}
+          </span>
+        )}
       </span>
     </>
   );
@@ -128,19 +132,18 @@ export default function PositionForm({
   const longitudeString = formatLongitudeDegMinSecs(longitude);
   const heightString = height.toFixed(DECIMAL_PLACES_FOR_HEIGHT);
 
-  const computationHandle = (func: () => Position | undefined) => {
-    const resultPosition = func();
-    if (resultPosition) {
-      onPositionChange(resultPosition);
-    }
-    return resultPosition;
+  const computationHandle = (func: () => Position | string): string | null => {
+    const result = func();
+    if (typeof result === 'string') return result;
+    onPositionChange(result);
+    return null;
   };
 
   return (
     <form className="card flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
+        <h3 className="text-sm font-semibold text-fg m-0">{title}</h3>
         <button
           type="button"
           className="inline-flex items-center gap-1 text-[11px] text-fg/50 hover:text-fg transition-colors bg-transparent border-0 p-0 m-0 cursor-pointer"

@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import type { NtripStream, StreamStats, SatCn0 } from '../../util/ntrip';
 import { SYS_SHORT, systemColor, SYSTEM_COLORS, CONSTELLATION_COLORS, SYSTEM_META } from '../../util/gnss-constants';
-import { geodeticToEcef, computeLiveSkyPositions } from '../../util/orbit';
+import { geodeticToEcef } from '../../util/positioning';
+import { computeLiveSkyPositions } from '../../util/orbit';
 import SatelliteStatusPanel from '../SatelliteStatusPanel';
 import { RecordIcon, StopIcon, DownloadIcon } from './Icons';
 import StationInfoCard from './StationInfoCard';

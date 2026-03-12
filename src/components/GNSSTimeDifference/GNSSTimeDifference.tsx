@@ -24,7 +24,7 @@ export default function GNSSTimeDifference({
   return (
     <form className="card-output flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/90 m-0">Difference</h3>
+        <h3 className="text-sm font-semibold text-fg m-0">Difference</h3>
         <button
           className="inline-flex items-center gap-1 text-[11px] text-fg/50 hover:text-fg transition-colors bg-transparent border-0 p-0 m-0 cursor-pointer"
           type="button"

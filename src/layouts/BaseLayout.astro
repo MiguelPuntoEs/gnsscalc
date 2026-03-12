@@ -23,7 +23,7 @@ const defaultDescription = 'GNSS Calculator is a tool to perform time conversion
 const description = pageDescription || defaultDescription;
 
 const pathname = Astro.url.pathname;
-const schemaNames: Record<string, string> = { '/': 'GPS Time Converter', '/positioning': 'GNSS Positioning Calculator', '/nmea': 'NMEA Log Viewer', '/rinex': 'RINEX Observation Viewer', '/ntrip': 'NTRIP Client', '/antex': 'ANTEX Antenna Viewer' };
+const schemaNames: Record<string, string> = { '/': 'GPS Time Converter', '/positioning': 'GNSS Positioning Calculator', '/nmea': 'NMEA Log Viewer', '/rinex': 'RINEX Observation Viewer', '/ntrip': 'NTRIP Client', '/antex': 'ANTEX Antenna Viewer', '/about': 'About GNSS Calculator' };
 const schemaName = schemaNames[pathname] ?? 'GNSS Calculator';
 const schema = {
   "@context": "https://schema.org",
@@ -115,6 +115,9 @@ const schema = {
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={`${baseUrl}/img/og.webp`} />
+    <script is:inline>
+      if('serviceWorker' in navigator&&location.hostname!=='localhost')navigator.serviceWorker.register('/sw.js');
+    </script>
   </head>
   <body>
     <Header />

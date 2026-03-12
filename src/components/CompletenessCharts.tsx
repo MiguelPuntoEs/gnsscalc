@@ -10,7 +10,8 @@ import {
   Cell,
 } from 'recharts';
 import type { CompletenessResult } from '../util/completeness';
-import { SYSTEM_COLORS, GRID_STROKE, AXIS_STYLE, TOOLTIP_STYLE, systemColor } from '../util/gnss-constants';
+import { SYSTEM_COLORS, systemColor } from '../util/gnss-constants';
+import { useChartTheme, getChartTheme } from '../hooks/useChartTheme';
 import { systemName } from '../util/rinex';
 import ChartCard from './ChartCard';
 
@@ -34,8 +35,8 @@ function SystemTabs({
         onClick={() => onSelect(null)}
         className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
           selected === null
-            ? 'bg-white/10 text-white/80'
-            : 'bg-white/[0.03] text-fg/40 hover:text-fg/60'
+            ? 'bg-fg/10 text-fg/80'
+            : 'bg-fg/[0.03] text-fg/40 hover:text-fg/60'
         }`}
       >
         All
@@ -47,8 +48,8 @@ function SystemTabs({
           onClick={() => onSelect(sys)}
           className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
             selected === sys
-              ? 'bg-white/10 text-white/80'
-              : 'bg-white/[0.03] text-fg/40 hover:text-fg/60'
+              ? 'bg-fg/10 text-fg/80'
+              : 'bg-fg/[0.03] text-fg/40 hover:text-fg/60'
           }`}
         >
           <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: systemColor(sys) }} />
@@ -64,6 +65,7 @@ function SystemTabs({
 /* ================================================================== */
 
 function SignalCompletenessBar({ result, selectedSys }: { result: CompletenessResult; selectedSys: string | null }) {
+  const theme = useChartTheme();
   const data = useMemo(() =>
     result.signalStats
       .filter(s => !selectedSys || s.system === selectedSys)
@@ -83,11 +85,11 @@ function SignalCompletenessBar({ result, selectedSys }: { result: CompletenessRe
     <ChartCard title="Data completeness per signal (%)" height={Math.max(160, data.length * 24 + 40)}>
       <ResponsiveContainer>
         <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
-          <XAxis type="number" tick={AXIS_STYLE} tickLine={false} axisLine={false} domain={[0, 100]} unit="%" />
-          <YAxis type="category" dataKey="label" tick={AXIS_STYLE} tickLine={false} axisLine={false} width={140} />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} horizontal={false} />
+          <XAxis type="number" tick={theme.axisStyle} tickLine={false} axisLine={false} domain={[0, 100]} unit="%" />
+          <YAxis type="category" dataKey="label" tick={theme.axisStyle} tickLine={false} axisLine={false} width={140} />
           <Tooltip
-            {...TOOLTIP_STYLE}
+            {...theme.tooltipStyle}
             formatter={(value: any, _name: any, props: any) => [
               `${Number(value).toFixed(1)}%  (${props.payload.present.toLocaleString()} / ${props.payload.expected.toLocaleString()}, ${props.payload.satellites} SVs)`,
               'Completeness',
@@ -119,6 +121,7 @@ function completeColor(pct: number): string {
 }
 
 function CompletenessHeatmap({ result, selectedSys }: { result: CompletenessResult; selectedSys: string | null }) {
+  useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -150,6 +153,7 @@ function CompletenessHeatmap({ result, selectedSys }: { result: CompletenessResu
   const LEGEND_H = 30;
 
   const draw = useCallback((canvas: HTMLCanvasElement) => {
+    const t = getChartTheme();
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
@@ -169,7 +173,7 @@ function CompletenessHeatmap({ result, selectedSys }: { result: CompletenessResu
     const cellH = Math.min(plotH / numRows, 14);
 
     // Column headers (obs codes)
-    ctx.fillStyle = 'rgba(208,208,211,0.4)';
+    ctx.fillStyle = t.canvasText + '0.4)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'center';
     for (let c = 0; c < numCols; c++) {
@@ -195,9 +199,9 @@ function CompletenessHeatmap({ result, selectedSys }: { result: CompletenessResu
     ctx.textBaseline = 'middle';
     for (let r = 0; r < numRows; r++) {
       const prn = prns[r]!;
-      ctx.fillStyle = SYSTEM_COLORS[prn[0]!] ?? 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = SYSTEM_COLORS[prn[0]!] ?? t.canvasText + '0.5)';
       ctx.fillRect(0, HEADER_H + r * cellH, 3, cellH - 0.5);
-      ctx.fillStyle = 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = t.canvasText + '0.5)';
       ctx.fillText(prn, LABEL_W - 4, HEADER_H + r * cellH + cellH / 2);
     }
 
@@ -212,7 +216,7 @@ function CompletenessHeatmap({ result, selectedSys }: { result: CompletenessResu
       ctx.fillStyle = completeColor((steps[i]! + steps[i + 1]!) / 2);
       ctx.fillRect(legendX + i * stepW, legendY, stepW + 0.5, 8);
     }
-    ctx.fillStyle = 'rgba(208,208,211,0.4)';
+    ctx.fillStyle = t.canvasText + '0.4)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'center';
     for (const pct of [0, 50, 75, 90, 100]) {
@@ -275,7 +279,7 @@ function CompletenessHeatmap({ result, selectedSys }: { result: CompletenessResu
         <div
           ref={tooltipRef}
           className="pointer-events-none absolute z-10 rounded-md px-2 py-1 text-xs"
-          style={{ display: 'none', backgroundColor: '#32323f', border: '1px solid rgba(74,74,90,0.6)', color: '#d0d0d3', whiteSpace: 'nowrap' }}
+          style={{ display: 'none', backgroundColor: getChartTheme().tooltipBg, border: getChartTheme().tooltipBorder, color: getChartTheme().tooltipFg, whiteSpace: 'nowrap' }}
         />
       </div>
     </div>
@@ -317,7 +321,7 @@ export default function CompletenessCharts({ result }: { result: CompletenessRes
         <SystemTabs systems={result.systems} selected={selectedSys} onSelect={setSelectedSys} />
 
         <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
-          <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+          <div className="rounded-lg bg-fg/[0.03] px-3 py-2">
             <div className="text-[10px] text-fg/40 mb-0.5">Overall</div>
             <div className="text-lg font-semibold" style={{ color: overall > 95 ? '#46c850' : overall > 80 ? '#c8b432' : '#dc3c28' }}>
               {overall.toFixed(1)}<span className="text-xs font-normal text-fg/30 ml-0.5">%</span>
@@ -331,7 +335,7 @@ export default function CompletenessCharts({ result }: { result: CompletenessRes
               const pres = stats.reduce((a, s) => a + s.present, 0);
               const pct = exp > 0 ? (pres / exp) * 100 : 0;
               return (
-                <div key={sys} className="rounded-lg bg-white/[0.03] px-3 py-2">
+                <div key={sys} className="rounded-lg bg-fg/[0.03] px-3 py-2">
                   <div className="text-[10px] text-fg/40 mb-0.5">{systemName(sys)}</div>
                   <div className="text-lg font-semibold" style={{ color: systemColor(sys) }}>
                     {pct.toFixed(1)}<span className="text-xs font-normal text-fg/30 ml-0.5">%</span>

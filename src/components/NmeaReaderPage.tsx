@@ -226,7 +226,7 @@ export default function NmeaReaderPage() {
           <div className="card-output">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-white/90">Track Statistics</span>
+                <span className="text-sm font-semibold text-fg">Track Statistics</span>
                 {fileName && (
                   <span className="text-xs text-fg/40 truncate max-w-[200px]" title={fileName}>
                     {fileName}

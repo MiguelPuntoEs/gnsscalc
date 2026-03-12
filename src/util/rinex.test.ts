@@ -51,8 +51,8 @@ describe('RINEX 3.x parser', () => {
     const result = await parseRinexStream(file);
 
     expect(result.epochs).toHaveLength(1);
-    expect(result.epochs[0].totalSats).toBe(3);
-    expect(result.epochs[0].satsPerSystem).toEqual({ G: 2, R: 1 });
+    expect(result.epochs[0]!.totalSats).toBe(3);
+    expect(result.epochs[0]!.satsPerSystem).toEqual({ G: 2, R: 1 });
   });
 
   it('extracts SNR values', async () => {
@@ -60,9 +60,9 @@ describe('RINEX 3.x parser', () => {
     const result = await parseRinexStream(file);
 
     // G has S1C at index 2 → values 42.3 and 38.1; R has S1C at index 1 → value 35.5
-    expect(result.epochs[0].meanSnr).toBeCloseTo((42.3 + 38.1 + 35.5) / 3, 1);
-    expect(result.epochs[0].snrPerSystem['G']).toBeCloseTo((42.3 + 38.1) / 2, 1);
-    expect(result.epochs[0].snrPerSystem['R']).toBeCloseTo(35.5, 1);
+    expect(result.epochs[0]!.meanSnr).toBeCloseTo((42.3 + 38.1 + 35.5) / 3, 1);
+    expect(result.epochs[0]!.snrPerSystem['G']).toBeCloseTo((42.3 + 38.1) / 2, 1);
+    expect(result.epochs[0]!.snrPerSystem['R']).toBeCloseTo(35.5, 1);
   });
 
   it('parses multiple epochs', async () => {
@@ -70,8 +70,8 @@ describe('RINEX 3.x parser', () => {
     const result = await parseRinexStream(file);
 
     expect(result.epochs).toHaveLength(2);
-    expect(result.epochs[1].totalSats).toBe(2);
-    expect(result.epochs[1].satsPerSystem).toEqual({ G: 1, R: 1 });
+    expect(result.epochs[1]!.totalSats).toBe(2);
+    expect(result.epochs[1]!.satsPerSystem).toEqual({ G: 1, R: 1 });
   });
 
   it('computes stats correctly', async () => {
@@ -136,11 +136,11 @@ E    2 C1C S1C                                              SYS / # / OBS TYPES
     const result = await parseRinexStream(file);
     expect(result.header.version).toBe(4.02);
     expect(result.epochs).toHaveLength(1);
-    expect(result.epochs[0].totalSats).toBe(3);
-    expect(result.epochs[0].satsPerSystem).toEqual({ G: 2, E: 1 });
+    expect(result.epochs[0]!.totalSats).toBe(3);
+    expect(result.epochs[0]!.satsPerSystem).toEqual({ G: 2, E: 1 });
     // G06 S1C=24.158, G09 S1C=38.123, E11 S1C=40.500
-    expect(result.epochs[0].snrPerSat['G06']).toBeCloseTo(24.158, 2);
-    expect(result.epochs[0].snrPerSat['E11']).toBeCloseTo(40.5, 1);
+    expect(result.epochs[0]!.snrPerSat['G06']).toBeCloseTo(24.158, 2);
+    expect(result.epochs[0]!.snrPerSat['E11']).toBeCloseTo(40.5, 1);
   });
 });
 
@@ -168,8 +168,8 @@ describe('RINEX 2.x parser', () => {
     expect(result.header.version).toBe(2.11);
     expect(result.header.obsTypes['_v2']).toEqual(['C1', 'L1', 'S1', 'C2', 'S2']);
     expect(result.epochs).toHaveLength(1);
-    expect(result.epochs[0].totalSats).toBe(2);
-    expect(result.epochs[0].satsPerSystem).toEqual({ G: 2 });
+    expect(result.epochs[0]!.totalSats).toBe(2);
+    expect(result.epochs[0]!.satsPerSystem).toEqual({ G: 2 });
   });
 
   it('extracts v2 SNR values', async () => {
@@ -178,7 +178,7 @@ describe('RINEX 2.x parser', () => {
 
     // S1 at index 2 (41.2, 37.6), S2 at index 4 (39.8, 35.2)
     const allSnr = [41.2, 39.8, 37.6, 35.2];
-    expect(result.epochs[0].meanSnr).toBeCloseTo(
+    expect(result.epochs[0]!.meanSnr).toBeCloseTo(
       allSnr.reduce((a, b) => a + b, 0) / allSnr.length,
       1,
     );
@@ -233,17 +233,17 @@ describe('CRX 3.0 parser', () => {
     const file = fileFrom(CRX3_HEADER + CRX3_EPOCH1);
     const result = await parseRinexStream(file);
     expect(result.epochs).toHaveLength(1);
-    expect(result.epochs[0].totalSats).toBe(3);
-    expect(result.epochs[0].satsPerSystem).toEqual({ G: 2, R: 1 });
+    expect(result.epochs[0]!.totalSats).toBe(3);
+    expect(result.epochs[0]!.satsPerSystem).toEqual({ G: 2, R: 1 });
   });
 
   it('decompresses SNR on initialization', async () => {
     const file = fileFrom(CRX3_HEADER + CRX3_EPOCH1);
     const result = await parseRinexStream(file);
     // G01 S1C = 42300/1000 = 42.3, G03 S1C = 38100/1000 = 38.1, R01 S1C = 35500/1000 = 35.5
-    expect(result.epochs[0].meanSnr).toBeCloseTo((42.3 + 38.1 + 35.5) / 3, 1);
-    expect(result.epochs[0].snrPerSystem['G']).toBeCloseTo((42.3 + 38.1) / 2, 1);
-    expect(result.epochs[0].snrPerSystem['R']).toBeCloseTo(35.5, 1);
+    expect(result.epochs[0]!.meanSnr).toBeCloseTo((42.3 + 38.1 + 35.5) / 3, 1);
+    expect(result.epochs[0]!.snrPerSystem['G']).toBeCloseTo((42.3 + 38.1) / 2, 1);
+    expect(result.epochs[0]!.snrPerSystem['R']).toBeCloseTo(35.5, 1);
   });
 
   it('decompresses differences across epochs', async () => {
@@ -251,9 +251,9 @@ describe('CRX 3.0 parser', () => {
     const result = await parseRinexStream(file);
     expect(result.epochs).toHaveLength(2);
     // G01 S1C: init 42300, diff +800 → 42300+800 = 43100 → 43.1
-    expect(result.epochs[1].snrPerSat['G01']).toBeCloseTo(43.1, 1);
+    expect(result.epochs[1]!.snrPerSat['G01']).toBeCloseTo(43.1, 1);
     // R01 S1C: init 35500, diff +700 → 35500+700 = 36200 → 36.2
-    expect(result.epochs[1].snrPerSat['R01']).toBeCloseTo(36.2, 1);
+    expect(result.epochs[1]!.snrPerSat['R01']).toBeCloseTo(36.2, 1);
   });
 
   it('computes stats for CRX files', async () => {
@@ -299,26 +299,26 @@ describe('CRX 1.0 parser', () => {
     expect(result.header.isCrx).toBe(true);
     expect(result.header.crxVersion).toBe(1);
     expect(result.epochs).toHaveLength(1);
-    expect(result.epochs[0].totalSats).toBe(2);
-    expect(result.epochs[0].satsPerSystem).toEqual({ G: 2 });
+    expect(result.epochs[0]!.totalSats).toBe(2);
+    expect(result.epochs[0]!.satsPerSystem).toEqual({ G: 2 });
   });
 
   it('decompresses CRX 1.0 SNR values', async () => {
     const file = fileFrom(CRX1_HEADER + CRX1_EPOCH1);
     const result = await parseRinexStream(file);
     // G01 S1=42300/1000=42.3, G03 S1=38100/1000=38.1
-    expect(result.epochs[0].meanSnr).toBeCloseTo((42.3 + 38.1) / 2, 1);
+    expect(result.epochs[0]!.meanSnr).toBeCloseTo((42.3 + 38.1) / 2, 1);
   });
 
   it('handles text-differenced CRX 1.0 epochs', async () => {
     const file = fileFrom(CRX1_HEADER + CRX1_EPOCH1 + CRX1_EPOCH2);
     const result = await parseRinexStream(file);
     expect(result.epochs).toHaveLength(2);
-    expect(result.epochs[1].totalSats).toBe(2);
+    expect(result.epochs[1]!.totalSats).toBe(2);
     // G01 S1C: 42300 + 800 = 43100 → 43.1
-    expect(result.epochs[1].snrPerSat['G01']).toBeCloseTo(43.1, 1);
+    expect(result.epochs[1]!.snrPerSat['G01']).toBeCloseTo(43.1, 1);
     // G03 S1C: 38100 + (-200) = 37900 → 37.9
-    expect(result.epochs[1].snrPerSat['G03']).toBeCloseTo(37.9, 1);
+    expect(result.epochs[1]!.snrPerSat['G03']).toBeCloseTo(37.9, 1);
   });
 });
 
@@ -340,7 +340,7 @@ ANOTHER HEADER RECORD                                       COMMENT
     const result = await parseRinexStream(file);
     // Should have 2 data epochs, event is skipped
     expect(result.epochs).toHaveLength(2);
-    expect(result.epochs[1]!.totalSats).toBe(2);
+    expect(result.epochs[1]!!.totalSats).toBe(2);
   });
 });
 
@@ -388,6 +388,6 @@ describe('downsampleEpochs', () => {
     const ds = downsampleEpochs(epochs);
     expect(ds.length).toBeLessThanOrEqual(2000);
     expect(ds.length).toBeGreaterThan(0);
-    expect(ds[0].totalSats).toBe(10);
+    expect(ds[0]!.totalSats).toBe(10);
   });
 });

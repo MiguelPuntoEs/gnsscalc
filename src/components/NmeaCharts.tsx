@@ -17,22 +17,9 @@ import {
   Legend,
 } from 'recharts';
 import type { NmeaFix } from '../util/nmea';
-import { geo2car, getEnuDifference } from '../util/positioning';
+import { geodeticToEcef, getEnuDifference } from '../util/positioning';
 import { deg2rad } from '../util/units';
-
-const GRID_STROKE = 'rgba(255,255,255,0.06)';
-const AXIS_STYLE = { fontSize: 10, fill: 'rgba(208,208,211,0.5)' };
-const TOOLTIP_STYLE = {
-  contentStyle: {
-    backgroundColor: '#32323f',
-    border: '1px solid rgba(74,74,90,0.6)',
-    borderRadius: 8,
-    fontSize: 12,
-    color: '#d0d0d3',
-  },
-  labelStyle: { color: 'rgba(208,208,211,0.6)', fontSize: 11 },
-  itemStyle: { color: '#d0d0d3' },
-};
+import { useChartTheme } from '../hooks/useChartTheme';
 
 interface ChartData {
   label: string;
@@ -66,7 +53,7 @@ function satColor(sats: number | null): string {
 
 function computeEnuData(fixes: NmeaFix[]): EnuPoint[] {
   // Convert all fixes to ECEF
-  const ecef = fixes.map(f => geo2car(deg2rad(f.lat), deg2rad(f.lon), f.alt ?? 0));
+  const ecef = fixes.map(f => geodeticToEcef(deg2rad(f.lat), deg2rad(f.lon), f.alt ?? 0));
 
   // Compute mean ECEF as reference
   const n = ecef.length;
@@ -76,7 +63,7 @@ function computeEnuData(fixes: NmeaFix[]): EnuPoint[] {
 
   return fixes.map((f, i) => {
     const [dE, dN, dU] = getEnuDifference(
-      ecef[i][0], ecef[i][1], ecef[i][2],
+      ecef[i]![0], ecef[i]![1], ecef[i]![2],
       meanX, meanY, meanZ,
     );
     return {
@@ -113,6 +100,7 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
+  const theme = useChartTheme();
   const data = useMemo<ChartData[]>(() =>
     fixes.map((f, i) => ({
       label: formatTimeLabel(f, i),
@@ -153,22 +141,22 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
         <ChartCard title="Altitude (m)">
           <ResponsiveContainer>
             <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 interval={tickInterval}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 tickLine={false}
                 axisLine={false}
                 width={45}
                 domain={['auto', 'auto']}
               />
-              <Tooltip {...TOOLTIP_STYLE} />
+              <Tooltip {...theme.tooltipStyle} />
               <defs>
                 <linearGradient id="altGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#7c8aff" stopOpacity={0.3} />
@@ -195,23 +183,23 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
         <ChartCard title="Satellites">
           <ResponsiveContainer>
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 interval={tickInterval}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 tickLine={false}
                 axisLine={false}
                 width={30}
                 allowDecimals={false}
                 domain={[0, 'auto']}
               />
-              <Tooltip {...TOOLTIP_STYLE} />
+              <Tooltip {...theme.tooltipStyle} />
               <Line
                 type="stepAfter"
                 dataKey="satellites"
@@ -230,22 +218,22 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
         <ChartCard title="Speed (km/h)">
           <ResponsiveContainer>
             <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 interval={tickInterval}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 tickLine={false}
                 axisLine={false}
                 width={40}
                 domain={[0, 'auto']}
               />
-              <Tooltip {...TOOLTIP_STYLE} />
+              <Tooltip {...theme.tooltipStyle} />
               <defs>
                 <linearGradient id="speedGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
@@ -278,32 +266,32 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
             <div className="flex justify-center">
               <ResponsiveContainer width="100%" aspect={1} maxHeight={400}>
                 <ScatterChart margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
                   <XAxis
                     dataKey="dE"
                     type="number"
                     name="East"
-                    tick={AXIS_STYLE}
+                    tick={theme.axisStyle}
                     tickLine={false}
                     axisLine={false}
                     domain={[-scatterDomain, scatterDomain]}
-                    label={{ value: 'East (m)', position: 'insideBottom', offset: -2, fill: 'rgba(208,208,211,0.5)', fontSize: 10 }}
+                    label={{ value: 'East (m)', position: 'insideBottom', offset: -2, fill: theme.axisStyle.fill, fontSize: 10 }}
                   />
                   <YAxis
                     dataKey="dN"
                     type="number"
                     name="North"
-                    tick={AXIS_STYLE}
+                    tick={theme.axisStyle}
                     tickLine={false}
                     axisLine={false}
                     width={50}
                     domain={[-scatterDomain, scatterDomain]}
-                    label={{ value: 'North (m)', angle: -90, position: 'insideLeft', offset: 10, fill: 'rgba(208,208,211,0.5)', fontSize: 10 }}
+                    label={{ value: 'North (m)', angle: -90, position: 'insideLeft', offset: 10, fill: theme.axisStyle.fill, fontSize: 10 }}
                   />
                   <ZAxis range={[8, 8]} />
                   <Tooltip
-                    {...TOOLTIP_STYLE}
-                    formatter={(value: number, name: string) => [`${value.toFixed(3)} m`, name]}
+                    {...theme.tooltipStyle}
+                    formatter={(value) => [`${Number(value ?? 0).toFixed(3)} m`]}
                   />
                   <ReferenceLine x={0} stroke="rgba(255,255,255,0.15)" />
                   <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
@@ -324,16 +312,16 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
           <ChartCard title="ENU deviation from mean (m)">
             <ResponsiveContainer>
               <LineChart data={enuData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
                 <XAxis
                   dataKey="label"
-                  tick={AXIS_STYLE}
+                  tick={theme.axisStyle}
                   interval={tickInterval}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
-                  tick={AXIS_STYLE}
+                  tick={theme.axisStyle}
                   tickLine={false}
                   axisLine={false}
                   width={50}
@@ -341,12 +329,12 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
                   unit=" m"
                 />
                 <Tooltip
-                  {...TOOLTIP_STYLE}
-                  formatter={(value: number, name: string) => [`${value.toFixed(3)} m`, name]}
+                  {...theme.tooltipStyle}
+                  formatter={(value) => [`${Number(value ?? 0).toFixed(3)} m`]}
                 />
                 <Legend
                   iconSize={10}
-                  wrapperStyle={{ fontSize: 11, color: 'rgba(208,208,211,0.6)' }}
+                  wrapperStyle={{ fontSize: 11, color: theme.legendColor }}
                 />
                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
                 <Line type="monotone" dataKey="dE" stroke="#7c8aff" strokeWidth={1.5} dot={false} name="East" />

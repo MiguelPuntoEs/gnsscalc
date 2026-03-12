@@ -18,7 +18,7 @@ export default function AERForm({
 
   return (
     <div className="card-output flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
+      <h3 className="text-sm font-semibold text-fg m-0">{title}</h3>
       <div className="card-fields">
         <label title="Elevation angle (degrees)">&theta;</label>
         <CopyableInput value={`${elevationDeg.toFixed(5)}°`} />

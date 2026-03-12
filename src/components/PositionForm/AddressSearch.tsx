@@ -152,7 +152,7 @@ export default function AddressSearch({
                 <button
                   type="button"
                   className={`w-full flex items-start gap-2.5 text-left px-3 py-2 text-xs leading-relaxed border-0 bg-transparent text-fg m-0 rounded-none transition-colors cursor-pointer ${
-                    i === activeIndex ? 'bg-white/10' : 'hover:bg-white/5'
+                    i === activeIndex ? 'bg-fg/10' : 'hover:bg-fg/5'
                   }`}
                   onMouseEnter={() => setActiveIndex(i)}
                   onMouseDown={(e) => e.preventDefault()}

@@ -36,7 +36,7 @@ export default function DistanceForm({
 
   return (
     <div className="card-output flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
+      <h3 className="text-sm font-semibold text-fg m-0">{title}</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
         <div className="card-fields">

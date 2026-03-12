@@ -1,12 +1,9 @@
 import {
   WGS84_SEMI_MAJOR_AXIS,
   WGS84_ECCENTRICITY_SQUARED,
+  WGS84_SEMI_MINOR_AXIS,
+  WGS84_FLATTENING,
 } from '../constants/geoid';
-
-// WGS84 semi-minor axis
-const b = WGS84_SEMI_MAJOR_AXIS * Math.sqrt(1 - WGS84_ECCENTRICITY_SQUARED);
-// WGS84 flattening
-const f = 1 - b / WGS84_SEMI_MAJOR_AXIS;
 
 /**
  * Vincenty's inverse formula — orthodromic (great-circle) distance,
@@ -19,8 +16,8 @@ export function vincenty(
   lat2: number,
   lon2: number
 ): { distance: number; initialBearing: number; finalBearing: number } {
-  const U1 = Math.atan((1 - f) * Math.tan(lat1));
-  const U2 = Math.atan((1 - f) * Math.tan(lat2));
+  const U1 = Math.atan((1 - WGS84_FLATTENING) * Math.tan(lat1));
+  const U2 = Math.atan((1 - WGS84_FLATTENING) * Math.tan(lat2));
   const sinU1 = Math.sin(U1),
     cosU1 = Math.cos(U1);
   const sinU2 = Math.sin(U2),
@@ -59,13 +56,13 @@ export function vincenty(
     cos2SigmaM =
       cos2Alpha !== 0 ? cosSigma - (2 * sinU1 * sinU2) / cos2Alpha : 0;
 
-    C = (f / 16) * cos2Alpha * (4 + f * (4 - 3 * cos2Alpha));
+    C = (WGS84_FLATTENING / 16) * cos2Alpha * (4 + WGS84_FLATTENING * (4 - 3 * cos2Alpha));
     lambdaPrev = lambda;
     lambda =
       lon2 -
       lon1 +
       (1 - C) *
-        f *
+        WGS84_FLATTENING *
         sinAlpha *
         (sigma +
           C *
@@ -73,8 +70,30 @@ export function vincenty(
             (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM ** 2)));
   } while (Math.abs(lambda - lambdaPrev) > 1e-12 && ++iter < 200);
 
+  if (iter >= 200) {
+    // Antipodal or near-antipodal: Vincenty fails to converge.
+    // Fall back to spherical great-circle approximation.
+    const cosLat1 = Math.cos(lat1), sinLat1 = Math.sin(lat1);
+    const cosLat2 = Math.cos(lat2), sinLat2 = Math.sin(lat2);
+    const dLon = lon2 - lon1;
+    sigma = Math.acos(
+      Math.min(1, Math.max(-1, sinLat1 * sinLat2 + cosLat1 * cosLat2 * Math.cos(dLon)))
+    );
+    // Use mean radius for distance when Vincenty won't converge
+    const distance = WGS84_SEMI_MAJOR_AXIS * sigma;
+    const ib = Math.atan2(
+      cosLat2 * Math.sin(dLon),
+      cosLat1 * sinLat2 - sinLat1 * cosLat2 * Math.cos(dLon)
+    );
+    const fb = Math.atan2(
+      cosLat1 * Math.sin(-dLon),
+      -sinLat1 * cosLat2 + cosLat1 * sinLat2 * Math.cos(-dLon)
+    );
+    return { distance, initialBearing: ib, finalBearing: fb };
+  }
+
   const uSq =
-    (cos2Alpha! * (WGS84_SEMI_MAJOR_AXIS ** 2 - b ** 2)) / b ** 2;
+    (cos2Alpha! * (WGS84_SEMI_MAJOR_AXIS ** 2 - WGS84_SEMI_MINOR_AXIS ** 2)) / WGS84_SEMI_MINOR_AXIS ** 2;
   const A = 1 + (uSq / 16384) * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
   const B = (uSq / 1024) * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
   const deltaSigma =
@@ -88,7 +107,7 @@ export function vincenty(
             (-3 + 4 * sinSigma! ** 2) *
             (-3 + 4 * cos2SigmaM! ** 2)));
 
-  const distance = b * A * (sigma! - deltaSigma);
+  const distance = WGS84_SEMI_MINOR_AXIS * A * (sigma! - deltaSigma);
 
   // Bearings
   const sinLambda = Math.sin(lambda);
@@ -119,12 +138,14 @@ export function rhumbLine(
   const dLat = lat2 - lat1;
   let dLon = lon2 - lon1;
 
-  // Isometric latitude on the ellipsoid
+  // Isometric latitude on the ellipsoid (clamped to avoid log(0)/log(∞) at poles)
+  const MAX_LAT = Math.PI / 2 - 1e-10;
   const isometricLat = (lat: number) => {
-    const sinLat = Math.sin(lat);
+    const clampedLat = Math.max(-MAX_LAT, Math.min(MAX_LAT, lat));
+    const sinLat = Math.sin(clampedLat);
     const e = Math.sqrt(WGS84_ECCENTRICITY_SQUARED);
     return Math.log(
-      Math.tan(Math.PI / 4 + lat / 2) *
+      Math.tan(Math.PI / 4 + clampedLat / 2) *
         ((1 - e * sinLat) / (1 + e * sinLat)) ** (e / 2)
     );
   };
@@ -185,11 +206,17 @@ export function greatCircleMidpoint(
   const Bx = Math.cos(lat2) * Math.cos(dLon);
   const By = Math.cos(lat2) * Math.sin(dLon);
 
-  const latMid = Math.atan2(
-    Math.sin(lat1) + Math.sin(lat2),
-    Math.sqrt((Math.cos(lat1) + Bx) ** 2 + By ** 2)
-  );
-  const lonMid = lon1 + Math.atan2(By, Math.cos(lat1) + Bx);
+  const sumX = Math.cos(lat1) + Bx;
+  const denom = Math.sqrt(sumX ** 2 + By ** 2);
+
+  // Near-antipodal: denominator approaches 0, midpoint is indeterminate.
+  // Return average latitude with lon1 as a reasonable fallback.
+  if (denom < 1e-15) {
+    return [(lat1 + lat2) / 2, lon1];
+  }
+
+  const latMid = Math.atan2(Math.sin(lat1) + Math.sin(lat2), denom);
+  const lonMid = lon1 + Math.atan2(By, sumX);
 
   return [latMid, lonMid];
 }

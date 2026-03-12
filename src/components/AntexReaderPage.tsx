@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { parseAntex, frequencyLabel } from '../util/antex';
 import type { AntexFile, AntennaEntry, FrequencyData } from '../util/antex';
 import { SYSTEM_COLORS } from '../util/gnss-constants';
+import { useChartTheme, getChartTheme } from '../hooks/useChartTheme';
 import CopyableInput from './CopyableInput';
 
 /* ─── Icons ────────────────────────────────────────────────────── */
@@ -79,6 +80,7 @@ function PcvPolarPlot({
   dzen: number;
   dazi: number;
 }) {
+  const theme = useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +115,7 @@ function PcvPolarPlot({
   }, [absMax]);
 
   const draw = useCallback((canvas: HTMLCanvasElement) => {
+    const ct = getChartTheme();
     const ctx = canvas.getContext('2d');
     if (!ctx || numZen === 0) return;
     const dpr = window.devicePixelRatio || 1;
@@ -190,7 +193,7 @@ function PcvPolarPlot({
     }
 
     // Labels — direction
-    ctx.fillStyle = 'rgba(208,208,211,0.5)';
+    ctx.fillStyle = ct.canvasText + '0.5)';
     ctx.font = '11px ui-monospace, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -201,7 +204,7 @@ function PcvPolarPlot({
     }
 
     // Zenith angle labels
-    ctx.fillStyle = 'rgba(208,208,211,0.3)';
+    ctx.fillStyle = ct.canvasText + '0.3)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'left';
     for (let z = zen1 + ringStep; z < zen2; z += ringStep) {
@@ -224,7 +227,7 @@ function PcvPolarPlot({
     ctx.lineWidth = 0.5;
     ctx.strokeRect(barX, barY, barW, barH);
     // Tick marks — aim for ~5 ticks
-    ctx.fillStyle = 'rgba(208,208,211,0.5)';
+    ctx.fillStyle = ct.canvasText + '0.5)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -239,11 +242,11 @@ function PcvPolarPlot({
       ctx.lineTo(tx, barY + barH + 3);
       ctx.stroke();
       // Label
-      ctx.fillStyle = 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = ct.canvasText + '0.5)';
       ctx.fillText(tv.toFixed(1), tx, barY + barH + 4);
     }
     // Unit label below ticks
-    ctx.fillStyle = 'rgba(208,208,211,0.35)';
+    ctx.fillStyle = ct.canvasText + '0.35)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.fillText('PCV [mm]', barX + barW / 2, barY + barH + 16);
   }, [freq, numZen, hasAzimuth, zen1, zen2, dzen, pcvColor, absMax]);
@@ -320,9 +323,9 @@ function PcvPolarPlot({
         className="pointer-events-none absolute z-10 rounded-md px-2 py-1 text-xs"
         style={{
           display: 'none',
-          backgroundColor: '#32323f',
-          border: '1px solid rgba(74,74,90,0.6)',
-          color: '#d0d0d3',
+          backgroundColor: theme.tooltipBg,
+          border: theme.tooltipBorder,
+          color: theme.tooltipFg,
           whiteSpace: 'nowrap',
         }}
       />
@@ -345,6 +348,7 @@ function PcvSurfacePlot({
   dzen: number;
   dazi: number;
 }) {
+  const theme = useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hasAzimuth = dazi > 0 && freq.pcv.length > 0;
@@ -402,6 +406,7 @@ function PcvSurfacePlot({
   }, [freq, numZen, hasAzimuth, zen1, dzen, dazi]);
 
   const draw = useCallback((canvas: HTMLCanvasElement) => {
+    const ct = getChartTheme();
     const ctx = canvas.getContext('2d');
     if (!ctx || mesh.length === 0) return;
     const dpr = window.devicePixelRatio || 1;
@@ -547,16 +552,16 @@ function PcvSurfacePlot({
 
     // PCV axis (vertical)
     const [pax, pay] = project(zen1, 0, absMax * 1.5);
-    ctx.strokeStyle = 'rgba(208,208,211,0.5)';
+    ctx.strokeStyle = ct.canvasText + '0.5)';
     ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(pax, pay); ctx.stroke();
-    ctx.fillStyle = 'rgba(208,208,211,0.6)';
+    ctx.fillStyle = ct.canvasText + '0.6)';
     ctx.textAlign = 'left';
     ctx.fillText('PCV [mm]', pax + 5, pay);
 
     // Z-axis tick marks
     ctx.font = '8px ui-monospace, monospace';
-    ctx.fillStyle = 'rgba(208,208,211,0.4)';
-    ctx.strokeStyle = 'rgba(208,208,211,0.2)';
+    ctx.fillStyle = ct.canvasText + '0.4)';
+    ctx.strokeStyle = ct.canvasText + '0.2)';
     ctx.lineWidth = 0.5;
     const zTickStep = niceStep(2 * absMax, 4);
     const zTickStart = Math.ceil(-absMax / zTickStep) * zTickStep;
@@ -582,7 +587,7 @@ function PcvSurfacePlot({
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 0.5;
     ctx.strokeRect(barX, barY, barW, barH);
-    ctx.fillStyle = 'rgba(208,208,211,0.5)';
+    ctx.fillStyle = ct.canvasText + '0.5)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -592,10 +597,10 @@ function PcvSurfacePlot({
       const tx = barX + ((tv / absMax + 1) / 2) * barW;
       ctx.strokeStyle = 'rgba(255,255,255,0.3)';
       ctx.beginPath(); ctx.moveTo(tx, barY + barH); ctx.lineTo(tx, barY + barH + 3); ctx.stroke();
-      ctx.fillStyle = 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = ct.canvasText + '0.5)';
       ctx.fillText(tv.toFixed(1), tx, barY + barH + 4);
     }
-    ctx.fillStyle = 'rgba(208,208,211,0.3)';
+    ctx.fillStyle = ct.canvasText + '0.3)';
     ctx.fillText('PCV [mm]', barX + barW / 2, barY + barH + 15);
 
   }, [mesh, rotX, rotZ, absMax, zen1, zen2]);
@@ -677,9 +682,9 @@ function PcvSurfacePlot({
         className="pointer-events-none absolute z-10 rounded-md px-2 py-1 text-xs"
         style={{
           display: 'none',
-          backgroundColor: '#32323f',
-          border: '1px solid rgba(74,74,90,0.6)',
-          color: '#d0d0d3',
+          backgroundColor: theme.tooltipBg,
+          border: theme.tooltipBorder,
+          color: theme.tooltipFg,
           whiteSpace: 'nowrap',
         }}
       />
@@ -715,7 +720,7 @@ function AntennaDetail({ antenna }: { antenna: AntennaEntry }) {
               ? <SatelliteIcon className="size-3.5 text-fg/40" />
               : <AntennaIcon className="size-3.5 text-fg/40" />
             }
-            <span className="text-sm font-semibold text-white/90">
+            <span className="text-sm font-semibold text-fg">
               {antenna.type}
             </span>
           </div>

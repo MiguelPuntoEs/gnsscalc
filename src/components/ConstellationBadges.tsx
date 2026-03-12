@@ -1,4 +1,5 @@
 import { systemColor } from '../util/gnss-constants';
+import { getChartTheme } from '../hooks/useChartTheme';
 import { systemName } from '../util/rinex';
 
 /** All constellation identifiers rendered by the badge grid. */
@@ -14,6 +15,7 @@ export default function ConstellationBadges({
   /** The constellation identifiers that should appear highlighted. */
   activeSystems: string[];
 }) {
+  const t = getChartTheme();
   return (
     <span className="grid grid-cols-4 gap-1.5 items-center py-1">
       {ALL_SYSTEMS.map(s => {
@@ -25,12 +27,12 @@ export default function ConstellationBadges({
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none"
             style={active
               ? { backgroundColor: `${c}18`, color: c, border: `1px solid ${c}30` }
-              : { backgroundColor: 'transparent', color: 'rgba(208,208,211,0.2)', border: '1px solid rgba(208,208,211,0.08)' }
+              : { backgroundColor: 'transparent', color: t.canvasText + '0.2)', border: `1px solid ${t.canvasText}0.08)` }
             }
           >
             <span
               className="size-1.5 rounded-full"
-              style={{ backgroundColor: active ? c : 'rgba(208,208,211,0.15)' }}
+              style={{ backgroundColor: active ? c : t.canvasText + '0.15)' }}
             />
             {systemName(s)}
           </span>

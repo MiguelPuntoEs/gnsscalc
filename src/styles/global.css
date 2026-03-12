@@ -2,12 +2,15 @@
 
 @theme {
   --color-fg: #d0d0d3;
+  --color-fg-strong: #ffffff;
   --color-bg: #2a2a35;
   --color-bg-raised: #32323f;
   --color-input: #3f3f4f;
   --color-border: #4a4a5a;
   --color-accent: #7c8aff;
 }
+
+
 
 @layer base {
   html {
@@ -37,7 +40,7 @@
   }
 
   a {
-    @apply no-underline text-inherit hover:text-white;
+    @apply no-underline text-inherit hover:text-fg;
   }
 
   section {
@@ -55,7 +58,7 @@
   }
 
   dt {
-    @apply font-semibold text-white/90;
+    @apply font-semibold text-fg;
   }
 
   dd {
@@ -66,7 +69,7 @@
 @utility btn {
   @apply m-0 rounded-md px-3 py-1 border-none bg-fg text-bg font-semibold text-xs;
   @apply transition-colors;
-  @apply hover:bg-white hover:text-bg;
+  @apply hover:bg-fg hover:text-bg;
   @apply active:bg-[#bbb] active:scale-[0.98];
 }
 
@@ -83,6 +86,7 @@
 @utility card {
   @apply rounded-xl bg-bg-raised border border-border/60 p-5 self-start;
 }
+
 
 @utility card-fields {
   @apply grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 items-center;
@@ -133,7 +137,7 @@
     @apply inline-block font-bold text-sm self-center whitespace-nowrap;
   }
   & > span {
-    @apply font-semibold text-sm col-span-2 text-white/90 mb-1;
+    @apply font-semibold text-sm col-span-2 text-fg mb-1;
   }
 
   @media (max-width: 600px) {

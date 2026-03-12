@@ -9,22 +9,17 @@
  */
 
 import type { Rtcm3Frame } from './ntrip';
+import { C_LIGHT, GLO_F1_BASE, GLO_F1_STEP, GLO_F2_BASE, GLO_F2_STEP } from './gnss-constants';
 
 /* ================================================================== */
 /*  Constants                                                          */
 /* ================================================================== */
-
-const LIGHTSPEED = 299792458.0;
 
 /* Frequencies (Hz) */
 const GPS_L1  = 1575420000.0;
 const GPS_L2  = 1227600000.0;
 const GPS_L5  = 1176450000.0;
 
-const GLO_L1_BASE = 1602000000.0;
-const GLO_L1_STEP = 562500.0;
-const GLO_L2_BASE = 1246000000.0;
-const GLO_L2_STEP = 437500.0;
 const GLO_L1a = 1600995000.0;
 const GLO_L2a = 1248060000.0;
 const GLO_L3  = 1202025000.0;
@@ -248,17 +243,17 @@ const gloFreqNum = new Int8Array(64).fill(-128); // -128 = unknown
 
 /** Get GLONASS frequency for a satellite given its slot and signal table freq marker */
 function gloWavelength(satIdx: number, freqMarker: number): number {
-  const k = gloFreqNum[satIdx];
+  const k = gloFreqNum[satIdx]!;
   if (k === -128) return 0;
   if (freqMarker === 0) {
     // L1
-    return LIGHTSPEED / (GLO_L1_BASE + k * GLO_L1_STEP);
+    return C_LIGHT / (GLO_F1_BASE + k * GLO_F1_STEP);
   } else if (freqMarker === 1) {
     // L2
-    return LIGHTSPEED / (GLO_L2_BASE + k * GLO_L2_STEP);
+    return C_LIGHT / (GLO_F2_BASE + k * GLO_F2_STEP);
   }
   // Non-FDMA signals use fixed frequency
-  return freqMarker > 0 ? LIGHTSPEED / freqMarker : 0;
+  return freqMarker > 0 ? C_LIGHT / freqMarker : 0;
 }
 
 /* ================================================================== */
@@ -473,7 +468,7 @@ export function decodeMsmFull(frame: Rtcm3Frame): MsmEpoch | null {
     const satIdx1 = satIndices[s]!;
     const prn = satPrn(sys, satIdx1);
     const roughRange_ms = rrint[s]! + rrmod[s]!;
-    const roughRange_m = roughRange_ms * LIGHTSPEED / 1000.0;
+    const roughRange_m = roughRange_ms * C_LIGHT / 1000.0;
     const roughRate_ms = rdop[s]!; // m/s
 
     const signals: MsmSignal[] = [];
@@ -494,7 +489,7 @@ export function decodeMsmFull(frame: Rtcm3Frame): MsmEpoch | null {
       if (sys === 'R' && (sigDef.freq === 0 || sigDef.freq === 1)) {
         wavelength = gloWavelength(satIdx1 - 1, sigDef.freq);
       } else if (sigDef.freq > 0) {
-        wavelength = LIGHTSPEED / sigDef.freq;
+        wavelength = C_LIGHT / sigDef.freq;
       } else {
         wavelength = 0;
       }
@@ -507,13 +502,13 @@ export function decodeMsmFull(frame: Rtcm3Frame): MsmEpoch | null {
       // Pseudorange
       const psrVal = psr[cellIdx]!;
       if (psrVal > -1 / (1 << 10)) {
-        signal.pseudorange = psrVal * LIGHTSPEED / 1000.0 + roughRange_m;
+        signal.pseudorange = psrVal * C_LIGHT / 1000.0 + roughRange_m;
       }
 
       // Carrier phase (in cycles)
       const cpVal = cp[cellIdx]!;
       if (cpVal > -1 / (1 << 8) && wavelength > 0) {
-        signal.phase = cpVal * LIGHTSPEED / 1000.0 / wavelength
+        signal.phase = cpVal * C_LIGHT / 1000.0 / wavelength
                      + roughRange_m / wavelength;
       }
 

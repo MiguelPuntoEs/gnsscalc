@@ -36,5 +36,5 @@ yarn-error.log*
 dist/
 tsconfig.tsbuildinfo
 
-# Data
+# Data (downloaded at test time via scripts/fetch-e2e-data.sh)
 /data/

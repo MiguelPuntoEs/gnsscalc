@@ -10,7 +10,8 @@ import {
   Cell,
 } from 'recharts';
 import type { CycleSlipResult } from '../util/cycle-slip';
-import { SYSTEM_COLORS, GRID_STROKE, AXIS_STYLE, TOOLTIP_STYLE, systemColor } from '../util/gnss-constants';
+import { SYSTEM_COLORS, systemColor } from '../util/gnss-constants';
+import { useChartTheme, getChartTheme } from '../hooks/useChartTheme';
 import { systemName } from '../util/rinex';
 import ChartCard from './ChartCard';
 
@@ -34,8 +35,8 @@ function SignalTabs({
         onClick={() => onSelect(null)}
         className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
           selected === null
-            ? 'bg-white/10 text-white/80'
-            : 'bg-white/[0.03] text-fg/40 hover:text-fg/60'
+            ? 'bg-fg/10 text-fg/80'
+            : 'bg-fg/[0.03] text-fg/40 hover:text-fg/60'
         }`}
       >
         All signals
@@ -47,8 +48,8 @@ function SignalTabs({
           onClick={() => onSelect(s.label)}
           className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
             selected === s.label
-              ? 'bg-white/10 text-white/80'
-              : 'bg-white/[0.03] text-fg/40 hover:text-fg/60'
+              ? 'bg-fg/10 text-fg/80'
+              : 'bg-fg/[0.03] text-fg/40 hover:text-fg/60'
           }`}
         >
           <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: systemColor(s.system) }} />
@@ -65,6 +66,7 @@ function SignalTabs({
 /* ================================================================== */
 
 function SlipRateBar({ stats }: { stats: CycleSlipResult['signalStats'] }) {
+  const theme = useChartTheme();
   const data = useMemo(() =>
     stats.filter(s => s.totalEpochs > 0).map(s => ({
       label: s.label,
@@ -82,11 +84,11 @@ function SlipRateBar({ stats }: { stats: CycleSlipResult['signalStats'] }) {
     <ChartCard title="Cycle slip rate per signal (slips / 1000 epochs)" height={Math.max(160, data.length * 36 + 40)}>
       <ResponsiveContainer>
         <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
-          <XAxis type="number" tick={AXIS_STYLE} tickLine={false} axisLine={false} domain={[0, 'auto']} />
-          <YAxis type="category" dataKey="label" tick={AXIS_STYLE} tickLine={false} axisLine={false} width={140} />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} horizontal={false} />
+          <XAxis type="number" tick={theme.axisStyle} tickLine={false} axisLine={false} domain={[0, 'auto']} />
+          <YAxis type="category" dataKey="label" tick={theme.axisStyle} tickLine={false} axisLine={false} width={140} />
           <Tooltip
-            {...TOOLTIP_STYLE}
+            {...theme.tooltipStyle}
             formatter={(value: any, _name: any, props: any) => [
               `${Number(value).toFixed(2)} / 1000 ep  (${props.payload.totalSlips} slips, ${props.payload.satellites} SVs)`,
               'Rate',
@@ -108,6 +110,7 @@ function SlipRateBar({ stats }: { stats: CycleSlipResult['signalStats'] }) {
 /* ================================================================== */
 
 function SatSlipBar({ result, selected }: { result: CycleSlipResult; selected: string | null }) {
+  const theme = useChartTheme();
   const data = useMemo(() => {
     const counts = new Map<string, number>();
     for (const ev of result.events) {
@@ -125,11 +128,11 @@ function SatSlipBar({ result, selected }: { result: CycleSlipResult; selected: s
     <ChartCard title="Cycle slips per satellite" height={Math.max(160, data.length * 14 + 40)}>
       <ResponsiveContainer>
         <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
-          <XAxis type="number" tick={AXIS_STYLE} tickLine={false} axisLine={false} allowDecimals={false} />
-          <YAxis type="category" dataKey="prn" tick={AXIS_STYLE} tickLine={false} axisLine={false} width={35} />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} horizontal={false} />
+          <XAxis type="number" tick={theme.axisStyle} tickLine={false} axisLine={false} allowDecimals={false} />
+          <YAxis type="category" dataKey="prn" tick={theme.axisStyle} tickLine={false} axisLine={false} width={35} />
           <Tooltip
-            {...TOOLTIP_STYLE}
+            {...theme.tooltipStyle}
             formatter={(value: any) => [`${value} slips`, 'Count']}
           />
           <Bar dataKey="slips" name="Slips" radius={[0, 4, 4, 0]} barSize={10}>
@@ -148,6 +151,7 @@ function SatSlipBar({ result, selected }: { result: CycleSlipResult; selected: s
 /* ================================================================== */
 
 function SlipTimeline({ result, selected }: { result: CycleSlipResult; selected: string | null }) {
+  useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -175,6 +179,7 @@ function SlipTimeline({ result, selected }: { result: CycleSlipResult; selected:
   const LABEL_W = 36;
 
   const draw = useCallback((canvas: HTMLCanvasElement) => {
+    const t = getChartTheme();
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
@@ -210,20 +215,20 @@ function SlipTimeline({ result, selected }: { result: CycleSlipResult; selected:
     ctx.textBaseline = 'middle';
     for (let r = 0; r < numRows; r++) {
       const prn = allPrns[r]!;
-      ctx.fillStyle = SYSTEM_COLORS[prn[0]!] ?? 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = SYSTEM_COLORS[prn[0]!] ?? t.canvasText + '0.5)';
       ctx.fillRect(0, r * cellH, 3, cellH - 0.5);
-      ctx.fillStyle = 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = t.canvasText + '0.5)';
       ctx.fillText(prn, LABEL_W - 4, r * cellH + cellH / 2);
     }
 
     // Time labels
     const actualH = cellH * numRows;
-    ctx.fillStyle = 'rgba(208,208,211,0.4)';
+    ctx.fillStyle = t.canvasText + '0.4)';
     ctx.font = '9px ui-monospace, monospace';
     ctx.textAlign = 'center';
     for (let i = 0; i <= 6; i++) {
-      const t = tMin + (i / 6) * duration;
-      const d = new Date(t);
+      const tt = tMin + (i / 6) * duration;
+      const d = new Date(tt);
       ctx.fillText(
         `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`,
         LABEL_W + (i / 6) * plotW,
@@ -293,7 +298,7 @@ function SlipTimeline({ result, selected }: { result: CycleSlipResult; selected:
         <div
           ref={tooltipRef}
           className="pointer-events-none absolute z-10 rounded-md px-2 py-1 text-xs"
-          style={{ display: 'none', backgroundColor: '#32323f', border: '1px solid rgba(74,74,90,0.6)', color: '#d0d0d3', whiteSpace: 'nowrap' }}
+          style={{ display: 'none', backgroundColor: getChartTheme().tooltipBg, border: getChartTheme().tooltipBorder, color: getChartTheme().tooltipFg, whiteSpace: 'nowrap' }}
         />
       </div>
     </div>
@@ -327,7 +332,7 @@ export default function CycleSlipCharts({ result }: { result: CycleSlipResult })
 
         {/* Summary cards */}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
-          <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+          <div className="rounded-lg bg-fg/[0.03] px-3 py-2">
             <div className="text-[10px] text-fg/40 mb-0.5">Total slips</div>
             <div className="text-lg font-semibold text-fg/80">{totalSlips.toLocaleString()}</div>
           </div>
@@ -335,7 +340,7 @@ export default function CycleSlipCharts({ result }: { result: CycleSlipResult })
             ? result.signalStats.filter(s => s.label === selected)
             : result.signalStats
           ).map(s => (
-            <div key={s.label} className="rounded-lg bg-white/[0.03] px-3 py-2">
+            <div key={s.label} className="rounded-lg bg-fg/[0.03] px-3 py-2">
               <div className="text-[10px] text-fg/40 mb-0.5">{s.label}</div>
               <div className="text-lg font-semibold" style={{ color: systemColor(s.system) }}>
                 {s.totalSlips}

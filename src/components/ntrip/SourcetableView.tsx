@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { NtripVersion, Sourcetable } from '../../util/ntrip';
 import { CONSTELLATION_COLORS } from '../../util/gnss-constants';
 import { SpinnerIcon, SignalIcon } from './Icons';
+
+const PAGE_SIZE = 50;
 
 function formatBitrate(bps: number): string {
   if (bps >= 1e6) return `${(bps / 1e6).toFixed(1)} Mbps`;
@@ -27,6 +29,7 @@ export default function SourcetableView({ sourcetable, host, port, version, user
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<'mountpoint' | 'format' | 'navSystem' | 'country' | 'bitrate'>('mountpoint');
   const [sortAsc, setSortAsc] = useState(true);
+  const [page, setPage] = useState(0);
 
   const { streams, networks } = sourcetable;
 
@@ -54,10 +57,26 @@ export default function SourcetableView({ sourcetable, host, port, version, user
     });
   }, [streams, search, sortKey, sortAsc]);
 
+  // Reset page when filters change
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  if (safePage !== page) setPage(safePage);
+
+  const paginatedRows = useMemo(() => {
+    const start = safePage * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, safePage]);
+
   const handleSort = (key: typeof sortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(true); }
+    setPage(0);
   };
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setPage(0);
+  }, []);
 
   const sortArrow = (key: typeof sortKey) => sortKey === key ? (sortAsc ? ' \u25B2' : ' \u25BC') : '';
 
@@ -96,7 +115,7 @@ export default function SourcetableView({ sourcetable, host, port, version, user
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={handleSearchChange}
           placeholder="Filter mountpoints…"
           className="w-full !text-left px-3 py-2 rounded-lg bg-input border border-border/40 text-sm text-fg placeholder:text-fg/30"
         />
@@ -127,7 +146,7 @@ export default function SourcetableView({ sourcetable, host, port, version, user
             </tr>
           </thead>
           <tbody>
-            {filtered.map(s => (
+            {paginatedRows.map(s => (
               <tr key={s.mountpoint} className="border-t border-border/20 hover:bg-bg-raised/50 transition-colors cursor-pointer" onClick={() => { if (!streamConnecting) onStreamConnect(s.mountpoint); }}>
                 <td className="px-3 py-1.5 font-mono font-medium whitespace-nowrap">
                   <button
@@ -164,6 +183,42 @@ export default function SourcetableView({ sourcetable, host, port, version, user
           </tbody>
         </table>
       </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 text-xs text-fg/50">
+          <button
+            className="px-2 py-1 rounded bg-bg-raised border border-border/30 hover:text-fg/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => setPage(0)}
+            disabled={safePage === 0}
+          >
+            &laquo;
+          </button>
+          <button
+            className="px-2 py-1 rounded bg-bg-raised border border-border/30 hover:text-fg/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={safePage === 0}
+          >
+            &lsaquo; Prev
+          </button>
+          <span className="tabular-nums">
+            {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </span>
+          <button
+            className="px-2 py-1 rounded bg-bg-raised border border-border/30 hover:text-fg/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={safePage >= totalPages - 1}
+          >
+            Next &rsaquo;
+          </button>
+          <button
+            className="px-2 py-1 rounded bg-bg-raised border border-border/30 hover:text-fg/80 disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={() => setPage(totalPages - 1)}
+            disabled={safePage >= totalPages - 1}
+          >
+            &raquo;
+          </button>
+        </div>
+      )}
       <p className="text-[10px] text-fg/25 text-center">
         {filtered.length} of {streams.length} streams — click a mountpoint to connect
       </p>

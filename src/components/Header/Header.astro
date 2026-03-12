@@ -9,31 +9,34 @@ const links = [
   { href: '/ntrip', label: 'NTRIP' },
   { href: '/spectrum', label: 'Spectrum' },
   { href: '/antex', label: 'ANTEX' },
+  { href: '/about', label: 'About' },
 ];
 ---
 
 <header class="border-b border-border">
   <div class="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-    <a href="/" class="text-xl font-bold tracking-tight text-white">gnsscalc</a>
+    <a href="/" class="text-xl font-bold tracking-tight text-fg-strong">gnsscalc</a>
 
     {/* Desktop nav */}
     <nav class="hidden sm:flex gap-6 text-sm font-medium">
       {links.map(({ href, label }) => (
-        <a href={href} class={pathname === href ? 'text-white' : 'text-fg/60 hover:text-white'}>{label}</a>
+        <a href={href} class={pathname === href ? 'text-fg-strong' : 'text-fg/60 hover:text-fg-strong'}>{label}</a>
       ))}
     </nav>
 
-    {/* Mobile hamburger */}
-    <button
-      id="menu-toggle"
-      class="sm:hidden flex flex-col justify-center gap-[5px] w-8 h-8 -mr-1"
-      aria-label="Toggle menu"
-      aria-expanded="false"
-    >
-      <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar1" />
-      <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar2" />
-      <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar3" />
-    </button>
+    <div class="flex items-center gap-1">
+      {/* Mobile hamburger */}
+      <button
+        id="menu-toggle"
+        class="sm:hidden flex flex-col justify-center gap-[5px] w-8 h-8 -mr-1"
+        aria-label="Toggle menu"
+        aria-expanded="false"
+      >
+        <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar1" />
+        <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar2" />
+        <span class="block w-5 h-[1.5px] bg-fg/60 transition-all origin-center" id="bar3" />
+      </button>
+    </div>
   </div>
 
   {/* Mobile dropdown */}
@@ -47,8 +50,8 @@ const links = [
           href={href}
           class={`py-2 px-2 -mx-2 rounded-md text-sm font-medium transition-colors ${
             pathname === href
-              ? 'text-white bg-white/5'
-              : 'text-fg/60 hover:text-white hover:bg-white/5'
+              ? 'text-fg-strong bg-fg/5'
+              : 'text-fg/60 hover:text-fg-strong hover:bg-fg/5'
           }`}
         >{label}</a>
       ))}
@@ -71,4 +74,5 @@ const links = [
     bar2.style.opacity = isOpen ? '0' : '1';
     bar3.style.transform = isOpen ? 'translateY(-6.5px) rotate(-45deg)' : '';
   });
+
 </script>

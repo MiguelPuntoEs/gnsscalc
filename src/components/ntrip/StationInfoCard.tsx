@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { StationMeta } from '../../util/ntrip';
-import { ecefToGeodetic } from '../../util/orbit';
+import { ecefToGeodetic } from '../../util/positioning';
 
 export default function StationInfoCard({ meta, streamEntry }: { meta: StationMeta; streamEntry?: { latitude: number; longitude: number; network: string; country: string; identifier: string; navSystem: string } | null }) {
   const hasAny = meta.stationId !== null || meta.receiverType || meta.antennaType || meta.position || meta.description;
@@ -8,8 +8,8 @@ export default function StationInfoCard({ meta, streamEntry }: { meta: StationMe
 
   const geo = useMemo(() => {
     if (meta.position) {
-      const g = ecefToGeodetic(...meta.position);
-      return { lat: g.lat * 180 / Math.PI, lon: g.lon * 180 / Math.PI, alt: g.alt };
+      const [lat, lon, alt] = ecefToGeodetic(...meta.position);
+      return { lat: lat * 180 / Math.PI, lon: lon * 180 / Math.PI, alt };
     }
     if (streamEntry && (streamEntry.latitude !== 0 || streamEntry.longitude !== 0)) {
       return { lat: streamEntry.latitude, lon: streamEntry.longitude, alt: null as number | null };

@@ -1,15 +1,17 @@
 import { lazy, Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { parseRinexStream } from '../util/rinex';
 import type { RinexResult } from '../util/rinex';
-import { analyzeQuality } from '../util/quality-analysis';
 import type { QualityResult } from '../util/quality-analysis';
 import { systemName, systemCmp } from '../util/rinex';
+import { CONSTELLATION_COLORS } from '../util/gnss-constants';
 import ConstellationBadges from './ConstellationBadges';
-import { parseNavFile } from '../util/nav';
 import type { NavResult } from '../util/nav';
 import type { AllPositionsData } from '../util/orbit';
-import { computeAllPositions, navTimesFromEph } from '../util/orbit';
+import {
+  addObsFiles, addNavFiles,
+  exportObs, exportNav, clearWorker,
+} from '../util/rinex-client';
 import CopyableInput from './CopyableInput';
+import ErrorBoundary from './ErrorBoundary';
 
 const RinexCharts = lazy(() => import('./RinexCharts'));
 const SkyPlotCharts = lazy(() => import('./SkyPlot'));
@@ -45,7 +47,7 @@ function formatFileSize(bytes: number): string {
 function isNavFileName(name: string): boolean {
   const lower = name.toLowerCase();
   if (/_[MGRECJI]N\.rnx(\.gz)?$/i.test(lower)) return true;
-  if (/\.\d{2}[nglp]$/i.test(lower)) return true;
+  if (/\.\d{2}[nglpfhiq]$/i.test(lower)) return true;
   if (lower.endsWith('.nav') || lower.endsWith('.nnav') || lower.endsWith('.gnav')) return true;
   return false;
 }
@@ -95,8 +97,43 @@ async function readFileText(file: File): Promise<string> {
   return file.text();
 }
 
+/** Guess constellation from a nav file name. Returns system letter (G/R/E/C/J/I/S) or null. */
+function navFileConstellation(name: string): string | null {
+  const lower = name.toLowerCase();
+  // RINEX 3/4 long name: _GN, _RN, _EN, _CN, _JN, _IN, _SN, _MN
+  const r3 = lower.match(/_([grecjism])n\.rnx/i);
+  if (r3) {
+    const map: Record<string, string> = { g: 'G', r: 'R', e: 'E', c: 'C', j: 'J', i: 'I', s: 'S', m: 'M' };
+    return map[r3[1]!.toLowerCase()] ?? null;
+  }
+  // Legacy .YYx extension
+  const leg = lower.match(/\.\d{2}([nglpfhiq])(?:\.gz)?$/);
+  if (leg) {
+    const map: Record<string, string> = { n: 'G', g: 'R', l: 'E', f: 'C', q: 'J', i: 'I', h: 'S', p: 'M' };
+    return map[leg[1]!] ?? null;
+  }
+  return null;
+}
+
+/** Human label for a constellation letter */
+function constellationLabel(sys: string): string {
+  const labels: Record<string, string> = {
+    G: 'GPS', R: 'GLONASS', E: 'Galileo', C: 'BeiDou',
+    J: 'QZSS', I: 'NavIC', S: 'SBAS', M: 'Mixed',
+  };
+  return labels[sys] ?? sys;
+}
+
+/* ─── Multi-obs merge ─────────────────────────────────────────────── */
+
 const OBS_ACCEPT = ".obs,.rnx,.crx,.gz,.Z,.26o,.25o,.24o,.23o,.22o,.21o,.20o,.19o,.18o,.17o,.16o,.15o,.14o,.13o,.12o,.11o,.10o,.09o,.08o,.07o,.06o,.05o,.04o,.03o,.02o,.01o,.00o,.26d,.25d,.24d,.23d,.22d,.21d,.20d,.19d,.18d,.17d,.16d,.15d,.14d,.13d,.12d,.11d,.10d,.09d,.08d,.07d,.06d,.05d,.04d,.03d,.02d,.01d,.00d";
-const NAV_ACCEPT = ".rnx,.nav,.nnav,.gnav,.gz,.26n,.25n,.24n,.23n,.22n,.21n,.20n,.19n,.18n,.17n,.16n,.15n,.14n,.13n,.12n,.11n,.10n,.09n,.08n,.07n,.06n,.05n,.04n,.03n,.02n,.01n,.00n";
+const NAV_ACCEPT = [
+  ".rnx,.nav,.nnav,.gnav,.gz",
+  // Legacy per-constellation nav extensions (.YYx): n=GPS, g=GLONASS, l=Galileo, f=BeiDou, h=SBAS, i=NavIC, q=QZSS, p=mixed
+  ...['n','g','l','f','h','i','q','p'].flatMap(c =>
+    Array.from({ length: 27 }, (_, y) => `.${String(y).padStart(2, '0')}${c}`)
+  ),
+].join(',');
 
 /* ─── Icons ───────────────────────────────────────────────────────── */
 
@@ -110,13 +147,6 @@ function UploadIcon({ className }: { className?: string }) {
   );
 }
 
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
-      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-    </svg>
-  );
-}
 
 function SpinnerIcon({ className }: { className?: string }) {
   return (
@@ -127,149 +157,64 @@ function SpinnerIcon({ className }: { className?: string }) {
   );
 }
 
-/* ─── Compact file slot (for loaded state bar) ────────────────────── */
-
-function MiniFileSlot({
-  label,
-  hint,
-  fileName,
-  loading,
-  loadingText,
-  progress,
-  fileSize,
-  loaded,
-  accept,
-  onFile,
-  onClear,
-}: {
-  label: string;
-  hint: string;
-  fileName: string | null;
-  loading: boolean;
-  loadingText?: string;
-  progress?: number;
-  fileSize?: number;
-  loaded: boolean;
-  accept: string;
-  onFile: (file: File) => void;
-  onClear?: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) onFile(file);
-  }, [onFile]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onFile(file);
-  }, [onFile]);
-
-  if (loading) {
-    return (
-      <div className="flex-1 rounded-md border border-border/40 bg-bg-raised/30 px-2 py-1.5 flex items-center gap-2 min-w-0">
-        <SpinnerIcon className="size-3 animate-spin text-accent shrink-0" />
-        <span className="text-[10px] text-fg/50 truncate">
-          {progress != null ? `${progress}%` : (loadingText ?? 'Parsing…')}
-        </span>
-        {progress != null && (
-          <div className="w-12 h-0.5 bg-border/40 rounded-full overflow-hidden shrink-0">
-            <div className="h-full bg-accent rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (loaded && fileName) {
-    return (
-      <div className="flex-1 rounded-md border border-green-500/15 bg-green-500/5 px-2 py-1.5 flex items-center gap-1.5 min-w-0">
-        <CheckIcon className="size-3 text-green-400 shrink-0" />
-        <span className="text-[10px] text-fg/50 truncate" title={fileName}>{fileName}</span>
-        {onClear && (
-          <button
-            type="button"
-            className="ml-auto text-fg/15 hover:text-fg/40 transition-colors shrink-0"
-            onClick={(e) => { e.stopPropagation(); onClear(); }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-3">
-              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-            </svg>
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`flex-1 rounded-md border border-dashed px-2 py-1.5 flex items-center gap-1.5 cursor-pointer transition-colors min-w-0 ${
-        dragging ? 'border-accent bg-accent/10' : 'border-border/30 hover:border-fg/20'
-      }`}
-      onClick={() => inputRef.current?.click()}
-      onDrop={handleDrop}
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-    >
-      <UploadIcon className="size-3 text-fg/25 shrink-0" />
-      <span className="text-[10px] text-fg/35 truncate">{label} ({hint})</span>
-      <input ref={inputRef} type="file" accept={accept} onChange={handleChange} className="hidden" />
-    </div>
-  );
-}
-
 /* ─── Upload drop zone (initial state) ────────────────────────────── */
 
 function UploadDropZone({
   isDragging,
   loading,
   fileName,
+  fileIndex,
+  fileTotal,
   progress,
   fileSize,
+  navFileNames,
+  navLoading,
   onDrop,
   onDragOver,
   onDragLeave,
-  onFile,
+  onFiles,
 }: {
   isDragging: boolean;
   loading: boolean;
   fileName: string | null;
+  fileIndex: number | null;
+  fileTotal: number | null;
   progress: number;
   fileSize: number;
+  navFileNames: string[];
+  navLoading: boolean;
   onDrop: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: () => void;
-  onFile: (file: File) => void;
+  onFiles: (files: FileList) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      for (let i = 0; i < files.length; i++) {
-        onFile(files[i]!);
-      }
-    }
-  }, [onFile]);
+    if (e.target.files && e.target.files.length > 0) onFiles(e.target.files);
+  }, [onFiles]);
 
   // Show loading state
-  if (loading) {
+  if (loading || navLoading) {
     return (
       <div className="card flex flex-col items-center justify-center gap-3 py-12">
         <SpinnerIcon className="size-6 animate-spin text-accent" />
         <div className="text-center">
           <p className="text-sm text-fg/60 mb-0.5">
-            Parsing{fileName ? ` ${fileName}` : ''}…
-            {progress > 0 && ` ${progress}%`}
+            {loading
+              ? fileIndex != null && fileTotal != null && fileTotal > 1
+                ? `Parsing obs ${fileIndex + 1}/${fileTotal}… ${progress > 0 ? `${progress}%` : ''}`
+                : `Parsing${fileName ? ` ${fileName}` : ''}… ${progress > 0 ? `${progress}%` : ''}`
+              : 'Loading navigation…'}
           </p>
-          {fileSize > 0 && <p className="text-[10px] text-fg/25 mb-0">{formatFileSize(fileSize)}</p>}
+          {loading && fileSize > 0 && <p className="text-[10px] text-fg/25 mb-0">{formatFileSize(fileSize)}</p>}
+          {navFileNames.length > 0 && (
+            <p className="text-[10px] text-fg/25 mt-1 mb-0">
+              + {navFileNames.length} nav file{navFileNames.length > 1 ? 's' : ''}
+            </p>
+          )}
         </div>
-        {progress > 0 && (
+        {loading && progress > 0 && (
           <div className="w-48 h-1 bg-border/40 rounded-full overflow-hidden">
             <div className="h-full bg-accent rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
           </div>
@@ -290,12 +235,14 @@ function UploadDropZone({
     >
       <UploadIcon className="size-8 text-fg/20" />
       <div className="text-center">
-        <p className="text-sm text-fg/50 mb-0.5">Drop RINEX files here or click to browse</p>
+        <p className="text-sm text-fg/50 mb-0.5">Drop all station files here</p>
         <p className="text-[10px] text-fg/20 mb-0">
-          Observation (.obs .rnx .YYo) + optional Navigation (.nav .YYn)
+          Observation + Navigation &mdash; we&apos;ll sort them automatically
         </p>
       </div>
-      <p className="text-[10px] text-fg/15 mb-0">RINEX 2/3/4 &middot; Hatanaka CRX &middot; gzip</p>
+      <p className="text-[10px] text-fg/15 mb-0">
+        .obs .rnx .YYo .YYn .YYg .YYl .YYf &middot; RINEX 2/3/4 &middot; Hatanaka &middot; gzip
+      </p>
       <input
         ref={inputRef}
         type="file"
@@ -353,7 +300,7 @@ function NavSummary({ navResult }: { navResult: NavResult }) {
   return (
     <div className="card-output">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-white/90">Navigation Summary</span>
+        <span className="text-sm font-semibold text-fg">Navigation Summary</span>
       </div>
       <div className="card-fields">
         <label>RINEX version</label>
@@ -394,168 +341,417 @@ function NavSummary({ navResult }: { navResult: NavResult }) {
   );
 }
 
+/* ─── File panel (collapsible manifest of loaded files) ───────────── */
+
+function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className={`${className ?? ''} transition-transform ${open ? 'rotate-90' : ''}`}>
+      <path fillRule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L8.94 8 6.22 5.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className={className}>
+      <path d="M8 1a.75.75 0 01.75.75v6.69l1.72-1.72a.75.75 0 111.06 1.06l-3 3a.75.75 0 01-1.06 0l-3-3a.75.75 0 011.06-1.06l1.72 1.72V1.75A.75.75 0 018 1zM2.75 9.5a.75.75 0 01.75.75v2c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-2a.75.75 0 011.5 0v2A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-2a.75.75 0 01.75-.75z" />
+    </svg>
+  );
+}
+
+function FilePanel({
+  files,
+  loading,
+  navLoading,
+  computing,
+  hasObs,
+  hasNav,
+  obsExporting,
+  obsExportProgress,
+  navExporting,
+  onDownloadObs,
+  onDownloadNav,
+}: {
+  files: LoadedFileInfo[];
+  loading: boolean;
+  navLoading: boolean;
+  computing: boolean;
+  hasObs: boolean;
+  hasNav: boolean;
+  obsExporting: boolean;
+  obsExportProgress: number;
+  navExporting: boolean;
+  onDownloadObs: () => void;
+  onDownloadNav: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const initializedRef = useRef(false);
+
+  const obsFiles = files.filter(f => f.type === 'obs');
+  const navFiles = files.filter(f => f.type === 'nav');
+
+  // Group nav by constellation
+  const navGroups = useMemo(() => {
+    const groups = new Map<string, LoadedFileInfo[]>();
+    for (const f of navFiles) {
+      const sys = f.constellation ?? '?';
+      const arr = groups.get(sys) ?? [];
+      arr.push(f);
+      groups.set(sys, arr);
+    }
+    const sysOrder = ['G', 'R', 'E', 'C', 'J', 'I', 'S', 'M', '?'];
+    return sysOrder.filter(s => groups.has(s)).map(s => ({ sys: s, files: groups.get(s)! }));
+  }, [navFiles]);
+
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+  const toggleSection = useCallback((key: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Auto-expand when <14 files on first load
+  useEffect(() => {
+    if (initializedRef.current || files.length === 0) return;
+    initializedRef.current = true;
+    if (files.length < 14) {
+      setOpen(true);
+      const sections = new Set<string>();
+      if (files.some(f => f.type === 'obs')) sections.add('obs');
+      const navSystems = new Set<string>();
+      for (const f of files) {
+        if (f.type === 'nav') navSystems.add(f.constellation ?? '?');
+      }
+      for (const sys of navSystems) sections.add(`nav-${sys}`);
+      setExpandedSections(sections);
+    }
+  }, [files]);
+
+  if (files.length === 0 && !loading && !navLoading) return null;
+
+  const OBS_COLOR = '#60a5fa'; // blue-400
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/20">
+      {/* Summary row — always visible, clickable to toggle */}
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[11px] text-fg/40 hover:text-fg/60 transition-colors"
+          onClick={() => setOpen(o => !o)}
+        >
+          <ChevronIcon open={open} className="size-3" />
+          <span>
+            {obsFiles.length > 0 && (
+              <span style={{ color: OBS_COLOR, opacity: 0.7 }}>{obsFiles.length === 1 ? '1 obs' : `${obsFiles.length} obs`}</span>
+            )}
+            {obsFiles.length > 0 && navFiles.length > 0 && <span className="text-fg/20"> · </span>}
+            {navGroups.map((g, i) => {
+              const color = CONSTELLATION_COLORS[g.sys] ?? '#94a3b8';
+              return (
+                <span key={g.sys}>
+                  {i > 0 && <span className="text-fg/20"> · </span>}
+                  <span style={{ color, opacity: 0.7 }}>
+                    {constellationLabel(g.sys)}{g.files.length > 1 && <span style={{ opacity: 0.5 }}> ×{g.files.length}</span>}
+                  </span>
+                </span>
+              );
+            })}
+          </span>
+          {totalSize > 0 && <span className="text-fg/20 ml-1">{formatFileSize(totalSize)}</span>}
+        </button>
+
+        {/* Loading spinners */}
+        {loading && <span className="inline-flex items-center gap-1 text-[10px] text-fg/30"><SpinnerIcon className="size-2.5 animate-spin" /> obs</span>}
+        {navLoading && <span className="inline-flex items-center gap-1 text-[10px] text-fg/30"><SpinnerIcon className="size-2.5 animate-spin" /> nav</span>}
+        {computing && <span className="inline-flex items-center gap-1 text-[10px] text-fg/30"><SpinnerIcon className="size-2.5 animate-spin" /> orbits</span>}
+      </div>
+
+      {/* Expanded file list */}
+      {open && files.length > 0 && (
+        <div className="mt-2 rounded-lg bg-bg/40 border border-border/20 text-[11px]">
+          {/* Observations */}
+          {obsFiles.length > 0 && (
+            <div>
+              <button
+                type="button"
+                className="w-full flex items-center gap-1.5 bg-bg/80 backdrop-blur px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b border-border/10 hover:bg-bg/90 transition-colors text-left"
+                style={{ color: OBS_COLOR, opacity: 0.8 }}
+                onClick={() => toggleSection('obs')}
+              >
+                <ChevronIcon open={expandedSections.has('obs')} className="size-2.5 shrink-0" />
+                Observations
+                <span className="font-normal text-fg/25">{obsFiles.length} file{obsFiles.length > 1 ? 's' : ''} · {formatFileSize(obsFiles.reduce((s, f) => s + f.size, 0))}</span>
+              </button>
+              {expandedSections.has('obs') && obsFiles.map(f => (
+                <div key={f.name} className="flex items-center justify-between px-3 pl-7 py-1 border-b border-border/5 hover:bg-fg/[0.02]">
+                  <span className="font-mono text-fg/50 truncate">{f.name}</span>
+                  <span className="text-fg/20 shrink-0 ml-3">{formatFileSize(f.size)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Navigation — per constellation */}
+          {navGroups.map(g => {
+            const color = CONSTELLATION_COLORS[g.sys] ?? '#94a3b8';
+            const sectionKey = `nav-${g.sys}`;
+            return (
+              <div key={g.sys}>
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-1.5 bg-bg/80 backdrop-blur px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider border-b border-border/10 hover:bg-bg/90 transition-colors text-left"
+                  style={{ color, opacity: 0.8 }}
+                  onClick={() => toggleSection(sectionKey)}
+                >
+                  <ChevronIcon open={expandedSections.has(sectionKey)} className="size-2.5 shrink-0" />
+                  {constellationLabel(g.sys)}
+                  <span className="font-normal text-fg/25">{g.files.length} file{g.files.length > 1 ? 's' : ''} · {formatFileSize(g.files.reduce((s, f) => s + f.size, 0))}</span>
+                </button>
+                {expandedSections.has(sectionKey) && g.files.map(f => (
+                  <div key={f.name} className="flex items-center justify-between px-3 pl-7 py-1 border-b border-border/5 hover:bg-fg/[0.02]">
+                    <span className="font-mono text-fg/50 truncate">{f.name}</span>
+                    <span className="text-fg/20 shrink-0 ml-3">{formatFileSize(f.size)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Download merged files */}
+      {(hasObs || hasNav) && (
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/20">
+          {hasObs && (
+            <button
+              type="button"
+              className="relative inline-flex items-center gap-1.5 text-[11px] text-fg/40 hover:text-accent px-2.5 py-1 rounded-md border border-border/20 hover:border-accent/30 transition-colors disabled:text-fg/30 disabled:hover:text-fg/30 overflow-hidden"
+              onClick={onDownloadObs}
+              disabled={obsExporting}
+            >
+              {obsExporting && obsExportProgress > 0 && (
+                <div className="absolute inset-0 bg-accent/10 transition-all duration-300" style={{ width: `${obsExportProgress}%` }} />
+              )}
+              <span className="relative inline-flex items-center gap-1.5">
+                {obsExporting
+                  ? <SpinnerIcon className="size-3 animate-spin" />
+                  : <DownloadIcon className="size-3" />}
+                {obsExporting
+                  ? `Exporting${obsExportProgress > 0 ? ` ${obsExportProgress}%` : '…'}`
+                  : obsFiles.length > 1 ? 'Download merged OBS' : 'Download OBS'}
+                {!obsExporting && <span className="text-fg/15">.rnx</span>}
+              </span>
+            </button>
+          )}
+          {hasNav && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-[11px] text-fg/40 hover:text-accent px-2.5 py-1 rounded-md border border-border/20 hover:border-accent/30 transition-colors disabled:text-fg/30 disabled:hover:text-fg/30"
+              onClick={onDownloadNav}
+              disabled={navExporting}
+            >
+              {navExporting
+                ? <SpinnerIcon className="size-3 animate-spin" />
+                : <DownloadIcon className="size-3" />}
+              {navExporting ? 'Exporting…' : navFiles.length > 1 ? 'Download merged NAV' : 'Download NAV'}
+              {!navExporting && <span className="text-fg/15">.rnx</span>}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main component ──────────────────────────────────────────────── */
 
+/** A staged file entry in the manifest */
+interface StagedFile {
+  file: File;
+  type: 'obs' | 'nav' | 'unknown';
+  constellation: string | null; // for nav files
+  name: string;
+  size: number;
+}
+
+/** Metadata kept after processing for display in the file panel */
+interface LoadedFileInfo {
+  name: string;
+  size: number;
+  type: 'obs' | 'nav';
+  constellation: string | null;
+}
+
 export default function RinexReaderPage() {
+  // Staged files (manifest before/during loading)
+  const [staged, setStaged] = useState<StagedFile[]>([]);
+
+  // Parsed results
   const [result, setResult] = useState<RinexResult | null>(null);
+  const [obsFiles, setObsFiles] = useState<File[]>([]);
+  const [obsFileNames, setObsFileNames] = useState<string[]>([]);
   const [navResult, setNavResult] = useState<NavResult | null>(null);
+  const [navFileNames, setNavFileNames] = useState<string[]>([]);
+  const [loadedFiles, setLoadedFiles] = useState<LoadedFileInfo[]>([]);
   const [allPositions, setAllPositions] = useState<AllPositionsData | null>(null);
   const [observedPrns, setObservedPrns] = useState<Set<string>[] | null>(null);
+
+  // UI state
   const [error, setError] = useState<string | null>(null);
-  const [obsFile, setObsFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [navFileName, setNavFileName] = useState<string | null>(null);
-  const [fileSize, setFileSize] = useState<number>(0);
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const abortRef = useRef<AbortController | null>(null);
-
+  const [loadingFileName, setLoadingFileName] = useState<string | null>(null);
+  const [loadingFileIndex, setLoadingFileIndex] = useState<number | null>(null);
+  const [loadingFileTotal, setLoadingFileTotal] = useState<number | null>(null);
   const [computing, setComputing] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const addFilesInputRef = useRef<HTMLInputElement>(null);
 
   const [qaResult, setQaResult] = useState<QualityResult | null>(null);
   const [qaLoading, setQaLoading] = useState(false);
   const [qaProgress, setQaProgress] = useState(0);
 
-  const runQualityAnalysis = useCallback(async (file: File, header: RinexResult['header']) => {
-    setQaLoading(true);
-    setQaProgress(0);
-    setQaResult(null);
-    try {
-      const qa = await analyzeQuality(file, header, setQaProgress);
-      setQaResult(qa);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Quality analysis failed.');
-    } finally {
-      setQaLoading(false);
-    }
-  }, []);
 
-  const processObsFile = useCallback(async (file: File) => {
-    setError(null);
-    setObsFile(file);
-    setFileName(file.name);
-    setFileSize(file.size);
-    setLoading(true);
-    setProgress(0);
-    setResult(null);
-    setAllPositions(null); setObservedPrns(null);
+  /** Classify files and add to staged manifest */
+  const stageFiles = useCallback(async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    const newStaged: StagedFile[] = [];
 
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+    for (const f of files) {
+      // Skip duplicates
+      if (staged.some(s => s.name === f.name) || newStaged.some(s => s.name === f.name)) continue;
 
-    try {
-      const r = await parseRinexStream(file, setProgress, controller.signal);
-      if (r.epochs.length === 0) {
-        setError('No valid observation epochs found in the file.');
-        setResult(null);
+      let type: 'obs' | 'nav' | 'unknown';
+      let constellation: string | null = null;
+
+      if (isNavFileName(f.name)) {
+        type = 'nav';
+        constellation = navFileConstellation(f.name);
       } else {
-        setResult(r);
-        runQualityAnalysis(file, r.header);
+        const lower = f.name.toLowerCase();
+        if (lower.endsWith('.rnx') || lower.endsWith('.rnx.gz') || lower.endsWith('.gz')) {
+          const sniffed = await sniffFileType(f);
+          type = sniffed === 'unknown' ? 'obs' : sniffed; // default ambiguous to obs
+          if (type === 'nav') constellation = navFileConstellation(f.name);
+        } else {
+          type = 'obs';
+        }
       }
-    } catch (e: unknown) {
-      if (e instanceof DOMException && e.name === 'AbortError') return;
-      setError(e instanceof Error ? e.message : 'Failed to parse RINEX file.');
-      setResult(null);
-    } finally {
-      setLoading(false);
+      newStaged.push({ file: f, type, constellation, name: f.name, size: f.size });
     }
-  }, [runQualityAnalysis]);
 
-  const processNavFile = useCallback(async (file: File) => {
-    setError(null);
-    setNavLoading(true);
-    setNavFileName(file.name);
-    setAllPositions(null); setObservedPrns(null);
-    try {
-      const text = await readFileText(file);
-      const nav = parseNavFile(text);
-      if (nav.ephemerides.length === 0) {
-        setError('No navigation ephemerides found. Is this a navigation file?');
-        setNavResult(null);
-        setNavFileName(null);
-        return;
-      }
-      setNavResult(nav);
-      setComputing(true);
-      await new Promise(r => requestAnimationFrame(r));
-      const times = navTimesFromEph(nav.ephemerides);
-      const positions = computeAllPositions(nav.ephemerides, times);
-      setAllPositions(positions);
-      setObservedPrns(null);
-      setComputing(false);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to parse navigation file.');
-      setNavResult(null);
-      setNavFileName(null);
-    } finally {
-      setNavLoading(false);
-      setComputing(false);
+    if (newStaged.length > 0) {
+      setStaged(prev => [...prev, ...newStaged]);
     }
+  }, [staged]);
+
+  /** Remove a file from the staged manifest */
+  const unstageFile = useCallback((name: string) => {
+    setStaged(prev => prev.filter(s => s.name !== name));
   }, []);
 
-  useEffect(() => {
-    if (!navResult || !result) return;
-    const rxPos = result.header.approxPosition ?? undefined;
-    const maxEpochs = 500;
-    const step = Math.max(1, Math.ceil(result.epochs.length / maxEpochs));
-    const times: number[] = [];
-    const obsPrns: Set<string>[] = [];
-    for (let i = 0; i < result.epochs.length; i += step) {
-      const e = result.epochs[i]!;
-      times.push(e.time);
-      obsPrns.push(new Set(Object.keys(e.snrPerSat)));
-    }
+  /** Process all staged files — parse obs and nav */
+  const processStaged = useCallback(async () => {
+    const obsEntries = staged.filter(s => s.type === 'obs');
+    const navEntries = staged.filter(s => s.type === 'nav');
 
-    let cancelled = false;
-    setComputing(true);
-    const id = requestAnimationFrame(() => {
-      if (cancelled) return;
-      const positions = computeAllPositions(
-        navResult.ephemerides, times,
-        rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0) ? rxPos : undefined,
-      );
-      if (!cancelled) {
-        setAllPositions(positions);
-        setObservedPrns(obsPrns);
-        setComputing(false);
+    if (obsEntries.length === 0 && navEntries.length === 0) return;
+
+    setError(null);
+
+    // Process observation files (incremental — worker accumulates)
+    if (obsEntries.length > 0) {
+      const newObsEntries = obsEntries.filter(e => !obsFileNames.includes(e.name));
+
+      if (newObsEntries.length > 0) {
+        setLoading(true);
+        setProgress(0);
+        setLoadingFileIndex(null);
+        setLoadingFileTotal(newObsEntries.length);
+
+        try {
+          const { result: merged, qaResult, positions, observedPrns: prns } =
+            await addObsFiles(newObsEntries.map(e => e.file), setProgress);
+          setResult(merged);
+          setQaResult(qaResult);
+          setObsFiles(prev => [...prev, ...newObsEntries.map(e => e.file)]);
+          setObsFileNames(prev => [...prev, ...newObsEntries.map(e => e.name)]);
+          if (positions) { setAllPositions(positions); setObservedPrns(prns); }
+        } catch (e: unknown) {
+          setError(e instanceof Error ? e.message : 'Failed to parse observation file(s).');
+        } finally {
+          setLoading(false);
+          setLoadingFileName(null);
+          setLoadingFileIndex(null);
+          setLoadingFileTotal(null);
+        }
       }
-    });
-    return () => { cancelled = true; cancelAnimationFrame(id); };
-  }, [result, navResult]);
-
-  const routeFile = useCallback(async (file: File) => {
-    if (isNavFileName(file.name)) { processNavFile(file); return; }
-    const lower = file.name.toLowerCase();
-    if (lower.endsWith('.rnx') || lower.endsWith('.rnx.gz') || lower.endsWith('.gz')) {
-      const type = await sniffFileType(file);
-      if (type === 'nav') { processNavFile(file); return; }
     }
-    processObsFile(file);
-  }, [processObsFile, processNavFile]);
+
+    // Process nav files (incremental — worker accumulates)
+    if (navEntries.length > 0) {
+      const newNavEntries = navEntries.filter(e => !navFileNames.includes(e.name));
+
+      if (newNavEntries.length > 0) {
+        setNavLoading(true);
+        try {
+          setComputing(true);
+          const { navResult: merged, positions, observedPrns: prns } =
+            await addNavFiles(newNavEntries.map(e => e.file));
+          setNavResult(merged);
+          setNavFileNames(prev => [...prev, ...newNavEntries.map(e => e.name)]);
+          if (positions) { setAllPositions(positions); setObservedPrns(prns); }
+        } catch (e: unknown) {
+          setError(e instanceof Error ? e.message : 'Failed to parse navigation file(s).');
+        } finally {
+          setComputing(false);
+          setNavLoading(false);
+        }
+      }
+    }
+
+    // Preserve file metadata for display, then clear staged
+    setLoadedFiles(prev => [
+      ...prev,
+      ...staged
+        .filter(s => s.type === 'obs' || s.type === 'nav')
+        .map(s => ({ name: s.name, size: s.size, type: s.type as 'obs' | 'nav', constellation: s.constellation })),
+    ]);
+    setStaged([]);
+  }, [staged, obsFileNames, navFileNames]);
+
+  // Auto-process when files are staged (no manual "Load" button — just go)
+  const pendingProcess = useRef(false);
+  useEffect(() => {
+    if (staged.length === 0 || pendingProcess.current) return;
+    pendingProcess.current = true;
+    // Small delay to batch rapid drops
+    const timer = setTimeout(() => {
+      processStaged();
+      pendingProcess.current = false;
+    }, 150);
+    return () => { clearTimeout(timer); pendingProcess.current = false; };
+  }, [staged, processStaged]);
+
+  /** Add more files (from drop or picker) on already-loaded page */
+  const addMoreFiles = useCallback(async (fileList: FileList | File[]) => {
+    await stageFiles(fileList);
+  }, [stageFiles]);
 
   const handleGlobalDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (!files || files.length === 0) return;
-    if (files.length === 1) { routeFile(files[0]!); return; }
-    let obsFile: File | null = null;
-    let navFile: File | null = null;
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i]!;
-      if (isNavFileName(f.name)) { navFile = f; continue; }
-      const lower = f.name.toLowerCase();
-      if (lower.endsWith('.rnx') || lower.endsWith('.rnx.gz') || lower.endsWith('.gz')) {
-        const type = await sniffFileType(f);
-        if (type === 'nav') { navFile = f; } else { obsFile = f; }
-      } else { obsFile = f; }
-    }
-    if (obsFile) processObsFile(obsFile);
-    if (navFile) processNavFile(navFile);
-  }, [routeFile, processObsFile, processNavFile]);
+    stageFiles(files);
+  }, [stageFiles]);
 
   const handleGlobalDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -564,30 +760,64 @@ export default function RinexReaderPage() {
 
   const handleReset = useCallback(() => {
     abortRef.current?.abort();
-    setResult(null); setNavResult(null);
+    setStaged([]); setResult(null); setNavResult(null);
     setAllPositions(null); setObservedPrns(null);
-    setError(null); setObsFile(null);
-    setFileName(null); setNavFileName(null);
-    setFileSize(0); setProgress(0);
+    setError(null); setObsFiles([]); setObsFileNames([]);
+    setNavFileNames([]); setLoadedFiles([]);
+    setProgress(0); setLoadingFileName(null);
+    setLoadingFileIndex(null); setLoadingFileTotal(null);
     setQaResult(null); setQaLoading(false); setQaProgress(0);
+    clearWorker();
   }, []);
+
+  const [navExporting, setNavExporting] = useState(false);
+  const handleDownloadNav = useCallback(async () => {
+    if (!navResult) return;
+    setNavExporting(true);
+    try {
+      await exportNav(result?.header.markerName || '');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to export navigation file.');
+    } finally {
+      setNavExporting(false);
+    }
+  }, [navResult, result]);
+
+  const [obsExporting, setObsExporting] = useState(false);
+  const [obsExportProgress, setObsExportProgress] = useState(0);
+  const handleDownloadObs = useCallback(async () => {
+    if (!result) return;
+    setObsExporting(true);
+    setObsExportProgress(0);
+    try {
+      await exportObs();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to export observation file.');
+    } finally {
+      setObsExporting(false);
+    }
+  }, [result]);
 
   const { header, stats } = result ?? {};
 
   /* ─── Initial upload state ──────────────────────────────────── */
-  if (!result && !loading) {
+  if (!result && !loading && !navLoading) {
     return (
       <section className="flex flex-col gap-4">
         <UploadDropZone
           isDragging={isDragging}
           loading={loading}
-          fileName={fileName}
+          fileName={loadingFileName}
+          fileIndex={loadingFileIndex}
+          fileTotal={loadingFileTotal}
           progress={progress}
-          fileSize={fileSize}
+          fileSize={0}
+          navFileNames={navFileNames}
+          navLoading={navLoading}
           onDrop={handleGlobalDrop}
           onDragOver={handleGlobalDragOver}
           onDragLeave={() => setIsDragging(false)}
-          onFile={routeFile}
+          onFiles={stageFiles}
         />
 
         {error && (
@@ -597,37 +827,44 @@ export default function RinexReaderPage() {
         {navResult && <NavSummary navResult={navResult} />}
 
         {allPositions && (
-          <Suspense fallback={
-            <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-              <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-              <div className="flex items-center justify-center" style={{ height: 360 }}>
-                <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+          <ErrorBoundary>
+            <Suspense fallback={
+              <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
+                <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
+                <div className="flex items-center justify-center" style={{ height: 360 }}>
+                  <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+                </div>
               </div>
-            </div>
-          }>
-            <SkyPlotCharts allPositions={allPositions} />
-          </Suspense>
+            }>
+              <SkyPlotCharts allPositions={allPositions} />
+            </Suspense>
+          </ErrorBoundary>
         )}
       </section>
     );
   }
 
   /* ─── Loaded / loading state ────────────────────────────────── */
+  const obsLabel = obsFileNames.length > 1 ? `${obsFileNames.length} obs files` : obsFileNames[0] ?? null;
+  const navLabel = navFileNames.length > 0
+    ? navFileNames.map(n => { const c = navFileConstellation(n); return c ? constellationLabel(c) : n; }).join(', ')
+    : null;
+
   return (
     <section className="flex flex-col gap-4">
       {/* ── Compact summary strip ────────────────────────────── */}
       <div
-        className="rounded-xl bg-bg-raised/60 border border-border/40 px-4 py-3"
+        className={`rounded-xl bg-bg-raised/60 border border-border/40 px-4 py-3 transition-colors ${isDragging ? 'border-accent bg-accent/5' : ''}`}
         onDrop={handleGlobalDrop}
         onDragOver={handleGlobalDragOver}
         onDragLeave={() => setIsDragging(false)}
       >
-        {/* Row 1: marker name + constellation badges + reset */}
+        {/* Row 1: marker name + constellation badges + actions */}
         <div className="flex items-center gap-3 min-w-0">
           {result && header ? (
             <>
-              <span className="text-sm font-semibold text-white/90 truncate shrink min-w-0" title={header.markerName || fileName || undefined}>
-                {header.markerName || fileName}
+              <span className="text-sm font-semibold text-fg truncate shrink min-w-0" title={header.markerName || obsLabel || undefined}>
+                {header.markerName || obsLabel}
               </span>
               <span className="text-[10px] text-fg/30 shrink-0">v{header.version.toFixed(0)}</span>
               <ConstellationBadges activeSystems={stats?.systems ?? []} />
@@ -636,7 +873,11 @@ export default function RinexReaderPage() {
             <div className="flex items-center gap-2">
               <SpinnerIcon className="size-3.5 animate-spin text-accent" />
               <span className="text-xs text-fg/50">
-                Parsing{fileName ? ` ${fileName}` : ''}… {progress > 0 && `${progress}%`}
+                {loading
+                  ? loadingFileIndex != null && loadingFileTotal != null && loadingFileTotal > 1
+                    ? `Parsing obs ${loadingFileIndex + 1}/${loadingFileTotal}… ${progress > 0 ? `${progress}%` : ''}`
+                    : `Parsing${loadingFileName ? ` ${loadingFileName}` : ''}… ${progress > 0 ? `${progress}%` : ''}`
+                  : 'Loading navigation…'}
               </span>
             </div>
           )}
@@ -674,32 +915,37 @@ export default function RinexReaderPage() {
           </div>
         )}
 
-        {/* Row 3: file slots for adding/replacing files */}
-        <div className="flex gap-2 mt-2 pt-2 border-t border-border/20">
-          <MiniFileSlot
-            label="Observation"
-            hint=".obs .rnx .YYo"
-            fileName={fileName}
-            loading={loading}
-            progress={progress}
-            fileSize={fileSize}
-            loaded={!!result}
-            accept={OBS_ACCEPT}
-            onFile={processObsFile}
-            onClear={() => { setResult(null); setAllPositions(null); setObservedPrns(null); setObsFile(null); setFileName(null); }}
-          />
-          <MiniFileSlot
-            label="Navigation"
-            hint=".nav .rnx .YYn"
-            fileName={navFileName}
-            loading={navLoading || computing}
-            loadingText={computing ? 'Orbits…' : undefined}
-            loaded={!!navResult && !computing}
-            accept={NAV_ACCEPT}
-            onFile={processNavFile}
-            onClear={() => { setNavResult(null); setAllPositions(null); setObservedPrns(null); setNavFileName(null); }}
-          />
-        </div>
+        {/* Row 3: collapsible file panel + downloads */}
+        <FilePanel
+          files={loadedFiles}
+          loading={loading}
+          navLoading={navLoading}
+          computing={computing}
+          hasObs={!!result && obsFileNames.length > 0}
+          hasNav={!!navResult}
+          obsExporting={obsExporting}
+          obsExportProgress={obsExportProgress}
+          navExporting={navExporting}
+          onDownloadObs={handleDownloadObs}
+          onDownloadNav={handleDownloadNav}
+        />
+      </div>
+
+      {/* Drop zone — always visible for adding more files */}
+      <div
+        className={`rounded-xl border border-dashed px-4 py-2.5 flex items-center justify-center gap-2 text-[11px] cursor-pointer transition-colors ${
+          isDragging ? 'border-accent bg-accent/5 text-accent/60' : 'border-border/30 text-fg/25 hover:border-fg/20 hover:text-fg/40'
+        }`}
+        onClick={() => addFilesInputRef.current?.click()}
+        onDrop={handleGlobalDrop}
+        onDragOver={handleGlobalDragOver}
+        onDragLeave={() => setIsDragging(false)}
+      >
+        <UploadIcon className="size-3.5" />
+        Drop more files or click to add
+        <input ref={addFilesInputRef} type="file" accept={`${OBS_ACCEPT},${NAV_ACCEPT}`} multiple className="hidden" onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) addMoreFiles(e.target.files);
+        }} />
       </div>
 
       {error && (
@@ -709,22 +955,24 @@ export default function RinexReaderPage() {
       {result && header && stats && (
         <>
           {/* ── Charts (the main content — immediately visible) ── */}
-          <Suspense
-            fallback={
-              <div className="flex flex-col gap-4">
-                {Array.from({ length: 3 }, (_, i) => (
-                  <div key={i} className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-                    <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                    <div className="flex items-center justify-center" style={{ height: 180 }}>
-                      <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+          <ErrorBoundary>
+            <Suspense
+              fallback={
+                <div className="flex flex-col gap-4">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <div key={i} className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
+                      <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
+                      <div className="flex items-center justify-center" style={{ height: 180 }}>
+                        <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            }
-          >
-            <RinexCharts epochs={result.epochs} systems={stats.systems} />
-          </Suspense>
+                  ))}
+                </div>
+              }
+            >
+              <RinexCharts epochs={result.epochs} systems={stats.systems} />
+            </Suspense>
+          </ErrorBoundary>
 
           {/* ── Signal quality analysis (multipath + cycle slips + completeness) ── */}
           {qaLoading && (
@@ -739,41 +987,47 @@ export default function RinexReaderPage() {
             </div>
           )}
           {qaResult && (
-            <Suspense fallback={
-              <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-                <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                <div className="flex items-center justify-center" style={{ height: 180 }}>
-                  <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+            <ErrorBoundary>
+              <Suspense fallback={
+                <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
+                  <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
+                  <div className="flex items-center justify-center" style={{ height: 180 }}>
+                    <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+                  </div>
                 </div>
-              </div>
-            }>
-              <MultipathCharts result={qaResult.multipath} allPositions={allPositions} />
-              <CycleSlipCharts result={qaResult.cycleSlips} />
-              <CompletenessCharts result={qaResult.completeness} />
-            </Suspense>
+              }>
+                <MultipathCharts result={qaResult.multipath} allPositions={allPositions} />
+                <CycleSlipCharts result={qaResult.cycleSlips} />
+                <CompletenessCharts result={qaResult.completeness} />
+              </Suspense>
+            </ErrorBoundary>
           )}
 
           {/* ── Sky Plot, Ground Tracks & DOP ──────────────────── */}
           {allPositions && (
-            <Suspense
-              fallback={
-                <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-                  <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                  <div className="flex items-center justify-center" style={{ height: 360 }}>
-                    <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+            <ErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
+                    <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
+                    <div className="flex items-center justify-center" style={{ height: 360 }}>
+                      <SpinnerIcon className="size-5 animate-spin text-fg/20" />
+                    </div>
                   </div>
-                </div>
-              }
-            >
-              <SkyPlotCharts allPositions={allPositions} observedPrns={observedPrns} rxPos={result.header.approxPosition ?? undefined} epochs={result.epochs} />
-            </Suspense>
+                }
+              >
+                <SkyPlotCharts allPositions={allPositions} observedPrns={observedPrns} rxPos={result.header.approxPosition ?? undefined} epochs={result.epochs} />
+              </Suspense>
+            </ErrorBoundary>
           )}
 
           {/* ── Header details + editor (below charts) ─────────── */}
-          {obsFile && (
-            <Suspense fallback={null}>
-              <RinexHeaderEditor result={result} file={obsFile} readFileText={readFileText} />
-            </Suspense>
+          {obsFiles.length > 0 && (
+            <ErrorBoundary>
+              <Suspense fallback={null}>
+                <RinexHeaderEditor result={result} file={obsFiles[0]!} readFileText={readFileText} />
+              </Suspense>
+            </ErrorBoundary>
           )}
         </>
       )}

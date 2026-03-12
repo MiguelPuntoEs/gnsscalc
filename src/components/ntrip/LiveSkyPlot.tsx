@@ -1,12 +1,14 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { SYSTEM_COLORS } from '../../util/gnss-constants';
-import { ecefToGeodetic } from '../../util/orbit';
+import { useChartTheme, getChartTheme } from '../../hooks/useChartTheme';
+import { ecefToGeodetic } from '../../util/positioning';
 import type { SatAzEl } from '../../util/orbit';
 
 export default function LiveSkyPlot({ satellites, stationPosition }: {
   satellites: SatAzEl[];
   stationPosition: [number, number, number];
 }) {
+  useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hovered, setHovered] = useState<{ sat: SatAzEl; x: number; y: number } | null>(null);
 
@@ -14,6 +16,7 @@ export default function LiveSkyPlot({ satellites, stationPosition }: {
   const satPositions = useRef<{ prn: string; x: number; y: number; sat: SatAzEl }[]>([]);
 
   const draw = useCallback((canvas: HTMLCanvasElement) => {
+    const t = getChartTheme();
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
@@ -53,7 +56,7 @@ export default function LiveSkyPlot({ satellites, stationPosition }: {
     }
 
     // Direction labels
-    ctx.fillStyle = 'rgba(208,208,211,0.5)';
+    ctx.fillStyle = t.canvasText + '0.5)';
     ctx.font = '11px ui-monospace, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -64,7 +67,7 @@ export default function LiveSkyPlot({ satellites, stationPosition }: {
     }
 
     // Elevation labels
-    ctx.fillStyle = 'rgba(208,208,211,0.25)';
+    ctx.fillStyle = t.canvasText + '0.25)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'left';
     for (const elDeg of [30, 60]) {
@@ -104,13 +107,13 @@ export default function LiveSkyPlot({ satellites, stationPosition }: {
         ctx.shadowColor = color;
         ctx.shadowBlur = 6;
       }
-      ctx.fillStyle = observed ? color : 'rgba(208,208,211,0.25)';
+      ctx.fillStyle = observed ? color : t.unobservedDot;
       ctx.beginPath();
       ctx.arc(x, y, observed ? 5 : 3, 0, 2 * Math.PI);
       ctx.fill();
       ctx.shadowBlur = 0;
 
-      ctx.fillStyle = observed ? 'rgba(208,208,211,0.8)' : 'rgba(208,208,211,0.2)';
+      ctx.fillStyle = observed ? t.canvasText + '0.8)' : t.canvasText + '0.2)';
       ctx.font = '9px ui-monospace, monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
@@ -126,8 +129,8 @@ export default function LiveSkyPlot({ satellites, stationPosition }: {
 
   // Station coordinates for display
   const geo = useMemo(() => {
-    const g = ecefToGeodetic(...stationPosition);
-    return { lat: g.lat * 180 / Math.PI, lon: g.lon * 180 / Math.PI, alt: g.alt };
+    const [lat, lon, alt] = ecefToGeodetic(...stationPosition);
+    return { lat: lat * 180 / Math.PI, lon: lon * 180 / Math.PI, alt };
   }, [stationPosition]);
 
   const aboveMask = satellites.filter(s => s.el >= 5 * Math.PI / 180).length;

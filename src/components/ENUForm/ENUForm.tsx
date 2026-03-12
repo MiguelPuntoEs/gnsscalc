@@ -15,7 +15,7 @@ export default function ENUForm({
 
   return (
     <div className="card-output flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
+      <h3 className="text-sm font-semibold text-fg m-0">{title}</h3>
       <div className="card-fields">
         <label title="East offset (meters)">&Delta;E</label>
         <CopyableInput value={`${deltaE.toFixed(3)} m`} />

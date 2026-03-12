@@ -15,7 +15,8 @@ import {
 } from 'recharts';
 import { downsampleEpochs, systemName } from '../util/rinex';
 import type { EpochSummary } from '../util/rinex';
-import { SYSTEM_COLORS, GRID_STROKE, AXIS_STYLE, TOOLTIP_STYLE, systemColor, formatUTCTime } from '../util/gnss-constants';
+import { SYSTEM_COLORS, systemColor, formatUTCTime } from '../util/gnss-constants';
+import { useChartTheme, getChartTheme } from '../hooks/useChartTheme';
 import ChartCard from './ChartCard';
 
 function formatTimeLabel(epoch: EpochSummary): string {
@@ -56,6 +57,7 @@ function SatelliteHeatmap({
   systems: string[];
   prnsPerSystem: Record<string, string[]>;
 }) {
+  const theme = useChartTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -92,6 +94,7 @@ function SatelliteHeatmap({
   const LEGEND_H = 50;
 
   const draw = useCallback((canvas: HTMLCanvasElement) => {
+    const t = getChartTheme();
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
@@ -119,21 +122,21 @@ function SatelliteHeatmap({
     }
 
     // PRN labels
-    ctx.fillStyle = 'rgba(208,208,211,0.5)';
+    ctx.fillStyle = t.canvasText + '0.5)';
     ctx.font = `${Math.min(cellH - 1, 9)}px ui-monospace, monospace`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     for (let r = 0; r < numRows; r++) {
       const prn = allPrns[r]!;
-      ctx.fillStyle = SYSTEM_COLORS[prn.charAt(0)] ?? 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = SYSTEM_COLORS[prn.charAt(0)] ?? t.canvasText + '0.5)';
       ctx.fillRect(0, r * cellH, 3, cellH - 0.5);
-      ctx.fillStyle = 'rgba(208,208,211,0.5)';
+      ctx.fillStyle = t.canvasText + '0.5)';
       ctx.fillText(prn, LABEL_W - 4, r * cellH + cellH / 2);
     }
 
     // Time labels along bottom
     const timeY = actualH + 12;
-    ctx.fillStyle = 'rgba(208,208,211,0.4)';
+    ctx.fillStyle = t.canvasText + '0.4)';
     ctx.font = '9px ui-monospace, monospace';
     ctx.textAlign = 'center';
     const labelStep = Math.max(1, Math.floor(numCols / 6));
@@ -153,7 +156,7 @@ function SatelliteHeatmap({
       ctx.fillStyle = cn0Color((i / legendW) * 55);
       ctx.fillRect(legendX + i, legendY, 1.5, 8);
     }
-    ctx.fillStyle = 'rgba(208,208,211,0.4)';
+    ctx.fillStyle = t.canvasText + '0.4)';
     ctx.font = '8px ui-monospace, monospace';
     ctx.textAlign = 'left';
     ctx.fillText('0', legendX, legendY + 16);
@@ -225,9 +228,9 @@ function SatelliteHeatmap({
           className="pointer-events-none absolute z-10 rounded-md px-2 py-1 text-xs"
           style={{
             display: 'none',
-            backgroundColor: '#32323f',
-            border: '1px solid rgba(74,74,90,0.6)',
-            color: '#d0d0d3',
+            backgroundColor: theme.tooltipBg,
+            border: theme.tooltipBorder,
+            color: theme.tooltipFg,
             whiteSpace: 'nowrap',
           }}
         />
@@ -239,6 +242,7 @@ function SatelliteHeatmap({
 const CN0_BINS = Array.from({ length: 12 }, (_, i) => i * 5);
 
 function Cn0Histogram({ epochs, systems }: { epochs: EpochSummary[]; systems: string[] }) {
+  const theme = useChartTheme();
   const histData = useMemo(() => {
     const counts: Record<string, number[]> = {};
     for (const sys of systems) counts[sys] = new Array(CN0_BINS.length).fill(0);
@@ -265,24 +269,24 @@ function Cn0Histogram({ epochs, systems }: { epochs: EpochSummary[]; systems: st
     <ChartCard title="C/N0 distribution (dB-Hz)">
       <ResponsiveContainer>
         <BarChart data={histData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
           <XAxis
             dataKey="bin"
-            tick={AXIS_STYLE}
+            tick={theme.axisStyle}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            tick={AXIS_STYLE}
+            tick={theme.axisStyle}
             tickLine={false}
             axisLine={false}
             width={40}
             allowDecimals={false}
           />
-          <Tooltip {...TOOLTIP_STYLE} />
+          <Tooltip {...theme.tooltipStyle} />
           <Legend
             iconSize={10}
-            wrapperStyle={{ fontSize: 11, color: 'rgba(208,208,211,0.6)' }}
+            wrapperStyle={{ fontSize: 11, color: theme.legendColor }}
           />
           {[...systems].reverse().map(sys => (
             <Bar
@@ -307,6 +311,7 @@ export default function RinexCharts({
   epochs: EpochSummary[];
   systems: string[];
 }) {
+  const theme = useChartTheme();
   const prnsPerSystem = useMemo(() => {
     const map: Record<string, string[]> = {};
     const sets: Record<string, Set<string>> = {};
@@ -387,26 +392,26 @@ export default function RinexCharts({
         <ChartCard title="Satellites per constellation">
           <ResponsiveContainer>
             <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 interval={tickInterval}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 tickLine={false}
                 axisLine={false}
                 width={30}
                 allowDecimals={false}
                 domain={[0, 'auto']}
               />
-              <Tooltip {...TOOLTIP_STYLE} />
+              <Tooltip {...theme.tooltipStyle} />
               <Legend
                 iconSize={10}
-                wrapperStyle={{ fontSize: 11, color: 'rgba(208,208,211,0.6)' }}
+                wrapperStyle={{ fontSize: 11, color: theme.legendColor }}
               />
               <defs>
                 {systems.map(sys => (
@@ -439,23 +444,23 @@ export default function RinexCharts({
         <ChartCard title="Total satellites">
           <ResponsiveContainer>
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 interval={tickInterval}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 tickLine={false}
                 axisLine={false}
                 width={30}
                 allowDecimals={false}
                 domain={[0, 'auto']}
               />
-              <Tooltip {...TOOLTIP_STYLE} />
+              <Tooltip {...theme.tooltipStyle} />
               <Line
                 type="stepAfter"
                 dataKey="total"
@@ -474,28 +479,28 @@ export default function RinexCharts({
         <ChartCard title="Mean C/N0 per constellation (dB-Hz)">
           <ResponsiveContainer>
             <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 interval={tickInterval}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 tickLine={false}
                 axisLine={false}
                 width={35}
                 domain={[0, 'auto']}
               />
               <Tooltip
-                {...TOOLTIP_STYLE}
+                {...theme.tooltipStyle}
                 formatter={(value: unknown) => [`${Number(value).toFixed(1)} dB-Hz`]}
               />
               <Legend
                 iconSize={10}
-                wrapperStyle={{ fontSize: 11, color: 'rgba(208,208,211,0.6)' }}
+                wrapperStyle={{ fontSize: 11, color: theme.legendColor }}
               />
               {[...systems].reverse().map(sys => (
                 <Line
@@ -527,23 +532,23 @@ export default function RinexCharts({
         <ChartCard title="Mean C/N0 — all constellations (dB-Hz)">
           <ResponsiveContainer>
             <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 interval={tickInterval}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                tick={AXIS_STYLE}
+                tick={theme.axisStyle}
                 tickLine={false}
                 axisLine={false}
                 width={35}
                 domain={[0, 'auto']}
               />
               <Tooltip
-                {...TOOLTIP_STYLE}
+                {...theme.tooltipStyle}
                 formatter={(value: unknown) => [`${Number(value).toFixed(1)} dB-Hz`]}
               />
               <defs>

@@ -307,11 +307,11 @@ export default function GNSSForm({
     <form className="card flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/90 m-0">{title}</h3>
+        <h3 className="text-sm font-semibold text-fg m-0">{title}</h3>
         <div className="flex gap-2">
           <button
             className={`inline-flex items-center gap-1 text-xs transition-colors rounded-md px-2 py-1 border cursor-pointer ${
-              rinexCopied ? 'text-green-400 border-green-400/30' : 'text-fg/50 hover:text-fg border-white/10 hover:border-white/20'
+              rinexCopied ? 'text-green-400 border-green-400/30' : 'text-fg/50 hover:text-fg border-fg/10 hover:border-fg/20'
             }`}
             type="button"
             onClick={copyRinex}

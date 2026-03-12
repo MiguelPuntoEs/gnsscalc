@@ -91,16 +91,16 @@ interface PartialFix {
 function parseGGA(fields: string[]): PartialFix | null {
   // $xxGGA,time,lat,N/S,lon,E/W,quality,numSV,hdop,alt,M,sep,M,diffAge,diffStation*cs
   if (fields.length < 10) return null;
-  const quality = parseInt(fields[6], 10);
+  const quality = parseInt(fields[6]!, 10);
   if (isNaN(quality) || quality === 0) return null;
 
-  const lat = nmeaCoordToDecimal(fields[2], fields[3]);
-  const lon = nmeaCoordToDecimal(fields[4], fields[5]);
+  const lat = nmeaCoordToDecimal(fields[2]!, fields[3]!);
+  const lon = nmeaCoordToDecimal(fields[4]!, fields[5]!);
   if (isNaN(lat) || isNaN(lon)) return null;
 
   return {
-    time: buildDate(fields[1]),
-    timeKey: fields[1],
+    time: buildDate(fields[1]!),
+    timeKey: fields[1]!,
     lat,
     lon,
     alt: fields[9] ? parseFloat(fields[9]) : null,
@@ -114,13 +114,13 @@ function parseRMC(fields: string[]): PartialFix | null {
   if (fields.length < 10) return null;
   if (fields[2] !== 'A') return null; // V = void / invalid
 
-  const lat = nmeaCoordToDecimal(fields[3], fields[4]);
-  const lon = nmeaCoordToDecimal(fields[5], fields[6]);
+  const lat = nmeaCoordToDecimal(fields[3]!, fields[4]!);
+  const lon = nmeaCoordToDecimal(fields[5]!, fields[6]!);
   if (isNaN(lat) || isNaN(lon)) return null;
 
   return {
-    time: buildDate(fields[1], fields[9]),
-    timeKey: fields[1],
+    time: buildDate(fields[1]!, fields[9]!),
+    timeKey: fields[1]!,
     lat,
     lon,
     speed: fields[7] ? parseFloat(fields[7]) : null,
@@ -139,11 +139,11 @@ export function computeStats(fixes: NmeaFix[]): NmeaStats {
   let endTime: Date | null = null;
   let duration: number | null = null;
   if (withTime.length >= 2) {
-    startTime = withTime[0].time;
-    endTime = withTime[withTime.length - 1].time;
+    startTime = withTime[0]!.time;
+    endTime = withTime[withTime.length - 1]!.time;
     duration = (endTime.getTime() - startTime.getTime()) / 1000;
   } else if (withTime.length === 1) {
-    startTime = endTime = withTime[0].time;
+    startTime = endTime = withTime[0]!.time;
   }
 
   // Total distance (sum of haversine segments between consecutive fixes)
@@ -270,8 +270,8 @@ export function parseNmeaFile(content: string): NmeaTrack {
     // Checksum validation (lenient: skip lines with bad checksum, accept lines without one)
     if (line.includes('*') && !verifyChecksum(line)) continue;
 
-    const fields = line.split('*')[0].split(',');
-    const sentenceId = fields[0].substring(3); // strip talker ID (e.g. $GP, $GN)
+    const fields = line.split('*')[0]!.split(',');
+    const sentenceId = fields[0]!.substring(3); // strip talker ID (e.g. $GP, $GN)
 
     let partial: PartialFix | null = null;
     if (sentenceId === 'GGA') partial = parseGGA(fields);
