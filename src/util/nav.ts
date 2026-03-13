@@ -72,12 +72,33 @@ export interface NavResult {
 /*  Constants                                                          */
 /* ================================================================== */
 
-// Lines per record (after epoch line) for each system
+// Lines per record (after epoch line) for each system (RINEX 2/3 default)
 const DATA_LINES: Record<string, number> = {
   G: 7, E: 7, C: 7, J: 7, // Keplerian
   R: 3,                     // GLONASS state vector
   S: 3, I: 7,               // SBAS / NavIC
 };
+
+/**
+ * RINEX 4 message type → total lines after the `>` header (epoch + data).
+ * Used both to skip unsupported types and to read supported ones correctly.
+ */
+const R4_MSG_LINES: Record<string, number> = {
+  // EPH types we parse (same Keplerian/state-vector layout as RINEX 3)
+  LNAV: 8, INAV: 8, FNAV: 8, D1: 8, D2: 8,
+  SBAS: 4,
+  FDMA: 5,  // RINEX 4 adds orbit-4 (status flags) vs 3 in RINEX 3
+
+  // EPH types we skip (different field layout)
+  CNAV: 9, CNV1: 10, CNV2: 10, CNV3: 9,
+  L1NV: 8, L1OC: 9, L3OC: 9,
+
+  // Non-EPH records
+  STO: 2, EOP: 3, ION: 3,
+};
+
+/** Message types whose field layout matches our Keplerian/state-vector builders. */
+const SUPPORTED_EPH_MSGS = new Set(['LNAV', 'INAV', 'FNAV', 'D1', 'D2', 'SBAS', 'FDMA']);
 
 /* ================================================================== */
 /*  Parser                                                             */
@@ -88,7 +109,8 @@ function parseFloat19(s: string): number {
   return parseFloat(s.trim().replace(/[dD]/g, 'E'));
 }
 
-function parseNavEpoch(line: string): { prn: string; date: Date; values: number[] } {
+/** Parse RINEX 3/4 epoch line: A3,I5,4(1X,I2.2),I3,3D19.12 */
+function parseNavEpochV3(line: string): { prn: string; date: Date; values: number[] } {
   const prn = line.substring(0, 3).trim();
   const yr = parseInt(line.substring(3, 8));
   const mo = parseInt(line.substring(8, 11));
@@ -109,11 +131,35 @@ function parseNavEpoch(line: string): { prn: string; date: Date; values: number[
   return { prn, date, values };
 }
 
-function parseDataLine(line: string): number[] {
+/** Parse RINEX 2 epoch line: I2,5I3,F5.1,3D19.12 */
+function parseNavEpochV2(line: string, defaultSys: string): { prn: string; date: Date; values: number[] } {
+  const prnNum = parseInt(line.substring(0, 2));
+  const yr = parseInt(line.substring(2, 5));
+  const mo = parseInt(line.substring(5, 8));
+  const dy = parseInt(line.substring(8, 11));
+  const hr = parseInt(line.substring(11, 14));
+  const mn = parseInt(line.substring(14, 17));
+  const sc = parseFloat(line.substring(17, 22));
+  const fullYr = yr < 80 ? 2000 + yr : 1900 + yr;
+  const date = new Date(Date.UTC(fullYr, mo - 1, dy, hr, mn, Math.floor(sc)));
+
+  const prn = `${defaultSys}${String(prnNum).padStart(2, '0')}`;
+
   const values: number[] = [];
-  // 4 values per line, each 19 chars, starting at col 4
+  // 3 values starting at col 22, each 19 chars
+  for (let i = 0; i < 3; i++) {
+    const start = 22 + i * 19;
+    if (start < line.length) {
+      values.push(parseFloat19(line.substring(start, start + 19)));
+    }
+  }
+  return { prn, date, values };
+}
+
+function parseDataLine(line: string, colOffset = 4): number[] {
+  const values: number[] = [];
   for (let i = 0; i < 4; i++) {
-    const start = 4 + i * 19;
+    const start = colOffset + i * 19;
     if (start >= line.length) break;
     const s = line.substring(start, start + 19).trim();
     if (s.length > 0) {
@@ -131,8 +177,14 @@ function buildKeplerEphemeris(
   epochVals: number[],
   data: number[][],
 ): KeplerEphemeris {
-  // Flatten data lines
-  const d = data.flat();
+  // Flatten data lines, padding each to 4 values.
+  // Some constellations' last orbit line has fewer than 4 fields
+  // (e.g. Galileo orbit-7 often has only 1), so we must pad to keep
+  // the flat array indices stable.
+  const d: number[] = [];
+  for (const line of data) {
+    for (let i = 0; i < 4; i++) d.push(line[i] ?? 0);
+  }
   return {
     system: sys,
     prn,
@@ -161,8 +213,8 @@ function buildKeplerEphemeris(
     // d[17] = codes on L2 (GPS) or data sources (GAL)
     week: d[18] ?? 0,
     // d[19] = L2P flag (GPS) or spare
-    svHealth: d[20] ?? 0,
-    // d[21] = 0 (spare) for GAL, or IODC for GPS
+    // d[20] = SV accuracy (URA index for GPS, SISA for GAL)
+    svHealth: d[21] ?? 0,
     tgd: d[22] ?? 0,
     // d[23] = BGD (GAL) or IODC (GPS)
   };
@@ -234,6 +286,22 @@ export function parseNavFile(text: string): NavResult {
         if (s) vals.push(parseFloat19(s));
       }
       header.ionoCorrections[corrType] = vals;
+    } else if (label === 'ION ALPHA') {
+      // RINEX 2 GPS iono alpha
+      const vals: number[] = [];
+      for (let j = 0; j < 4; j++) {
+        const s = line.substring(2 + j * 12, 2 + (j + 1) * 12).trim();
+        if (s) vals.push(parseFloat19(s));
+      }
+      header.ionoCorrections['GPSA'] = vals;
+    } else if (label === 'ION BETA') {
+      // RINEX 2 GPS iono beta
+      const vals: number[] = [];
+      for (let j = 0; j < 4; j++) {
+        const s = line.substring(2 + j * 12, 2 + (j + 1) * 12).trim();
+        if (s) vals.push(parseFloat19(s));
+      }
+      header.ionoCorrections['GPSB'] = vals;
     }
 
     i++;
@@ -241,12 +309,89 @@ export function parseNavFile(text: string): NavResult {
 
   if (inHeader) return { header, ephemerides };
 
+  // Determine RINEX version and default system for v2
+  const isV2 = header.version > 0 && header.version < 3;
+  let defaultSys = 'G';
+  if (isV2) {
+    const ht = header.type.toUpperCase();
+    if (ht.includes('GLONASS')) defaultSys = 'R';
+    else if (ht.includes('GEO')) defaultSys = 'S';
+    else if (ht.includes('GALILEO')) defaultSys = 'E';
+    else if (ht.includes('BEIDOU') || ht.includes('BDS')) defaultSys = 'C';
+    // Default: GPS
+  }
+
   // Parse records
+  const isV4 = header.version >= 4;
+
   while (i < lines.length) {
     const line = lines[i]!;
     if (line.trim().length === 0) { i++; continue; }
 
-    const sys = line.charAt(0);
+    // ── RINEX 4: handle `>` record header lines ──
+    if (isV4 && line.charAt(0) === '>') {
+      const parts = line.substring(2).trim().split(/\s+/);
+      const recType = parts[0] ?? ''; // EPH, STO, EOP, ION
+      const msgType = parts[2] ?? recType; // LNAV, CNAV, FDMA, etc.
+
+      if (recType !== 'EPH' || !SUPPORTED_EPH_MSGS.has(msgType)) {
+        // Skip unsupported record: advance past all its lines
+        const totalLines = R4_MSG_LINES[msgType] ?? 2;
+        i += totalLines + 1; // +1 for the `>` line itself
+        continue;
+      }
+
+      // Supported EPH: read the correct number of data lines
+      const numDataLines = (R4_MSG_LINES[msgType] ?? 8) - 1; // minus epoch line
+
+      // Advance past `>` to epoch line
+      i++;
+      if (i >= lines.length) break;
+      const epochLine = lines[i]!;
+      const sys = epochLine.charAt(0);
+      const parsed = parseNavEpochV3(epochLine);
+      const prn = `${sys}${parsed.prn.substring(1)}`;
+
+      // Read data lines
+      const dataLines: number[][] = [];
+      for (let j = 0; j < numDataLines; j++) {
+        i++;
+        if (i >= lines.length) break;
+        dataLines.push(parseDataLine(lines[i]!, 4));
+      }
+
+      if (dataLines.length === numDataLines) {
+        if (sys === 'R' || sys === 'S') {
+          ephemerides.push(buildStateVectorEphemeris(sys, prn, parsed.date, parsed.values, dataLines));
+        } else if (sys === 'G' || sys === 'E' || sys === 'C' || sys === 'J' || sys === 'I') {
+          ephemerides.push(buildKeplerEphemeris(sys, prn, parsed.date, parsed.values, dataLines));
+        }
+      }
+
+      i++;
+      continue;
+    }
+
+    // ── RINEX 2/3: no `>` prefix ──
+    let sys: string;
+    let prn: string;
+    let date: Date;
+    let epochVals: number[];
+
+    if (isV2) {
+      const parsed = parseNavEpochV2(line, defaultSys);
+      sys = defaultSys;
+      prn = parsed.prn;
+      date = parsed.date;
+      epochVals = parsed.values;
+    } else {
+      sys = line.charAt(0);
+      const parsed = parseNavEpochV3(line);
+      prn = `${sys}${parsed.prn.substring(1)}`;
+      date = parsed.date;
+      epochVals = parsed.values;
+    }
+
     const numDataLines = DATA_LINES[sys];
     if (numDataLines == null) {
       // Unknown system, try to skip
@@ -254,22 +399,19 @@ export function parseNavFile(text: string): NavResult {
       continue;
     }
 
-    const { prn, date, values: epochVals } = parseNavEpoch(line);
-
     // Read data lines
     const dataLines: number[][] = [];
     for (let j = 0; j < numDataLines; j++) {
       i++;
       if (i >= lines.length) break;
-      dataLines.push(parseDataLine(lines[i]!));
+      dataLines.push(parseDataLine(lines[i]!, isV2 ? 3 : 4));
     }
 
     if (dataLines.length === numDataLines) {
-      const fullPrn = `${sys}${prn.substring(1)}`;
       if (sys === 'R' || sys === 'S') {
-        ephemerides.push(buildStateVectorEphemeris(sys, fullPrn, date, epochVals, dataLines));
+        ephemerides.push(buildStateVectorEphemeris(sys, prn, date, epochVals, dataLines));
       } else if (sys === 'G' || sys === 'E' || sys === 'C' || sys === 'J' || sys === 'I') {
-        ephemerides.push(buildKeplerEphemeris(sys, fullPrn, date, epochVals, dataLines));
+        ephemerides.push(buildKeplerEphemeris(sys, prn, date, epochVals, dataLines));
       }
     }
 

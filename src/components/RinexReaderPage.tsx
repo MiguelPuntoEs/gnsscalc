@@ -20,6 +20,7 @@ const RinexHeaderEditor = lazy(() => import('./RinexHeaderEditor'));
 const MultipathCharts = lazy(() => import('./MultipathCharts'));
 const CycleSlipCharts = lazy(() => import('./CycleSlipCharts'));
 const CompletenessCharts = lazy(() => import('./CompletenessCharts'));
+const SatAvailabilityChart = lazy(() => import('./SatAvailabilityChart'));
 
 /* ─── Helpers ─────────────────────────────────────────────────────── */
 
@@ -48,7 +49,7 @@ function formatFileSize(bytes: number): string {
 function isNavFileName(name: string): boolean {
   const lower = name.toLowerCase();
   if (/_[MGRECJI]N\.rnx(\.gz)?$/i.test(lower)) return true;
-  if (/\.\d{2}[nglpfhiq]$/i.test(lower)) return true;
+  if (/\.\d{2}[nglpfhiq](\.gz)?$/i.test(lower)) return true;
   if (lower.endsWith('.nav') || lower.endsWith('.nnav') || lower.endsWith('.gnav')) return true;
   return false;
 }
@@ -76,6 +77,7 @@ async function sniffFileType(file: File): Promise<'nav' | 'obs' | 'unknown'> {
     text = await file.slice(0, 4096).text();
   }
   if (/N:\s*(GNSS NAV|GPS NAV|GLO NAV|GAL NAV|GEO NAV|BDS NAV|MIXED NAV)/i.test(text)) return 'nav';
+  if (/NAVIGATION DATA/i.test(text)) return 'nav';
   if (/OBSERVATION DATA|COMPACT RINEX/i.test(text)) return 'obs';
   return 'unknown';
 }
@@ -107,6 +109,31 @@ function constellationLabel(sys: string): string {
     J: 'QZSS', I: 'NavIC', S: 'SBAS', M: 'Mixed',
   };
   return labels[sys] ?? sys;
+}
+
+/* ─── IGS broadcast ephemeris download ────────────────────────────── */
+
+function dayOfYear(d: Date): number {
+  const start = Date.UTC(d.getUTCFullYear(), 0, 1);
+  return Math.floor((d.getTime() - start) / 86_400_000) + 1;
+}
+
+const IGS_PROXY = 'https://ntrip-proxy.gnsscalc.com';
+
+async function fetchIgsEphemeris(date: Date): Promise<File> {
+  const yyyy = String(date.getUTCFullYear());
+  const doy = String(dayOfYear(date)).padStart(3, '0');
+  const name = `BRDC00IGS_R_${yyyy}${doy}0000_01D_MN.rnx`;
+
+  const res = await fetch(IGS_PROXY, {
+    headers: { 'X-Igs-Brdc': `${yyyy}/${doy}` },
+  });
+  if (!res.ok) throw new Error(`Failed to download ephemeris (HTTP ${res.status})`);
+
+  const ds = new DecompressionStream('gzip');
+  const decompressed = res.body!.pipeThrough(ds);
+  const blob = await new Response(decompressed).blob();
+  return new File([blob], name, { type: 'text/plain' });
 }
 
 /* ─── Multi-obs merge ─────────────────────────────────────────────── */
@@ -729,6 +756,30 @@ export default function RinexReaderPage() {
     clearWorker();
   }, []);
 
+  const [igsLoading, setIgsLoading] = useState(false);
+  const handleFetchIgs = useCallback(async () => {
+    const startDate = stats?.startTime ?? navResult?.ephemerides[0]?.tocDate;
+    if (!startDate) return;
+    setIgsLoading(true);
+    setError(null);
+    try {
+      // Collect all days spanned by the observation
+      const endDate = stats?.endTime ?? startDate;
+      const startDay = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate());
+      const endDay = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
+      const days: Date[] = [];
+      for (let d = startDay; d <= endDay; d += 86_400_000) {
+        days.push(new Date(d));
+      }
+      const files = await Promise.all(days.map(d => fetchIgsEphemeris(d)));
+      await stageFiles(files);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to fetch IGS ephemeris.');
+    } finally {
+      setIgsLoading(false);
+    }
+  }, [stats, navResult, stageFiles]);
+
   const [navExporting, setNavExporting] = useState(false);
   const handleDownloadNav = useCallback(async () => {
     if (!navResult) return;
@@ -854,6 +905,23 @@ export default function RinexReaderPage() {
           </div>
         )}
 
+        {/* Fetch IGS ephemeris prompt */}
+        {header && !navResult && !navLoading && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/20">
+            <span className="text-[11px] text-fg/30">No navigation data</span>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-[11px] text-accent/70 hover:text-accent px-2.5 py-1 rounded-md border border-accent/20 hover:border-accent/40 transition-colors disabled:opacity-50"
+              onClick={handleFetchIgs}
+              disabled={igsLoading}
+            >
+              {igsLoading
+                ? <><SpinnerIcon className="size-3 animate-spin" /> Fetching…</>
+                : <><DownloadIcon className="size-3" /> Fetch IGS broadcast ephemeris</>}
+            </button>
+          </div>
+        )}
+
         {/* Row 3: collapsible file panel + downloads */}
         <FilePanel
           files={loadedFiles}
@@ -931,6 +999,15 @@ export default function RinexReaderPage() {
             </ErrorBoundary>
           )}
 
+          {/* ── Satellite availability & health ─────────────────── */}
+          {navResult && (
+            <ErrorBoundary>
+              <Suspense fallback={null}>
+                <SatAvailabilityChart ephemerides={navResult.ephemerides} grid={grid} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+
           {/* ── Sky Plot, Ground Tracks & DOP ──────────────────── */}
           {allPositions && (
             <ErrorBoundary>
@@ -960,10 +1037,15 @@ export default function RinexReaderPage() {
         </>
       )}
 
-      {/* ── Nav-only: sky plot + nav summary ──────────────────── */}
+      {/* ── Nav-only: availability, sky plot + nav summary ─────── */}
       {!header && navResult && (
         <>
           <NavSummary navResult={navResult} />
+          <ErrorBoundary>
+            <Suspense fallback={null}>
+              <SatAvailabilityChart ephemerides={navResult.ephemerides} grid={null} />
+            </Suspense>
+          </ErrorBoundary>
           {allPositions && (
             <ErrorBoundary>
               <Suspense

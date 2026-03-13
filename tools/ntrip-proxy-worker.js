@@ -34,11 +34,46 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
+    // ── IGS broadcast ephemeris proxy ──────────────────────────────
+    const igsBrdc = request.headers.get('X-Igs-Brdc');
+    if (igsBrdc) {
+      // igsBrdc = "YYYY/DOY" e.g. "2026/001"
+      if (!/^\d{4}\/\d{3}$/.test(igsBrdc)) {
+        return new Response('X-Igs-Brdc must be YYYY/DOY', {
+          status: 400,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'text/plain' },
+        });
+      }
+      const [yyyy, doy] = igsBrdc.split('/');
+      const name = `BRDC00IGS_R_${yyyy}${doy}0000_01D_MN.rnx.gz`;
+      const bkgUrl = `https://igs.bkg.bund.de/root_ftp/IGS/BRDC/${yyyy}/${doy}/${name}`;
+      try {
+        const upstream = await fetch(bkgUrl);
+        if (!upstream.ok) {
+          return new Response(`BKG returned ${upstream.status}`, {
+            status: upstream.status,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'text/plain' },
+          });
+        }
+        const responseHeaders = new Headers(CORS_HEADERS);
+        responseHeaders.set('Content-Type', 'application/gzip');
+        const cl = upstream.headers.get('Content-Length');
+        if (cl) responseHeaders.set('Content-Length', cl);
+        return new Response(upstream.body, { status: 200, headers: responseHeaders });
+      } catch (err) {
+        return new Response(`Proxy error: ${err.message}`, {
+          status: 502,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'text/plain' },
+        });
+      }
+    }
+
+    // ── NTRIP proxy ─────────────────────────────────────────────────
     const casterHost = request.headers.get('X-Ntrip-Host');
     const casterPort = request.headers.get('X-Ntrip-Port') || '2101';
 
     if (!casterHost) {
-      return new Response('Missing X-Ntrip-Host header', {
+      return new Response('Missing X-Ntrip-Host or X-Igs-Brdc header', {
         status: 400,
         headers: { ...CORS_HEADERS, 'Content-Type': 'text/plain' },
       });
