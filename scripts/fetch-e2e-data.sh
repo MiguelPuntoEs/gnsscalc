@@ -81,14 +81,18 @@ fi
 echo ""
 
 echo "[7/8] BRDC navigation (RINEX 3 DLR mixed, 2026/001)"
-download "$BKG26/BRDM00DLR_S_20260010000_01D_MN.rnx.gz" "$DATA_DIR/brdc_v3_dlr.nav.gz"
+if ! download "$BKG26/BRDM00DLR_S_20260010000_01D_MN.rnx.gz" "$DATA_DIR/brdc_v3_dlr.nav.gz"; then
+  echo "  ⚠ DLR v3 nav not available, skipping (tests will be skipped)"
+fi
 if [[ -f "$DATA_DIR/brdc_v3_dlr.nav.gz" && ! -f "$DATA_DIR/brdc_v3_dlr.nav" ]]; then
   gunzip -k "$DATA_DIR/brdc_v3_dlr.nav.gz"
 fi
 echo ""
 
 echo "[8/8] BRD4 navigation (RINEX 4 DLR mixed, 2026/001)"
-download "$BKG26/BRD400DLR_S_20260010000_01D_MN.rnx.gz" "$DATA_DIR/brdc_v4_dlr.nav.gz"
+if ! download "$BKG26/BRD400DLR_S_20260010000_01D_MN.rnx.gz" "$DATA_DIR/brdc_v4_dlr.nav.gz"; then
+  echo "  ⚠ DLR v4 nav not available, skipping (tests will be skipped)"
+fi
 if [[ -f "$DATA_DIR/brdc_v4_dlr.nav.gz" && ! -f "$DATA_DIR/brdc_v4_dlr.nav" ]]; then
   gunzip -k "$DATA_DIR/brdc_v4_dlr.nav.gz"
 fi
