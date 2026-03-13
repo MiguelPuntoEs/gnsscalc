@@ -22,6 +22,7 @@ import ErrorBoundary from './ErrorBoundary';
 import FilterBar from './FilterBar';
 import ExportPanel from './ExportPanel';
 import ObsTypeMatrix from './ObsTypeMatrix';
+import type { ReportData } from '../util/report-types';
 
 const RinexCharts = lazy(() => import('./RinexCharts'));
 const SkyPlotCharts = lazy(() => import('./SkyPlot'));
@@ -650,6 +651,29 @@ export default function RinexReaderPage() {
   // Header edit overrides (null = no edits)
   const [headerEdits, setHeaderEdits] = useState<EditableHeaderFields | null>(null);
 
+  // PDF report generation
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const handleGenerateReport = useCallback(async () => {
+    if (!header || !stats || !grid) return;
+    setReportGenerating(true);
+    try {
+      const { generateReport, downloadReport } = await import('./PdfReport');
+      const reportData: ReportData = {
+        header, stats, warnings, grid,
+        allPositions, observedPrns,
+        qaResult: qaResult ? { multipath: qaResult.multipath, cycleSlips: qaResult.cycleSlips, completeness: qaResult.completeness } : null,
+        obsFileNames, navFileNames,
+      };
+      const blob = await generateReport(reportData);
+      const name = header.markerName || obsFileNames[0]?.replace(/\.[^.]+$/, '') || 'report';
+      downloadReport(blob, `${name}_report.pdf`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to generate report.');
+    } finally {
+      setReportGenerating(false);
+    }
+  }, [header, stats, warnings, grid, allPositions, observedPrns, qaResult, obsFileNames, navFileNames]);
+
   // Recompute satellite positions when edited reference position changes
   const hasPositions = !!allPositions;
   useEffect(() => {
@@ -1073,6 +1097,22 @@ export default function RinexReaderPage() {
           onExportObs={handleDownloadObs}
           onExportNav={handleDownloadNav}
         />
+
+        {/* PDF report */}
+        {stats && (
+          <div className="mt-2 pt-2 border-t border-border/20 flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-[11px] text-accent/70 hover:text-accent px-2.5 py-1 rounded-md border border-accent/20 hover:border-accent/40 transition-colors disabled:opacity-50"
+              onClick={handleGenerateReport}
+              disabled={reportGenerating}
+            >
+              {reportGenerating
+                ? <><SpinnerIcon className="size-3 animate-spin" /> Generating…</>
+                : <><DownloadIcon className="size-3" /> Generate PDF Report</>}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Drop zone — always visible for adding more files */}

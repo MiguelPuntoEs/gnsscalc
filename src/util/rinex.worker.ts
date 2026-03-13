@@ -186,6 +186,8 @@ let compactEpochs: CompactEpoch[] = [];
 let compactEpochMap = new Map<number, CompactEpoch>();
 let sysCodeList = new Map<string, string[]>();       // sys → codes (defines Float64Array index order)
 let sysCodeIdx = new Map<string, Map<string, number>>(); // sys → code → index
+// Warnings
+let cachedWarnings: RinexWarnings = EMPTY_WARNINGS;
 // Navigation data
 let navHeader: NavResult['header'] | null = null;
 let navEphemerides: Ephemeris[] = [];
@@ -604,6 +606,7 @@ async function handleAddObs(msg: AddObsRequest) {
     for (const prn of epoch.sats.keys()) warnAccum.onPrn(prn);
   }
   const warnings = warnAccum.finalize();
+  cachedWarnings = warnings;
 
   // Auto-compute positions if nav is available
   const posData = tryComputePositions();
@@ -790,7 +793,7 @@ async function handleExportObs(msg: ExportObsRequest) {
       blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     } else if (format === 'json-meta') {
       const stats = compactToStats(chunk, codeList, header);
-      const json = writeMetadataJson(header, stats);
+      const json = writeMetadataJson(header, stats, cachedWarnings);
       blob = new Blob([json], { type: 'application/json;charset=utf-8' });
     } else if (format === 'rinex2') {
       blob = await writeRinex2ObsBlob(header, chunk, obsTypes);

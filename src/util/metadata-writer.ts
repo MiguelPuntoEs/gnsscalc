@@ -6,6 +6,7 @@
  */
 
 import type { RinexHeader, RinexStats } from './rinex';
+import type { RinexWarnings } from './rinex-warnings';
 
 export interface RinexMetadata {
   marker: {
@@ -43,9 +44,15 @@ export interface RinexMetadata {
     meanSatellites: number;
     meanSnr: number | null;
   };
+  validation: {
+    errors: number;
+    warnings: number;
+    info: number;
+    items: { code: string; severity: string; message: string; count: number; examples?: string[] }[];
+  };
 }
 
-export function buildMetadata(header: RinexHeader, stats: RinexStats): RinexMetadata {
+export function buildMetadata(header: RinexHeader, stats: RinexStats, warnings?: RinexWarnings): RinexMetadata {
   return {
     marker: {
       name: header.markerName || '',
@@ -82,9 +89,15 @@ export function buildMetadata(header: RinexHeader, stats: RinexStats): RinexMeta
       meanSatellites: stats.meanSatellites,
       meanSnr: stats.meanSnr,
     },
+    validation: {
+      errors: warnings?.errorCount ?? 0,
+      warnings: warnings?.warningCount ?? 0,
+      info: warnings?.infoCount ?? 0,
+      items: warnings?.items ?? [],
+    },
   };
 }
 
-export function writeMetadataJson(header: RinexHeader, stats: RinexStats): string {
-  return JSON.stringify(buildMetadata(header, stats), null, 2);
+export function writeMetadataJson(header: RinexHeader, stats: RinexStats, warnings?: RinexWarnings): string {
+  return JSON.stringify(buildMetadata(header, stats, warnings), null, 2);
 }
