@@ -13,14 +13,13 @@ const CROSS_V2_GLO_FILE = join(__dirname, '../../test-fixtures/brdc_v2_glo.nav')
 const CROSS_V3_FILE = join(__dirname, '../../test-fixtures/brdc_v3_igs.nav');
 const CROSS_V4_FILE = join(__dirname, '../../test-fixtures/brdc_v4_dlr.nav');
 const HAS_CROSS_DATA = existsSync(CROSS_V2_FILE) && existsSync(CROSS_V3_FILE) && existsSync(CROSS_V4_FILE);
-// Local dev copy for standalone RINEX 2 tests
-const NAV_V2_FILE = join(__dirname, '../../data/urum_001_extracted/brdc0010.26n');
+const HAS_V2_DATA = existsSync(CROSS_V2_FILE);
 
-describe('RINEX 2 Navigation file parser', () => {
+describe.skipIf(!HAS_V2_DATA)('RINEX 2 Navigation file parser', () => {
   let result: ReturnType<typeof parseNavFile>;
 
   it('reads the file', () => {
-    const text = readFileSync(NAV_V2_FILE, 'utf-8');
+    const text = readFileSync(CROSS_V2_FILE, 'utf-8');
     result = parseNavFile(text);
   });
 
