@@ -90,7 +90,7 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /** Build a RINEX 3 long filename: SSSS00CCC_R_YYYYDDDHHMM_PER_INT_TT.rnx */
-function rinex3Filename(
+export function rinex3Filename(
   marker: string,
   startTime: Date | null,
   durationSec: number | null,

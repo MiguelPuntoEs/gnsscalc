@@ -12,7 +12,7 @@ import type { AllPositionsData } from '../util/orbit';
 import {
   addObsFiles, addNavFiles,
   exportObs, exportNav, clearWorker, applyFilters,
-  recomputePositions,
+  recomputePositions, rinex3Filename,
 } from '../util/rinex-client';
 import type { FilterState, ExportFormat, FilenameOptions, HeaderOverrides } from '../util/rinex-client';
 import { DEFAULT_FILTER } from '../util/rinex-client';
@@ -665,8 +665,10 @@ export default function RinexReaderPage() {
         obsFileNames, navFileNames,
       };
       const blob = await generateReport(reportData);
-      const name = header.markerName || obsFileNames[0]?.replace(/\.[^.]+$/, '') || 'report';
-      downloadReport(blob, `${name}_report.pdf`);
+      const fname = rinex3Filename(
+        header.markerName, stats.startTime ?? null, stats.duration ?? null, stats.interval ?? null, 'MO',
+      ).replace(/_MO\.rnx$/, '.pdf');
+      downloadReport(blob, fname);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to generate report.');
     } finally {
