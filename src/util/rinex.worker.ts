@@ -26,12 +26,21 @@ import { CycleSlipAccumulator } from './cycle-slip';
 import { CompletenessAccumulator } from './completeness';
 import { MultipathAccumulator } from './multipath';
 import type { QualityResult } from './quality-analysis';
+import { WarningAccumulator, EMPTY_WARNINGS } from './rinex-warnings';
+import type { RinexWarnings } from './rinex-warnings';
 import { writeRinexObsBlob } from './obs-writer';
 import type { CompactEpoch } from './obs-writer';
+import { writeRinex2ObsBlob } from './obs-writer-v2';
+import { writeRinex4ObsBlob } from './obs-writer-v4';
+import { writeObsCsv } from './csv-writer';
+import { writeMetadataJson } from './metadata-writer';
 import { writeRinexNav } from './nav-writer';
 import { readFileText } from './read-file-text';
 import { compactToGrid, compactToStats, gridTransferables } from './epoch-grid';
 import type { EpochGrid } from './epoch-grid';
+import type { FilterState } from './filter-state';
+export type { FilterState } from './filter-state';
+export { DEFAULT_FILTER } from './filter-state';
 
 /* ================================================================== */
 /*  Message protocol                                                   */
@@ -49,12 +58,44 @@ export interface AddNavRequest {
   files: File[];   // only NEW files
 }
 
-export interface ExportObsRequest { type: 'export-obs' }
+export interface ApplyFiltersRequest {
+  type: 'apply-filters';
+  filters: FilterState;
+}
+
+export interface HeaderOverrides {
+  markerName?: string;
+  markerType?: string;
+  receiverNumber?: string;
+  receiverType?: string;
+  receiverVersion?: string;
+  antNumber?: string;
+  antType?: string;
+  approxPosition?: [number, number, number];
+  antDelta?: [number, number, number];
+  observer?: string;
+  agency?: string;
+}
+
+export interface RecomputePositionsRequest {
+  type: 'recompute-positions';
+  rxPos?: [number, number, number];
+}
+
+export interface ExportObsRequest {
+  type: 'export-obs';
+  filters?: FilterState;
+  format?: 'rinex3' | 'rinex2' | 'rinex4' | 'csv' | 'json-meta';
+  splitInterval?: number | null; // seconds, null = no split
+  headerOverrides?: HeaderOverrides;
+}
 export interface ExportNavRequest { type: 'export-nav'; markerName: string }
 export interface ClearRequest { type: 'clear' }
 
 export type WorkerRequest =
   (AddObsRequest | AddNavRequest
+  | ApplyFiltersRequest
+  | RecomputePositionsRequest
   | ExportObsRequest | ExportNavRequest
   | ClearRequest) & { requestId?: number };
 
@@ -74,8 +115,13 @@ export interface AddObsResult {
   /** Columnar epoch data, transferred zero-copy. */
   grid: EpochGrid;
   qaResult: QualityResult;
+  warnings: RinexWarnings;
   positions: AllPositionsData | null;
   observedPrns: string[][] | null;
+  /** All PRNs in the dataset, for filter UI. */
+  availablePrns: string[];
+  /** All obs codes per system, for filter UI. */
+  availableCodes: Record<string, string[]>;
 }
 
 export interface AddNavResult {
@@ -97,6 +143,25 @@ export interface NavExportResult {
   filename: { markerName: string; startTime: string | null; durationSec: number | null };
 }
 
+export interface ApplyFiltersResult {
+  type: 'apply-filters-result';
+  stats: RinexStats;
+  grid: EpochGrid;
+  qaResult: QualityResult;
+  /** PRNs available in the unfiltered dataset, for filter UI. */
+  availablePrns: string[];
+  /** Obs codes available in the unfiltered dataset, for filter UI. */
+  availableCodes: Record<string, string[]>;
+  positions: AllPositionsData | null;
+  observedPrns: string[][] | null;
+}
+
+export interface RecomputePositionsResult {
+  type: 'recompute-positions-result';
+  positions: AllPositionsData | null;
+  observedPrns: string[][] | null;
+}
+
 export interface ErrorMessage {
   type: 'error';
   task: string;
@@ -106,6 +171,8 @@ export interface ErrorMessage {
 export type WorkerResponse =
   | ProgressMessage
   | AddObsResult | AddNavResult
+  | ApplyFiltersResult
+  | RecomputePositionsResult
   | ObsExportResult | NavExportResult
   | ErrorMessage;
 
@@ -143,19 +210,6 @@ function progress(task: string, percent: number) {
   post({ type: 'progress', task, percent });
 }
 
-/** Build obs types map from code registry (in system order). */
-function buildObsTypes(): Map<string, string[]> {
-  const sysOrder = ['G', 'R', 'E', 'C', 'J', 'I', 'S'];
-  const result = new Map<string, string[]>();
-  for (const sys of sysOrder) {
-    const codes = sysCodeList.get(sys);
-    if (codes && codes.length > 0) {
-      result.set(sys, [...codes]);
-    }
-  }
-  return result;
-}
-
 /**
  * Register an obs code and return its index. If the code already exists,
  * returns the existing index. If it's new, appends it.
@@ -176,6 +230,209 @@ function registerCode(sys: string, code: string): number {
     codeArr!.push(code);
   }
   return idx;
+}
+
+/** Collect all unique PRNs across all cached epochs (sorted). */
+function collectAvailablePrns(): string[] {
+  const set = new Set<string>();
+  for (const epoch of compactEpochs) {
+    for (const prn of epoch.sats.keys()) set.add(prn);
+  }
+  return [...set].sort();
+}
+
+/** Collect obs codes per system from the code registry. */
+function collectAvailableCodes(): Record<string, string[]> {
+  const result: Record<string, string[]> = {};
+  for (const [sys, codes] of sysCodeList) {
+    result[sys] = [...codes];
+  }
+  return result;
+}
+
+/**
+ * Apply filters to compact epochs, producing a new filtered array.
+ * Non-destructive — original compactEpochs are never modified.
+ */
+function filterEpochs(filters: FilterState): {
+  epochs: CompactEpoch[];
+  filteredSysCodeList: Map<string, string[]>;
+} {
+  const {
+    excludedSystems, excludedPrns, excludedSignalTypes, excludedBands,
+    timeStart, timeEnd, samplingInterval, sparseThreshold,
+    excludedSignalsPerSystem,
+  } = filters;
+
+  const exSysSet = new Set(excludedSystems);
+  const exPrnSet = new Set(excludedPrns);
+  const exSigSet = new Set(excludedSignalTypes);
+  const exBandSet = new Set(excludedBands);
+
+  // Per-system signal exclusion sets (2-char suffix like '1C', '5Q')
+  const exSigPerSys = new Map<string, Set<string>>();
+  if (excludedSignalsPerSystem) {
+    for (const [sys, sigs] of Object.entries(excludedSignalsPerSystem)) {
+      if (sigs.length > 0) exSigPerSys.set(sys, new Set(sigs));
+    }
+  }
+
+  // Build filtered code registry (remove excluded signal types, bands, and per-system signals)
+  const filteredSysCodeList = new Map<string, string[]>();
+  const filteredCodeIdx = new Map<string, Map<string, number>>(); // sys → old code → new index
+  for (const [sys, codes] of sysCodeList) {
+    if (exSysSet.has(sys)) continue;
+    const perSysExcluded = exSigPerSys.get(sys);
+    const newCodes: string[] = [];
+    const idxMap = new Map<string, number>();
+    for (const code of codes) {
+      const sigType = code[0]!; // C, L, D, S
+      const band = code[1]!;   // 1, 2, 5, etc.
+      if (exSigSet.has(sigType)) continue;
+      if (exBandSet.has(band)) continue;
+      // Per-system signal: match 2-char suffix (band+attribute), e.g. '1C' from 'C1C'
+      if (perSysExcluded?.has(code.slice(1))) continue;
+      idxMap.set(code, newCodes.length);
+      newCodes.push(code);
+    }
+    if (newCodes.length > 0) {
+      filteredSysCodeList.set(sys, newCodes);
+      filteredCodeIdx.set(sys, idxMap);
+    }
+  }
+
+  // Time windowing
+  let source = compactEpochs;
+  if (timeStart != null || timeEnd != null) {
+    source = source.filter(e => {
+      if (timeStart != null && e.time < timeStart) return false;
+      if (timeEnd != null && e.time > timeEnd) return false;
+      return true;
+    });
+  }
+
+  // Sampling/decimation
+  if (samplingInterval != null && samplingInterval > 0 && source.length >= 2) {
+    const intervalMs = samplingInterval * 1000;
+    const decimated: CompactEpoch[] = [source[0]!];
+    let lastTime = source[0]!.time;
+    for (let i = 1; i < source.length; i++) {
+      if (source[i]!.time - lastTime >= intervalMs - 1) { // -1ms tolerance
+        decimated.push(source[i]!);
+        lastTime = source[i]!.time;
+      }
+    }
+    source = decimated;
+  }
+
+  // PRN and signal filtering
+  const hasCodeFilters = exSigSet.size > 0 || exBandSet.size > 0 || exSigPerSys.size > 0;
+  const hasPrnFilters = exSysSet.size > 0 || exPrnSet.size > 0;
+
+  let filtered: CompactEpoch[];
+  if (!hasPrnFilters && !hasCodeFilters) {
+    filtered = source;
+  } else {
+    filtered = [];
+    for (const epoch of source) {
+      const newSats = new Map<string, Float64Array>();
+      for (const [prn, valArr] of epoch.sats) {
+        const sys = prn[0]!;
+        if (exSysSet.has(sys) || exPrnSet.has(prn)) continue;
+
+        if (hasCodeFilters) {
+          const idxMap = filteredCodeIdx.get(sys);
+          if (!idxMap || idxMap.size === 0) continue;
+          const newArr = new Float64Array(idxMap.size);
+          newArr.fill(NaN);
+          for (const [code, newIdx] of idxMap) {
+            const origIdx = sysCodeIdx.get(sys)!.get(code)!;
+            if (origIdx < valArr.length) newArr[newIdx] = valArr[origIdx]!;
+          }
+          newSats.set(prn, newArr);
+        } else {
+          newSats.set(prn, valArr);
+        }
+      }
+      if (newSats.size > 0) {
+        filtered.push({ time: epoch.time, sats: newSats });
+      }
+    }
+  }
+
+  // Sparse obs removal: remove codes that appear in < sparseThreshold % of epochs
+  if (sparseThreshold > 0 && filtered.length > 0) {
+    const minCount = Math.ceil(filtered.length * sparseThreshold / 100);
+    // Count occurrences per system per code
+    for (const [sys, codes] of filteredSysCodeList) {
+      const counts = new Uint32Array(codes.length);
+      for (const epoch of filtered) {
+        for (const [prn, valArr] of epoch.sats) {
+          if (prn[0] !== sys) continue;
+          for (let i = 0; i < codes.length && i < valArr.length; i++) {
+            if (!isNaN(valArr[i]!)) counts[i]!++;
+          }
+        }
+      }
+      const keepIndices: number[] = [];
+      const newCodes: string[] = [];
+      for (let i = 0; i < codes.length; i++) {
+        if (counts[i]! >= minCount) {
+          keepIndices.push(i);
+          newCodes.push(codes[i]!);
+        }
+      }
+      if (newCodes.length < codes.length) {
+        filteredSysCodeList.set(sys, newCodes);
+        // Rebuild value arrays for this system
+        for (const epoch of filtered) {
+          for (const [prn, valArr] of epoch.sats) {
+            if (prn[0] !== sys) continue;
+            const newArr = new Float64Array(newCodes.length);
+            newArr.fill(NaN);
+            for (let j = 0; j < keepIndices.length; j++) {
+              if (keepIndices[j]! < valArr.length) newArr[j] = valArr[keepIndices[j]!]!;
+            }
+            epoch.sats.set(prn, newArr);
+          }
+        }
+      }
+    }
+  }
+
+  return { epochs: filtered, filteredSysCodeList };
+}
+
+/** Run QA over given epochs with a given code list. */
+function runQA(header: RinexHeader, epochs: CompactEpoch[], codeList: Map<string, string[]>): QualityResult {
+  const mpAccum = new MultipathAccumulator(header);
+  const csAccum = new CycleSlipAccumulator(header, (time, prn, bands) => {
+    mpAccum.notifySlip(time, prn, bands);
+  });
+  const compAccum = new CompletenessAccumulator(header);
+
+  const valBuf: (number | null)[] = [];
+  for (const epoch of epochs) {
+    for (const [prn, valArr] of epoch.sats) {
+      const sys = prn[0]!;
+      const codes = codeList.get(sys)!;
+      if (!codes) continue;
+      valBuf.length = codes.length;
+      for (let i = 0; i < codes.length; i++) {
+        const v = i < valArr.length ? valArr[i]! : NaN;
+        valBuf[i] = isNaN(v) ? null : v;
+      }
+      csAccum.onObservation(epoch.time, prn, codes, valBuf);
+      mpAccum.onObservation(epoch.time, prn, codes, valBuf);
+      compAccum.onObservation(epoch.time, prn, codes, valBuf);
+    }
+  }
+
+  return {
+    cycleSlips: csAccum.finalize(),
+    completeness: compAccum.finalize(),
+    multipath: mpAccum.finalize(),
+  };
 }
 
 /** Run QA over all cached compact epochs. */
@@ -215,7 +472,7 @@ function replayQA(header: RinexHeader): QualityResult {
  * Compute positions if both obs and nav are cached.
  * Returns null if either side is missing.
  */
-function tryComputePositions(): { positions: AllPositionsData; observedPrns: string[][] } | null {
+function tryComputePositions(rxPosOverride?: [number, number, number]): { positions: AllPositionsData; observedPrns: string[][] } | null {
   if (compactEpochs.length === 0 || navEphemerides.length === 0 || !obsHeader) return null;
 
   const maxEpochs = 500;
@@ -228,7 +485,7 @@ function tryComputePositions(): { positions: AllPositionsData; observedPrns: str
     prnsPerEpoch.push([...e.sats.keys()]);
   }
 
-  const rxPos = obsHeader.approxPosition;
+  const rxPos = rxPosOverride ?? obsHeader.approxPosition;
   const validRx = rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0) ? rxPos : undefined;
   const positions = computeAllPositions(navEphemerides, times, validRx);
   return { positions, observedPrns: prnsPerEpoch };
@@ -338,8 +595,22 @@ async function handleAddObs(msg: AddObsRequest) {
   // QA over full dataset
   const qaResult = replayQA(obsHeader!);
 
+  // Validation warnings — scan sorted epochs + header
+  const warnAccum = new WarningAccumulator();
+  warnAccum.checkHeader(obsHeader!);
+  if (obsHeader!.interval != null) warnAccum.setInterval(obsHeader!.interval * 1000);
+  for (const epoch of compactEpochs) {
+    warnAccum.onEpoch(epoch.time, 0); // compact epochs only store flag-0 measurement epochs
+    for (const prn of epoch.sats.keys()) warnAccum.onPrn(prn);
+  }
+  const warnings = warnAccum.finalize();
+
   // Auto-compute positions if nav is available
   const posData = tryComputePositions();
+
+  // Collect available PRNs and codes for filter UI
+  const availablePrns = collectAvailablePrns();
+  const availableCodes = collectAvailableCodes();
 
   post({
     type: 'add-obs-result',
@@ -347,8 +618,11 @@ async function handleAddObs(msg: AddObsRequest) {
     stats,
     grid,
     qaResult,
+    warnings,
     positions: posData?.positions ?? null,
     observedPrns: posData?.observedPrns ?? null,
+    availablePrns,
+    availableCodes,
   }, transfers);
 }
 
@@ -390,24 +664,153 @@ async function handleAddNav(msg: AddNavRequest) {
   });
 }
 
-async function handleExportObs() {
+function handleApplyFilters(msg: ApplyFiltersRequest) {
+  if (!obsHeader || compactEpochs.length === 0) {
+    post({ type: 'error', task: 'apply-filters', message: 'No observation data to filter.' });
+    return;
+  }
+
+  const { epochs: filtered, filteredSysCodeList } = filterEpochs(msg.filters);
+
+  if (filtered.length === 0) {
+    post({ type: 'error', task: 'apply-filters', message: 'All data was excluded by the current filters.' });
+    return;
+  }
+
+  const grid = compactToGrid(filtered, filteredSysCodeList);
+  const stats = compactToStats(filtered, filteredSysCodeList, obsHeader!);
+  const transfers = gridTransferables(grid);
+  const qaResult = runQA(obsHeader!, filtered, filteredSysCodeList);
+
+  // Positions from filtered data
+  let posData: { positions: AllPositionsData; observedPrns: string[][] } | null = null;
+  if (navEphemerides.length > 0) {
+    const maxEpochs = 500;
+    const step = Math.max(1, Math.ceil(filtered.length / maxEpochs));
+    const times: number[] = [];
+    const prnsPerEpoch: string[][] = [];
+    for (let i = 0; i < filtered.length; i += step) {
+      times.push(filtered[i]!.time);
+      prnsPerEpoch.push([...filtered[i]!.sats.keys()]);
+    }
+    const rxPos = obsHeader!.approxPosition;
+    const validRx = rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0) ? rxPos : undefined;
+    posData = { positions: computeAllPositions(navEphemerides, times, validRx), observedPrns: prnsPerEpoch };
+  }
+
+  post({
+    type: 'apply-filters-result',
+    stats,
+    grid,
+    qaResult,
+    availablePrns: collectAvailablePrns(),
+    availableCodes: collectAvailableCodes(),
+    positions: posData?.positions ?? null,
+    observedPrns: posData?.observedPrns ?? null,
+  }, transfers);
+}
+
+function applyHeaderOverrides(header: RinexHeader, overrides: HeaderOverrides): RinexHeader {
+  const h = { ...header };
+  if (overrides.markerName !== undefined) h.markerName = overrides.markerName;
+  if (overrides.markerType !== undefined) h.markerType = overrides.markerType;
+  if (overrides.receiverNumber !== undefined) h.receiverNumber = overrides.receiverNumber;
+  if (overrides.receiverType !== undefined) h.receiverType = overrides.receiverType;
+  if (overrides.receiverVersion !== undefined) h.receiverVersion = overrides.receiverVersion;
+  if (overrides.antNumber !== undefined) h.antNumber = overrides.antNumber;
+  if (overrides.antType !== undefined) h.antType = overrides.antType;
+  if (overrides.approxPosition !== undefined) h.approxPosition = overrides.approxPosition;
+  if (overrides.antDelta !== undefined) h.antDelta = overrides.antDelta;
+  if (overrides.observer !== undefined) h.observer = overrides.observer;
+  if (overrides.agency !== undefined) h.agency = overrides.agency;
+  return h;
+}
+
+async function handleExportObs(msg: ExportObsRequest) {
   if (!obsHeader || compactEpochs.length === 0) {
     post({ type: 'error', task: 'export-obs', message: 'No observation data to export.' });
     return;
   }
-  const obsTypes = buildObsTypes();
-  const blob = await writeRinexObsBlob(obsHeader, compactEpochs, obsTypes);
 
-  post({
-    type: 'obs-export-result', blob,
-    filename: {
-      markerName: obsHeader.markerName || '',
-      startTime: new Date(compactEpochs[0]!.time).toISOString(),
-      durationSec: (compactEpochs[compactEpochs.length - 1]!.time - compactEpochs[0]!.time) / 1000,
-      intervalSec: compactEpochs.length >= 2
-        ? (compactEpochs[1]!.time - compactEpochs[0]!.time) / 1000 : null,
-    },
-  });
+  const header = msg.headerOverrides
+    ? applyHeaderOverrides(obsHeader, msg.headerOverrides)
+    : obsHeader;
+  const format = msg.format ?? 'rinex3';
+  const splitInterval = msg.splitInterval ?? null;
+
+  // Apply filters if provided
+  let epochs: CompactEpoch[];
+  let codeList: Map<string, string[]>;
+  if (msg.filters) {
+    const f = filterEpochs(msg.filters);
+    epochs = f.epochs;
+    codeList = f.filteredSysCodeList;
+  } else {
+    epochs = compactEpochs;
+    codeList = sysCodeList;
+  }
+
+  if (epochs.length === 0) {
+    post({ type: 'error', task: 'export-obs', message: 'No data remaining after filters.' });
+    return;
+  }
+
+  const obsTypes = new Map<string, string[]>();
+  const sysOrder = ['G', 'R', 'E', 'C', 'J', 'I', 'S'];
+  for (const sys of sysOrder) {
+    const codes = codeList.get(sys);
+    if (codes && codes.length > 0) obsTypes.set(sys, [...codes]);
+  }
+
+  // Split epochs into chunks if splitInterval is set
+  const chunks: CompactEpoch[][] = [];
+  if (splitInterval != null && splitInterval > 0) {
+    const splitMs = splitInterval * 1000;
+    let chunkStart = epochs[0]!.time;
+    let current: CompactEpoch[] = [];
+    for (const epoch of epochs) {
+      if (epoch.time - chunkStart >= splitMs && current.length > 0) {
+        chunks.push(current);
+        current = [];
+        chunkStart = epoch.time;
+      }
+      current.push(epoch);
+    }
+    if (current.length > 0) chunks.push(current);
+  } else {
+    chunks.push(epochs);
+  }
+
+  // For multi-file exports, we post multiple results
+  for (const chunk of chunks) {
+    let blob: Blob;
+
+    if (format === 'csv') {
+      const csv = writeObsCsv(chunk, obsTypes);
+      blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    } else if (format === 'json-meta') {
+      const stats = compactToStats(chunk, codeList, header);
+      const json = writeMetadataJson(header, stats);
+      blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    } else if (format === 'rinex2') {
+      blob = await writeRinex2ObsBlob(header, chunk, obsTypes);
+    } else if (format === 'rinex4') {
+      blob = await writeRinex4ObsBlob(header, chunk, obsTypes);
+    } else {
+      blob = await writeRinexObsBlob(header, chunk, obsTypes);
+    }
+
+    post({
+      type: 'obs-export-result', blob,
+      filename: {
+        markerName: header.markerName || '',
+        startTime: new Date(chunk[0]!.time).toISOString(),
+        durationSec: (chunk[chunk.length - 1]!.time - chunk[0]!.time) / 1000,
+        intervalSec: chunk.length >= 2
+          ? (chunk[1]!.time - chunk[0]!.time) / 1000 : null,
+      },
+    });
+  }
 }
 
 function handleExportNav(msg: ExportNavRequest) {
@@ -445,6 +848,15 @@ function handleClear() {
   navEphemerides = [];
 }
 
+function handleRecomputePositions(msg: RecomputePositionsRequest) {
+  const posData = tryComputePositions(msg.rxPos);
+  post({
+    type: 'recompute-positions-result',
+    positions: posData?.positions ?? null,
+    observedPrns: posData?.observedPrns ?? null,
+  });
+}
+
 /* ================================================================== */
 /*  Dispatcher                                                         */
 /* ================================================================== */
@@ -456,7 +868,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     switch (msg.type) {
       case 'add-obs': return await handleAddObs(msg);
       case 'add-nav': return await handleAddNav(msg);
-      case 'export-obs': return await handleExportObs();
+      case 'apply-filters': return handleApplyFilters(msg);
+      case 'recompute-positions': return handleRecomputePositions(msg);
+      case 'export-obs': return await handleExportObs(msg);
       case 'export-nav': return handleExportNav(msg);
       case 'clear': return handleClear();
     }

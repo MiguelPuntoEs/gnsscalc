@@ -13,6 +13,7 @@ const rinexFaq = [
   { question: 'Can this tool handle large files?', answer: 'Yes. The parser reads the file in small chunks using streaming, so even multi-gigabyte RINEX files can be processed without exceeding browser memory. Nothing is uploaded — all processing happens locally in your browser.' },
   { question: 'What constellations are supported?', answer: 'All standard GNSS constellations: GPS (G), GLONASS (R), Galileo (E), BeiDou (C), QZSS (J), NavIC/IRNSS (I), and SBAS (S). GLONASS FDMA frequencies are computed per-satellite from the channel numbers in the RINEX header.' },
   { question: 'Can I load a navigation file?', answer: 'Yes. Drop a RINEX navigation file alongside the observation file to compute satellite orbits, sky plots, elevation angles and DOP values. Multipath vs elevation charts are also available when orbit data is present. You can load multiple constellation-specific nav files at once (e.g. .26n + .26g + .26l) and they will be merged automatically.' },
+  { question: 'What do RINEX observation codes mean per constellation?', answer: 'RINEX 3/4 observation codes are three characters "tna": t = measurement type (C=pseudorange, L=carrier phase, D=Doppler, S=signal strength), n = frequency band digit (1–9), a = tracking attribute (C=C/A, P=P-code, W=Z-tracking, X=combined, I=in-phase, Q=quadrature, etc.). The band digit maps to different signals per constellation — GPS: 1=L1 (1575.42 MHz, codes C1C/S/L/X/P/W/Y/M), 2=L2 (1227.60 MHz, codes C2C/D/S/L/X/P/W/Y), 5=L5 (1176.45 MHz, codes C5I/Q/X). GLONASS: 1=G1 FDMA, 2=G2 FDMA, 3=G3 CDMA (1202.025 MHz), 4=G1a (1600.995 MHz), 6=G2a (1248.06 MHz). Galileo: 1=E1 (A PRS/B OS data/C OS pilot), 5=E5a, 7=E5b, 8=E5 AltBOC (1191.795 MHz), 6=E6. BeiDou: 2=B1I (BDS-2/3), 1=B1C/B1A (BDS-3), 5=B2a, 7=B2I/B2b, 8=B2(a+b), 6=B3I/B3A. QZSS: 1=L1, 2=L2, 5=L5/L5S, 6=L6. NavIC: 1=L1, 5=L5, 9=S-band (2492.028 MHz). SBAS: 1=L1, 5=L5. Per RINEX 4.02, Tables 10–16.' },
   { question: 'What do the legacy RINEX file extensions mean?', answer: 'Legacy (RINEX 2) extensions follow the pattern .YYx, where YY is the two-digit year and x indicates the file type: n = GPS nav, g = GLONASS nav, l = Galileo nav, f = BeiDou nav, h = SBAS/geostationary nav, q = QZSS nav, i = NavIC/IRNSS nav, p = mixed nav, o = observation, d = Hatanaka-compressed observation, m = meteorological. For example, .26n is a GPS navigation file from 2026 and .24o is an observation file from 2024.' },
   { question: 'How does RINEX 3+ long-name file naming work?', answer: 'RINEX 3+ uses a structured long filename: XXXXMRCCC_K_YYYYDDDHHMM_PER_INT_TT.FMT(.gz), where XXXX = station (4 char), M = monument number, R = receiver number, CCC = country ISO code, K = data source (R=receiver, S=stream, U=unknown), YYYYDDD = year and day-of-year, HHMM = start time, PER = file period (e.g. 01D = 1 day, 01H = 1 hour), INT = sample interval (e.g. 30S, 01S), TT = file type (MO=mixed obs, GO/RO/EO/CO/JO/IO/SO=per-system obs, MN=mixed nav, GN/RN/EN/CN/JN/IN/SN=per-system nav), and FMT = format (rnx or crx). Example: BRUX00BEL_R_20260120000_01D_30S_MO.rnx.gz is a 1-day, 30s mixed observation file from Brussels.' },
 ];
@@ -174,6 +175,266 @@ const rinexFaq = [
         Multipath vs elevation charts are also available when orbit data is
         present. You can load multiple constellation-specific nav files at once
         (e.g.&nbsp;.26n + .26g + .26l) and they will be merged automatically.
+      </dd>
+      <dt>What do RINEX observation codes mean per constellation?</dt>
+      <dd>
+        <p>
+          Each RINEX&nbsp;3/4 observation code is three characters —
+          <code class="text-accent">t</code><code class="text-fg/70">n</code><code class="text-fg/50">a</code>
+          — where <strong>t</strong> is the measurement type,
+          <strong>n</strong> is the frequency band, and <strong>a</strong> is the
+          tracking attribute:
+        </p>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs mb-4 text-fg/60">
+          <span><code class="text-accent font-bold">C</code> = pseudorange</span>
+          <span><code class="text-accent font-bold">L</code> = carrier phase</span>
+          <span><code class="text-accent font-bold">D</code> = Doppler</span>
+          <span><code class="text-accent font-bold">S</code> = signal strength</span>
+        </div>
+
+        <!-- GPS -->
+        <div class="rounded-lg border border-[#4ade80]/20 bg-[#4ade80]/[0.03] p-4 mb-3">
+          <h4 class="text-sm font-semibold mb-2" style="color:#4ade80">GPS (G)</h4>
+          <table class="w-full text-xs">
+            <thead><tr class="border-b border-fg/10">
+              <th class="text-left pb-1.5 font-medium text-fg/50 w-28">Freq. Band</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50">Channel or Code</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Pseudo</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Phase</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Doppl.</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">SNR</th>
+            </tr></thead>
+            <tbody class="text-fg/65 [&_td]:py-[3px] [&_td]:pr-2 font-mono [&_td:nth-child(1)]:font-sans [&_td:nth-child(2)]:font-sans">
+              <tr><td rowspan="11" class="align-top text-fg/40 text-[11px] !font-sans">L1<br/>1575.42</td><td class="!font-sans">C/A</td><td>C1C</td><td>L1C</td><td>D1C</td><td>S1C</td></tr>
+              <tr><td class="!font-sans">L1C (D)</td><td>C1S</td><td>L1S</td><td>D1S</td><td>S1S</td></tr>
+              <tr><td class="!font-sans">L1C (P)</td><td>C1L</td><td>L1L</td><td>D1L</td><td>S1L</td></tr>
+              <tr><td class="!font-sans">L1C (D+P)</td><td>C1X</td><td>L1X</td><td>D1X</td><td>S1X</td></tr>
+              <tr><td class="!font-sans">P (AS off)</td><td>C1P</td><td>L1P</td><td>D1P</td><td>S1P</td></tr>
+              <tr><td class="!font-sans">Z-tracking (AS on)</td><td>C1W</td><td>L1W</td><td>D1W</td><td>S1W</td></tr>
+              <tr><td class="!font-sans">Y</td><td>C1Y</td><td>L1Y</td><td>D1Y</td><td>S1Y</td></tr>
+              <tr><td class="!font-sans">M</td><td>C1M</td><td>L1M</td><td>D1M</td><td>S1M</td></tr>
+              <tr><td class="!font-sans">codeless</td><td></td><td>L1N</td><td>D1N</td><td>S1N</td></tr>
+              <tr><td class="!font-sans">M (RMP antenna)</td><td>C1R</td><td>L1R</td><td>D1R</td><td>S1R</td></tr>
+              <tr class="border-b border-fg/5"><td colspan="5"></td></tr>
+              <tr><td rowspan="11" class="align-top text-fg/40 text-[11px] !font-sans">L2<br/>1227.60</td><td class="!font-sans">C/A</td><td>C2C</td><td>L2C</td><td>D2C</td><td>S2C</td></tr>
+              <tr><td class="!font-sans">L1(C/A)+(P2-P1) semi-codeless</td><td>C2D</td><td>L2D</td><td>D2D</td><td>S2D</td></tr>
+              <tr><td class="!font-sans">L2C (M)</td><td>C2S</td><td>L2S</td><td>D2S</td><td>S2S</td></tr>
+              <tr><td class="!font-sans">L2C (L)</td><td>C2L</td><td>L2L</td><td>D2L</td><td>S2L</td></tr>
+              <tr><td class="!font-sans">L2C (M+L)</td><td>C2X</td><td>L2X</td><td>D2X</td><td>S2X</td></tr>
+              <tr><td class="!font-sans">P (AS off)</td><td>C2P</td><td>L2P</td><td>D2P</td><td>S2P</td></tr>
+              <tr><td class="!font-sans">Z-tracking (AS on)</td><td>C2W</td><td>L2W</td><td>D2W</td><td>S2W</td></tr>
+              <tr><td class="!font-sans">Y</td><td>C2Y</td><td>L2Y</td><td>D2Y</td><td>S2Y</td></tr>
+              <tr><td class="!font-sans">M</td><td>C2M</td><td>L2M</td><td>D2M</td><td>S2M</td></tr>
+              <tr><td class="!font-sans">codeless</td><td></td><td>L2N</td><td>D2N</td><td>S2N</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">M (RMP antenna)</td><td>C2R</td><td>L2R</td><td>D2R</td><td>S2R</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">L5<br/>1176.45</td><td class="!font-sans">I</td><td>C5I</td><td>L5I</td><td>D5I</td><td>S5I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C5Q</td><td>L5Q</td><td>D5Q</td><td>S5Q</td></tr>
+              <tr><td class="!font-sans">I+Q</td><td>C5X</td><td>L5X</td><td>D5X</td><td>S5X</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- GLONASS -->
+        <div class="rounded-lg border border-[#f87171]/20 bg-[#f87171]/[0.03] p-4 mb-3">
+          <h4 class="text-sm font-semibold mb-2" style="color:#f87171">GLONASS (R)</h4>
+          <table class="w-full text-xs">
+            <thead><tr class="border-b border-fg/10">
+              <th class="text-left pb-1.5 font-medium text-fg/50 w-28">Freq. Band</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50">Channel or Code</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Pseudo</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Phase</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Doppl.</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">SNR</th>
+            </tr></thead>
+            <tbody class="text-fg/65 [&_td]:py-[3px] [&_td]:pr-2 font-mono [&_td:nth-child(1)]:font-sans [&_td:nth-child(2)]:font-sans">
+              <tr><td rowspan="2" class="align-top text-fg/40 text-[11px] !font-sans">G1<br/>1602+k&times;9/16</td><td class="!font-sans">C/A</td><td>C1C</td><td>L1C</td><td>D1C</td><td>S1C</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">P</td><td>C1P</td><td>L1P</td><td>D1P</td><td>S1P</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">G1a<br/>1600.995</td><td class="!font-sans">L1OCd</td><td>C4A</td><td>L4A</td><td>D4A</td><td>S4A</td></tr>
+              <tr><td class="!font-sans">L1OCp</td><td>C4B</td><td>L4B</td><td>D4B</td><td>S4B</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">L1OCd+L1OCp</td><td>C4X</td><td>L4X</td><td>D4X</td><td>S4X</td></tr>
+              <tr><td rowspan="2" class="align-top text-fg/40 text-[11px] !font-sans">G2<br/>1246+k&times;7/16</td><td class="!font-sans">C/A</td><td>C2C</td><td>L2C</td><td>D2C</td><td>S2C</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">P</td><td>C2P</td><td>L2P</td><td>D2P</td><td>S2P</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">G2a<br/>1248.06</td><td class="!font-sans">L2CSI</td><td>C6A</td><td>L6A</td><td>D6A</td><td>S6A</td></tr>
+              <tr><td class="!font-sans">L2OCp</td><td>C6B</td><td>L6B</td><td>D6B</td><td>S6B</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">L2CSI+L2OCp</td><td>C6X</td><td>L6X</td><td>D6X</td><td>S6X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">G3<br/>1202.025</td><td class="!font-sans">I</td><td>C3I</td><td>L3I</td><td>D3I</td><td>S3I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C3Q</td><td>L3Q</td><td>D3Q</td><td>S3Q</td></tr>
+              <tr><td class="!font-sans">I+Q</td><td>C3X</td><td>L3X</td><td>D3X</td><td>S3X</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Galileo -->
+        <div class="rounded-lg border border-[#60a5fa]/20 bg-[#60a5fa]/[0.03] p-4 mb-3">
+          <h4 class="text-sm font-semibold mb-2" style="color:#60a5fa">Galileo (E)</h4>
+          <table class="w-full text-xs">
+            <thead><tr class="border-b border-fg/10">
+              <th class="text-left pb-1.5 font-medium text-fg/50 w-28">Freq. Band</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50">Channel or Code</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Pseudo</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Phase</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Doppl.</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">SNR</th>
+            </tr></thead>
+            <tbody class="text-fg/65 [&_td]:py-[3px] [&_td]:pr-2 font-mono [&_td:nth-child(1)]:font-sans [&_td:nth-child(2)]:font-sans">
+              <tr><td rowspan="5" class="align-top text-fg/40 text-[11px] !font-sans">E1<br/>1575.42</td><td class="!font-sans">A PRS</td><td>C1A</td><td>L1A</td><td>D1A</td><td>S1A</td></tr>
+              <tr><td class="!font-sans">B OS data</td><td>C1B</td><td>L1B</td><td>D1B</td><td>S1B</td></tr>
+              <tr><td class="!font-sans">C OS pilot</td><td>C1C</td><td>L1C</td><td>D1C</td><td>S1C</td></tr>
+              <tr><td class="!font-sans">B+C</td><td>C1X</td><td>L1X</td><td>D1X</td><td>S1X</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">A+B+C</td><td>C1Z</td><td>L1Z</td><td>D1Z</td><td>S1Z</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">E5a<br/>1176.45</td><td class="!font-sans">I F/NAV OS</td><td>C5I</td><td>L5I</td><td>D5I</td><td>S5I</td></tr>
+              <tr><td class="!font-sans">Q &mdash; no data</td><td>C5Q</td><td>L5Q</td><td>D5Q</td><td>S5Q</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">I+Q</td><td>C5X</td><td>L5X</td><td>D5X</td><td>S5X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">E5b<br/>1207.14</td><td class="!font-sans">I I/NAV OS/CS/SoL</td><td>C7I</td><td>L7I</td><td>D7I</td><td>S7I</td></tr>
+              <tr><td class="!font-sans">Q &mdash; no data</td><td>C7Q</td><td>L7Q</td><td>D7Q</td><td>S7Q</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">I+Q</td><td>C7X</td><td>L7X</td><td>D7X</td><td>S7X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">E5 AltBOC<br/>1191.795</td><td class="!font-sans">I</td><td>C8I</td><td>L8I</td><td>D8I</td><td>S8I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C8Q</td><td>L8Q</td><td>D8Q</td><td>S8Q</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">I+Q</td><td>C8X</td><td>L8X</td><td>D8X</td><td>S8X</td></tr>
+              <tr><td rowspan="5" class="align-top text-fg/40 text-[11px] !font-sans">E6<br/>1278.75</td><td class="!font-sans">A PRS</td><td>C6A</td><td>L6A</td><td>D6A</td><td>S6A</td></tr>
+              <tr><td class="!font-sans">B C/NAV CS</td><td>C6B</td><td>L6B</td><td>D6B</td><td>S6B</td></tr>
+              <tr><td class="!font-sans">C &mdash; no data</td><td>C6C</td><td>L6C</td><td>D6C</td><td>S6C</td></tr>
+              <tr><td class="!font-sans">B+C</td><td>C6X</td><td>L6X</td><td>D6X</td><td>S6X</td></tr>
+              <tr><td class="!font-sans">A+B+C</td><td>C6Z</td><td>L6Z</td><td>D6Z</td><td>S6Z</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- BeiDou -->
+        <div class="rounded-lg border border-[#fbbf24]/20 bg-[#fbbf24]/[0.03] p-4 mb-3">
+          <h4 class="text-sm font-semibold mb-2" style="color:#fbbf24">BeiDou (C)</h4>
+          <table class="w-full text-xs">
+            <thead><tr class="border-b border-fg/10">
+              <th class="text-left pb-1.5 font-medium text-fg/50 w-28">Freq. Band</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50">Channel or Code</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Pseudo</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Phase</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Doppl.</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">SNR</th>
+            </tr></thead>
+            <tbody class="text-fg/65 [&_td]:py-[3px] [&_td]:pr-2 font-mono [&_td:nth-child(1)]:font-sans [&_td:nth-child(2)]:font-sans">
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B1I<br/>1561.098<br/><span class="text-[9px]">BDS-2/3</span></td><td class="!font-sans">I (B1I signal)</td><td>C2I</td><td>L2I</td><td>D2I</td><td>S2I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C2Q</td><td>L2Q</td><td>D2Q</td><td>S2Q</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">I+Q</td><td>C2X</td><td>L2X</td><td>D2X</td><td>S2X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B1C<br/>1575.42<br/><span class="text-[9px]">BDS-3</span></td><td class="!font-sans">Data</td><td>C1D</td><td>L1D</td><td>D1D</td><td>S1D</td></tr>
+              <tr><td class="!font-sans">Pilot</td><td>C1P</td><td>L1P</td><td>D1P</td><td>S1P</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">Data+Pilot</td><td>C1X</td><td>L1X</td><td>D1X</td><td>S1X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B1A<br/>1575.42<br/><span class="text-[9px]">BDS-3</span></td><td class="!font-sans">Data</td><td>C1S</td><td>L1S</td><td>D1S</td><td>S1S</td></tr>
+              <tr><td class="!font-sans">Pilot</td><td>C1L</td><td>L1L</td><td>D1L</td><td>S1L</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">Data+Pilot</td><td>C1Z</td><td>L1Z</td><td>D1Z</td><td>S1Z</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B2a<br/>1176.45<br/><span class="text-[9px]">BDS-3</span></td><td class="!font-sans">Data</td><td>C5D</td><td>L5D</td><td>D5D</td><td>S5D</td></tr>
+              <tr><td class="!font-sans">Pilot</td><td>C5P</td><td>L5P</td><td>D5P</td><td>S5P</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">Data+Pilot</td><td>C5X</td><td>L5X</td><td>D5X</td><td>S5X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B2I<br/>1207.14<br/><span class="text-[9px]">BDS-2</span></td><td class="!font-sans">I (B2I signal)</td><td>C7I</td><td>L7I</td><td>D7I</td><td>S7I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C7Q</td><td>L7Q</td><td>D7Q</td><td>S7Q</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">I+Q</td><td>C7X</td><td>L7X</td><td>D7X</td><td>S7X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B2b<br/>1207.14<br/><span class="text-[9px]">BDS-3</span></td><td class="!font-sans">Data</td><td>C7D</td><td>L7D</td><td>D7D</td><td>S7D</td></tr>
+              <tr><td class="!font-sans">Pilot</td><td>C7P</td><td>L7P</td><td>D7P</td><td>S7P</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">Data+Pilot</td><td>C7Z</td><td>L7Z</td><td>D7Z</td><td>S7Z</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B2(a+b)<br/>1191.795<br/><span class="text-[9px]">BDS-3</span></td><td class="!font-sans">Data</td><td>C8D</td><td>L8D</td><td>D8D</td><td>S8D</td></tr>
+              <tr><td class="!font-sans">Pilot</td><td>C8P</td><td>L8P</td><td>D8P</td><td>S8P</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">Data+Pilot</td><td>C8X</td><td>L8X</td><td>D8X</td><td>S8X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B3I<br/>1268.52<br/><span class="text-[9px]">BDS-2/3</span></td><td class="!font-sans">I</td><td>C6I</td><td>L6I</td><td>D6I</td><td>S6I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C6Q</td><td>L6Q</td><td>D6Q</td><td>S6Q</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">I+Q</td><td>C6X</td><td>L6X</td><td>D6X</td><td>S6X</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">B3A<br/>1268.52<br/><span class="text-[9px]">BDS-3</span></td><td class="!font-sans">Data</td><td>C6D</td><td>L6D</td><td>D6D</td><td>S6D</td></tr>
+              <tr><td class="!font-sans">Pilot</td><td>C6P</td><td>L6P</td><td>D6P</td><td>S6P</td></tr>
+              <tr><td class="!font-sans">Data+Pilot</td><td>C6Z</td><td>L6Z</td><td>D6Z</td><td>S6Z</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- QZSS -->
+        <div class="rounded-lg border border-[#c084fc]/20 bg-[#c084fc]/[0.03] p-4 mb-3">
+          <h4 class="text-sm font-semibold mb-2" style="color:#c084fc">QZSS (J)</h4>
+          <table class="w-full text-xs">
+            <thead><tr class="border-b border-fg/10">
+              <th class="text-left pb-1.5 font-medium text-fg/50 w-28">Freq. Band</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50">Channel or Code</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Pseudo</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Phase</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Doppl.</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">SNR</th>
+            </tr></thead>
+            <tbody class="text-fg/65 [&_td]:py-[3px] [&_td]:pr-2 font-mono [&_td:nth-child(1)]:font-sans [&_td:nth-child(2)]:font-sans">
+              <tr><td rowspan="7" class="align-top text-fg/40 text-[11px] !font-sans">L1<br/>1575.42</td><td class="!font-sans">C/A</td><td>C1C</td><td>L1C</td><td>D1C</td><td>S1C</td></tr>
+              <tr><td class="!font-sans">C/B</td><td>C1E</td><td>L1E</td><td>D1E</td><td>S1E</td></tr>
+              <tr><td class="!font-sans">L1C (D)</td><td>C1S</td><td>L1S</td><td>D1S</td><td>S1S</td></tr>
+              <tr><td class="!font-sans">L1C (P)</td><td>C1L</td><td>L1L</td><td>D1L</td><td>S1L</td></tr>
+              <tr><td class="!font-sans">L1C (D+P)</td><td>C1X</td><td>L1X</td><td>D1X</td><td>S1X</td></tr>
+              <tr><td class="!font-sans">L1S / L1-SAIF</td><td>C1Z</td><td>L1Z</td><td>D1Z</td><td>S1Z</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">L1Sb</td><td>C1B</td><td>L1B</td><td>D1B</td><td>S1B</td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">L2<br/>1227.60</td><td class="!font-sans">L2C (M)</td><td>C2S</td><td>L2S</td><td>D2S</td><td>S2S</td></tr>
+              <tr><td class="!font-sans">L2C (L)</td><td>C2L</td><td>L2L</td><td>D2L</td><td>S2L</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">L2C (M+L)</td><td>C2X</td><td>L2X</td><td>D2X</td><td>S2X</td></tr>
+              <tr><td rowspan="6" class="align-top text-fg/40 text-[11px] !font-sans">L5<br/>1176.45</td><td class="!font-sans">I</td><td>C5I</td><td>L5I</td><td>D5I</td><td>S5I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C5Q</td><td>L5Q</td><td>D5Q</td><td>S5Q</td></tr>
+              <tr><td class="!font-sans">I+Q</td><td>C5X</td><td>L5X</td><td>D5X</td><td>S5X</td></tr>
+              <tr><td class="!font-sans">L5S (I)</td><td>C5D</td><td>L5D</td><td>D5D</td><td>S5D</td></tr>
+              <tr><td class="!font-sans">L5S (Q)</td><td>C5P</td><td>L5P</td><td>D5P</td><td>S5P</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">L5S (I+Q)</td><td>C5Z</td><td>L5Z</td><td>D5Z</td><td>S5Z</td></tr>
+              <tr><td rowspan="5" class="align-top text-fg/40 text-[11px] !font-sans">L6<br/>1278.75</td><td class="!font-sans">L6D</td><td>C6S</td><td>L6S</td><td>D6S</td><td>S6S</td></tr>
+              <tr><td class="!font-sans">L6P</td><td>C6L</td><td>L6L</td><td>D6L</td><td>S6L</td></tr>
+              <tr><td class="!font-sans">L6 (D+P)</td><td>C6X</td><td>L6X</td><td>D6X</td><td>S6X</td></tr>
+              <tr><td class="!font-sans">L6E</td><td>C6E</td><td>L6E</td><td>D6E</td><td>S6E</td></tr>
+              <tr><td class="!font-sans">L6 (D+E)</td><td>C6Z</td><td>L6Z</td><td>D6Z</td><td>S6Z</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- NavIC -->
+        <div class="rounded-lg border border-[#fb923c]/20 bg-[#fb923c]/[0.03] p-4 mb-3">
+          <h4 class="text-sm font-semibold mb-2" style="color:#fb923c">NavIC / IRNSS (I)</h4>
+          <table class="w-full text-xs">
+            <thead><tr class="border-b border-fg/10">
+              <th class="text-left pb-1.5 font-medium text-fg/50 w-28">Freq. Band</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50">Channel or Code</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Pseudo</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Phase</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Doppl.</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">SNR</th>
+            </tr></thead>
+            <tbody class="text-fg/65 [&_td]:py-[3px] [&_td]:pr-2 font-mono [&_td:nth-child(1)]:font-sans [&_td:nth-child(2)]:font-sans">
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">L1<br/>1575.42</td><td class="!font-sans">Data</td><td>C1D</td><td>L1D</td><td>D1D</td><td>S1D</td></tr>
+              <tr><td class="!font-sans">Pilot</td><td>C1P</td><td>L1P</td><td>D1P</td><td>S1P</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">Data+Pilot</td><td>C1X</td><td>L1X</td><td>D1X</td><td>S1X</td></tr>
+              <tr><td rowspan="4" class="align-top text-fg/40 text-[11px] !font-sans">L5<br/>1176.45</td><td class="!font-sans">A SPS</td><td>C5A</td><td>L5A</td><td>D5A</td><td>S5A</td></tr>
+              <tr><td class="!font-sans">B RS (D)</td><td>C5B</td><td>L5B</td><td>D5B</td><td>S5B</td></tr>
+              <tr><td class="!font-sans">C RS (P)</td><td>C5C</td><td>L5C</td><td>D5C</td><td>S5C</td></tr>
+              <tr class="border-b border-fg/5"><td class="!font-sans">B+C</td><td>C5X</td><td>L5X</td><td>D5X</td><td>S5X</td></tr>
+              <tr><td rowspan="4" class="align-top text-fg/40 text-[11px] !font-sans">S-band<br/>2492.028</td><td class="!font-sans">A SPS</td><td>C9A</td><td>L9A</td><td>D9A</td><td>S9A</td></tr>
+              <tr><td class="!font-sans">B RS (D)</td><td>C9B</td><td>L9B</td><td>D9B</td><td>S9B</td></tr>
+              <tr><td class="!font-sans">C RS (P)</td><td>C9C</td><td>L9C</td><td>D9C</td><td>S9C</td></tr>
+              <tr><td class="!font-sans">B+C</td><td>C9X</td><td>L9X</td><td>D9X</td><td>S9X</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- SBAS -->
+        <div class="rounded-lg border border-[#94a3b8]/20 bg-[#94a3b8]/[0.03] p-4 mb-3">
+          <h4 class="text-sm font-semibold mb-2" style="color:#94a3b8">SBAS (S)</h4>
+          <table class="w-full text-xs">
+            <thead><tr class="border-b border-fg/10">
+              <th class="text-left pb-1.5 font-medium text-fg/50 w-28">Freq. Band</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50">Channel or Code</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Pseudo</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Phase</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">Doppl.</th>
+              <th class="text-left pb-1.5 font-medium text-fg/50 font-mono">SNR</th>
+            </tr></thead>
+            <tbody class="text-fg/65 [&_td]:py-[3px] [&_td]:pr-2 font-mono [&_td:nth-child(1)]:font-sans [&_td:nth-child(2)]:font-sans">
+              <tr><td class="align-top text-fg/40 text-[11px] !font-sans">L1<br/>1575.42</td><td class="!font-sans">C/A</td><td>C1C</td><td>L1C</td><td>D1C</td><td>S1C</td></tr>
+              <tr class="border-b border-fg/5"><td colspan="6"></td></tr>
+              <tr><td rowspan="3" class="align-top text-fg/40 text-[11px] !font-sans">L5<br/>1176.45</td><td class="!font-sans">I</td><td>C5I</td><td>L5I</td><td>D5I</td><td>S5I</td></tr>
+              <tr><td class="!font-sans">Q</td><td>C5Q</td><td>L5Q</td><td>D5Q</td><td>S5Q</td></tr>
+              <tr><td class="!font-sans">I+Q</td><td>C5X</td><td>L5X</td><td>D5X</td><td>S5X</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="text-xs text-fg/40 mt-1">
+          Source: RINEX&nbsp;4.02 specification (September&nbsp;2025), Tables&nbsp;10–16.
+        </p>
       </dd>
       <dt>What do the legacy RINEX file extensions mean?</dt>
       <dd>

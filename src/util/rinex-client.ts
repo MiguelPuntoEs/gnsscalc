@@ -10,12 +10,20 @@ import type {
   WorkerResponse,
   AddObsResult,
   AddNavResult,
+  ApplyFiltersResult,
+  RecomputePositionsResult,
   ObsExportResult,
   NavExportResult,
+  HeaderOverrides,
 } from './rinex.worker';
+export type { HeaderOverrides } from './rinex.worker';
+import type { FilterState } from './filter-state';
+export type { FilterState } from './filter-state';
+export { DEFAULT_FILTER } from './filter-state';
 import type { RinexHeader, RinexStats } from './rinex';
 import type { NavResult } from './nav';
 import type { QualityResult } from './quality-analysis';
+import type { RinexWarnings } from './rinex-warnings';
 import type { AllPositionsData } from './orbit';
 import type { EpochGrid } from './epoch-grid';
 
@@ -88,9 +96,12 @@ function rinex3Filename(
   durationSec: number | null,
   intervalSec: number | null,
   fileType: 'MO' | 'MN',
+  fnOpts?: FilenameOptions,
 ): string {
-  const stn = (marker || 'XXXX').replace(/\s+/g, '').toUpperCase().slice(0, 4).padEnd(4, 'X');
-  const ccc = 'XXX';
+  const stn = (fnOpts?.station || marker || 'XXXX').replace(/\s+/g, '').toUpperCase().slice(0, 4).padEnd(4, 'X');
+  const monument = (fnOpts?.monument ?? '00').slice(0, 2).padStart(2, '0');
+  const ccc = (fnOpts?.country ?? 'XXX').toUpperCase().slice(0, 3).padEnd(3, 'X');
+  const src = (fnOpts?.dataSource ?? 'R').toUpperCase().slice(0, 1);
   let yyyydddhhmm = '00000000000';
   if (startTime) {
     const y = startTime.getUTCFullYear();
@@ -114,7 +125,29 @@ function rinex3Filename(
     if (intervalSec < 60) intStr = `_${String(Math.round(intervalSec)).padStart(2, '0')}S`;
     else intStr = `_${String(Math.round(intervalSec / 60)).padStart(2, '0')}M`;
   }
-  return `${stn}00${ccc}_R_${yyyydddhhmm}_${per}${intStr}_${fileType}.rnx`;
+  return `${stn}${monument}${ccc}_${src}_${yyyydddhhmm}_${per}${intStr}_${fileType}.rnx`;
+}
+
+/** Build a RINEX 2 legacy filename: SSSSdddh.yyt */
+function rinex2LegacyFilename(
+  marker: string,
+  startTime: Date | null,
+  fileType: 'o' | 'n' | 'g',
+  fnOpts?: FilenameOptions,
+): string {
+  const stn = (fnOpts?.station || marker || 'XXXX').replace(/\s+/g, '').toUpperCase().slice(0, 4).padEnd(4, 'X');
+  let ddd = '001';
+  let h = '0'; // '0' = full day session
+  let yy = '00';
+  if (startTime) {
+    const y = startTime.getUTCFullYear();
+    const doy = Math.floor((startTime.getTime() - Date.UTC(y, 0, 1)) / 86400000) + 1;
+    ddd = String(doy).padStart(3, '0');
+    // Session hour: 'a'-'x' for hours 0-23, '0' if data spans multiple hours
+    h = String.fromCharCode(97 + startTime.getUTCHours()); // a=0, b=1, ...
+    yy = String(y % 100).padStart(2, '0');
+  }
+  return `${stn}${ddd}${h}.${yy}${fileType}`;
 }
 
 /* ================================================================== */
@@ -126,8 +159,21 @@ export interface ObsParseResult {
   stats: RinexStats;
   grid: EpochGrid;
   qaResult: QualityResult;
+  warnings: RinexWarnings;
   positions: AllPositionsData | null;
   observedPrns: Set<string>[] | null;
+  availablePrns: string[];
+  availableCodes: Record<string, string[]>;
+}
+
+export interface FilterResult {
+  stats: RinexStats;
+  grid: EpochGrid;
+  qaResult: QualityResult;
+  positions: AllPositionsData | null;
+  observedPrns: Set<string>[] | null;
+  availablePrns: string[];
+  availableCodes: Record<string, string[]>;
 }
 
 export interface NavParseResult {
@@ -154,8 +200,11 @@ export async function addObsFiles(
     stats: r.stats,
     grid: r.grid,
     qaResult: r.qaResult,
+    warnings: r.warnings,
     positions: r.positions,
     observedPrns: r.observedPrns?.map(arr => new Set(arr)) ?? null,
+    availablePrns: r.availablePrns,
+    availableCodes: r.availableCodes,
   };
 }
 
@@ -179,24 +228,111 @@ export async function addNavFiles(
   };
 }
 
+/**
+ * Apply filters to cached observation data.
+ * Returns filtered grid, stats, and QA — does NOT modify the cached data.
+ */
+export async function applyFilters(filters: FilterState): Promise<FilterResult> {
+  const r = await request<ApplyFiltersResult>(
+    { type: 'apply-filters', filters },
+    'apply-filters-result',
+  );
+  return {
+    stats: r.stats,
+    grid: r.grid,
+    qaResult: r.qaResult,
+    positions: r.positions,
+    observedPrns: r.observedPrns?.map(arr => new Set(arr)) ?? null,
+    availablePrns: r.availablePrns,
+    availableCodes: r.availableCodes,
+  };
+}
+
+export interface RecomputePositionsResult2 {
+  positions: AllPositionsData | null;
+  observedPrns: Set<string>[] | null;
+}
+
+/**
+ * Recompute satellite positions with an overridden receiver position.
+ * Used when the user edits the reference position in the header editor.
+ */
+export async function recomputePositions(rxPos?: [number, number, number]): Promise<RecomputePositionsResult2> {
+  const r = await request<RecomputePositionsResult>(
+    { type: 'recompute-positions', rxPos },
+    'recompute-positions-result',
+  );
+  return {
+    positions: r.positions,
+    observedPrns: r.observedPrns?.map(arr => new Set(arr)) ?? null,
+  };
+}
+
+export type ExportFormat = 'rinex3' | 'rinex2' | 'rinex4' | 'csv' | 'json-meta';
+
+/** Filename components that the user can customize. */
+export interface FilenameOptions {
+  /** 4-char station name (padded/truncated). Default: from header marker. */
+  station?: string;
+  /** 2-digit monument number. Default: '00'. */
+  monument?: string;
+  /** 3-char country code. Default: 'XXX'. */
+  country?: string;
+  /** 1-char data source: R=Receiver, S=Stream, U=Unknown. Default: 'R'. */
+  dataSource?: string;
+}
+
+export interface ExportOptions {
+  filters?: FilterState;
+  format?: ExportFormat;
+  splitInterval?: number | null;
+  filename?: FilenameOptions;
+  headerOverrides?: HeaderOverrides;
+}
+
+const FORMAT_EXT: Record<ExportFormat, string> = {
+  rinex3: '.rnx.gz',
+  rinex2: '.obs.gz',
+  rinex4: '.rnx.gz',
+  csv: '.csv',
+  'json-meta': '.json',
+};
+
 /** Export observation file from cached data. Triggers download. */
-export async function exportObs(): Promise<void> {
+export async function exportObs(options?: ExportOptions): Promise<void> {
+  const format = options?.format ?? 'rinex3';
+  const fnOpts = options?.filename;
   const r = await request<ObsExportResult>(
-    { type: 'export-obs' },
+    { type: 'export-obs', filters: options?.filters, format, splitInterval: options?.splitInterval, headerOverrides: options?.headerOverrides },
     'obs-export-result',
   );
-  const fname = rinex3Filename(
-    r.filename.markerName,
-    r.filename.startTime ? new Date(r.filename.startTime) : null,
-    r.filename.durationSec,
-    r.filename.intervalSec,
-    'MO',
-  );
-  downloadBlob(r.blob, fname + '.gz');
+
+  let fname: string;
+  if (format === 'csv' || format === 'json-meta') {
+    const marker = (fnOpts?.station || r.filename.markerName || 'XXXX').replace(/\s+/g, '').toUpperCase().slice(0, 9);
+    fname = `${marker}${FORMAT_EXT[format]}`;
+  } else if (format === 'rinex2') {
+    fname = rinex2LegacyFilename(
+      r.filename.markerName,
+      r.filename.startTime ? new Date(r.filename.startTime) : null,
+      'o',
+      fnOpts,
+    ) + '.gz';
+  } else {
+    fname = rinex3Filename(
+      r.filename.markerName,
+      r.filename.startTime ? new Date(r.filename.startTime) : null,
+      r.filename.durationSec,
+      r.filename.intervalSec,
+      'MO',
+      fnOpts,
+    ) + '.gz';
+  }
+  downloadBlob(r.blob, fname);
 }
 
 /** Export navigation file from cached data. Triggers download. */
-export async function exportNav(markerName: string): Promise<void> {
+export async function exportNav(markerName: string, fnOpts?: FilenameOptions): Promise<void> {
   const r = await request<NavExportResult>(
     { type: 'export-nav', markerName },
     'nav-export-result',
@@ -207,6 +343,7 @@ export async function exportNav(markerName: string): Promise<void> {
     r.filename.durationSec,
     null,
     'MN',
+    fnOpts,
   );
   downloadBlob(r.blob, fname);
 }

@@ -30,10 +30,7 @@ export default function ObsTypeMatrix({ obsTypes, systems }: { obsTypes: Record<
   for (const t of sortedTypes) grouped[t]!.sort();
 
   return (
-    <div className="col-span-2 mt-1">
-      <div className="section-divider" />
-      <div className="section-label">Observation types</div>
-      <div className="mt-2 overflow-x-auto">
+    <div className="overflow-x-auto">
         {sortedTypes.map(type => {
           const codes = grouped[type]!;
           return (
@@ -77,7 +74,6 @@ export default function ObsTypeMatrix({ obsTypes, systems }: { obsTypes: Record<
             </div>
           );
         })}
-      </div>
     </div>
   );
 }

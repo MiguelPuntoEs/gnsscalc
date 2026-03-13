@@ -1,6 +1,8 @@
-import { lazy, Suspense, useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useCallback, useRef, useEffect, useMemo, startTransition } from 'react';
 import type { RinexHeader, RinexStats } from '../util/rinex';
 import type { QualityResult } from '../util/quality-analysis';
+import type { RinexWarnings } from '../util/rinex-warnings';
+import { EMPTY_WARNINGS } from '../util/rinex-warnings';
 import type { EpochGrid } from '../util/epoch-grid';
 import { systemName, systemCmp } from '../util/rinex';
 import { CONSTELLATION_COLORS } from '../util/gnss-constants';
@@ -9,10 +11,17 @@ import type { NavResult } from '../util/nav';
 import type { AllPositionsData } from '../util/orbit';
 import {
   addObsFiles, addNavFiles,
-  exportObs, exportNav, clearWorker,
+  exportObs, exportNav, clearWorker, applyFilters,
+  recomputePositions,
 } from '../util/rinex-client';
+import type { FilterState, ExportFormat, FilenameOptions, HeaderOverrides } from '../util/rinex-client';
+import { DEFAULT_FILTER } from '../util/rinex-client';
+import type { EditableHeaderFields } from '../util/rinex-header-edit';
 import CopyableInput from './CopyableInput';
 import ErrorBoundary from './ErrorBoundary';
+import FilterBar from './FilterBar';
+import ExportPanel from './ExportPanel';
+import ObsTypeMatrix from './ObsTypeMatrix';
 
 const RinexCharts = lazy(() => import('./RinexCharts'));
 const SkyPlotCharts = lazy(() => import('./SkyPlot'));
@@ -82,7 +91,6 @@ async function sniffFileType(file: File): Promise<'nav' | 'obs' | 'unknown'> {
   return 'unknown';
 }
 
-import { readFileText } from '../util/read-file-text';
 
 /** Guess constellation from a nav file name. Returns system letter (G/R/E/C/J/I/S) or null. */
 function navFileConstellation(name: string): string | null {
@@ -267,6 +275,75 @@ function StatPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+/* ─── Validation warnings panel ───────────────────────────────────── */
+
+const SEVERITY_STYLE: Record<string, { dot: string; text: string }> = {
+  error:   { dot: 'bg-red-400',    text: 'text-red-400' },
+  warning: { dot: 'bg-orange-400', text: 'text-orange-400' },
+  info:    { dot: 'bg-fg/20',      text: 'text-fg/40' },
+};
+
+function WarningsPanel({ warnings }: { warnings: RinexWarnings }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/20">
+      <button
+        type="button"
+        className="flex items-center gap-2 text-[11px] text-fg/50 hover:text-fg/70 transition-colors"
+        onClick={() => setOpen(v => !v)}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-fg/30">
+          <path fillRule="evenodd" d="M6.701 2.25c.577-1 2.02-1 2.598 0l5.196 9a1.5 1.5 0 0 1-1.299 2.25H2.804a1.5 1.5 0 0 1-1.3-2.25l5.197-9ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+        </svg>
+        <span>Validation</span>
+        {warnings.errorCount > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-red-400">
+            <span className="size-1.5 rounded-full bg-red-400" />{warnings.errorCount}
+          </span>
+        )}
+        {warnings.warningCount > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-orange-400">
+            <span className="size-1.5 rounded-full bg-orange-400" />{warnings.warningCount}
+          </span>
+        )}
+        {warnings.infoCount > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-fg/30">
+            <span className="size-1.5 rounded-full bg-fg/20" />{warnings.infoCount}
+          </span>
+        )}
+        <svg
+          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+          className={`size-3 text-fg/30 transition-transform ${open ? 'rotate-180' : ''}`}
+        >
+          <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+        </svg>
+      </button>
+      {open && (
+        <div className="mt-1.5 flex flex-col gap-1">
+          {warnings.items.map(w => {
+            const style = SEVERITY_STYLE[w.severity] ?? SEVERITY_STYLE.info!;
+            return (
+              <div key={w.code} className="flex items-start gap-2 text-[11px]">
+                <span className={`size-1.5 rounded-full mt-1.5 shrink-0 ${style.dot}`} />
+                <div className="min-w-0">
+                  <span className="text-fg/60">{w.message}</span>
+                  {w.count > 1 && <span className="text-fg/25 ml-1">({w.count}x)</span>}
+                  {w.examples && w.examples.length > 0 && (
+                    <div className="text-[10px] text-fg/25 mt-0.5 font-mono truncate">
+                      {w.examples.join(' · ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Nav-only summary ────────────────────────────────────────────── */
 
 function NavSummary({ navResult }: { navResult: NavResult }) {
@@ -365,25 +442,11 @@ function FilePanel({
   loading,
   navLoading,
   computing,
-  hasObs,
-  hasNav,
-  obsExporting,
-  obsExportProgress,
-  navExporting,
-  onDownloadObs,
-  onDownloadNav,
 }: {
   files: LoadedFileInfo[];
   loading: boolean;
   navLoading: boolean;
   computing: boolean;
-  hasObs: boolean;
-  hasNav: boolean;
-  obsExporting: boolean;
-  obsExportProgress: number;
-  navExporting: boolean;
-  onDownloadObs: () => void;
-  onDownloadNav: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
@@ -525,46 +588,6 @@ function FilePanel({
         </div>
       )}
 
-      {/* Download merged files */}
-      {(hasObs || hasNav) && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/20">
-          {hasObs && (
-            <button
-              type="button"
-              className="relative inline-flex items-center gap-1.5 text-[11px] text-fg/40 hover:text-accent px-2.5 py-1 rounded-md border border-border/20 hover:border-accent/30 transition-colors disabled:text-fg/30 disabled:hover:text-fg/30 overflow-hidden"
-              onClick={onDownloadObs}
-              disabled={obsExporting}
-            >
-              {obsExporting && obsExportProgress > 0 && (
-                <div className="absolute inset-0 bg-accent/10 transition-all duration-300" style={{ width: `${obsExportProgress}%` }} />
-              )}
-              <span className="relative inline-flex items-center gap-1.5">
-                {obsExporting
-                  ? <SpinnerIcon className="size-3 animate-spin" />
-                  : <DownloadIcon className="size-3" />}
-                {obsExporting
-                  ? `Exporting${obsExportProgress > 0 ? ` ${obsExportProgress}%` : '…'}`
-                  : obsFiles.length > 1 ? 'Download merged OBS' : 'Download OBS'}
-                {!obsExporting && <span className="text-fg/15">.rnx</span>}
-              </span>
-            </button>
-          )}
-          {hasNav && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 text-[11px] text-fg/40 hover:text-accent px-2.5 py-1 rounded-md border border-border/20 hover:border-accent/30 transition-colors disabled:text-fg/30 disabled:hover:text-fg/30"
-              onClick={onDownloadNav}
-              disabled={navExporting}
-            >
-              {navExporting
-                ? <SpinnerIcon className="size-3 animate-spin" />
-                : <DownloadIcon className="size-3" />}
-              {navExporting ? 'Exporting…' : navFiles.length > 1 ? 'Download merged NAV' : 'Download NAV'}
-              {!navExporting && <span className="text-fg/15">.rnx</span>}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -595,8 +618,8 @@ export default function RinexReaderPage() {
   // Parsed results
   const [header, setHeader] = useState<RinexHeader | null>(null);
   const [stats, setStats] = useState<RinexStats | null>(null);
+  const [allSystems, setAllSystems] = useState<string[]>([]); // unfiltered systems list
   const [grid, setGrid] = useState<EpochGrid | null>(null);
-  const [obsFiles, setObsFiles] = useState<File[]>([]);
   const [obsFileNames, setObsFileNames] = useState<string[]>([]);
   const [navResult, setNavResult] = useState<NavResult | null>(null);
   const [navFileNames, setNavFileNames] = useState<string[]>([]);
@@ -614,7 +637,38 @@ export default function RinexReaderPage() {
   const addFilesInputRef = useRef<HTMLInputElement>(null);
 
   const [qaResult, setQaResult] = useState<QualityResult | null>(null);
+  const [warnings, setWarnings] = useState<RinexWarnings>(EMPTY_WARNINGS);
 
+  // Filter state
+  const [filters, setFilters] = useState<FilterState>({ ...DEFAULT_FILTER });
+  const [availablePrns, setAvailablePrns] = useState<string[]>([]);
+  const [availableCodes, setAvailableCodes] = useState<Record<string, string[]>>({});
+  const [filtering, setFiltering] = useState(false);
+  const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filterVersionRef = useRef(0);
+
+  // Header edit overrides (null = no edits)
+  const [headerEdits, setHeaderEdits] = useState<EditableHeaderFields | null>(null);
+
+  // Recompute satellite positions when edited reference position changes
+  const hasPositions = !!allPositions;
+  useEffect(() => {
+    if (!hasPositions) return; // no positions to recompute
+    const rxPos: [number, number, number] | undefined = headerEdits
+      ? [headerEdits.positionX, headerEdits.positionY, headerEdits.positionZ]
+      : header?.approxPosition ?? undefined;
+    let cancelled = false;
+    recomputePositions(rxPos).then(r => {
+      if (cancelled) return;
+      if (r.positions) {
+        setAllPositions(r.positions);
+        if (r.observedPrns) setObservedPrns(r.observedPrns);
+      }
+    });
+    return () => { cancelled = true; };
+    // Only re-run when position fields change, not on every headerEdits change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPositions, headerEdits?.positionX, headerEdits?.positionY, headerEdits?.positionZ]);
 
   /** Classify files and add to staged manifest */
   const stageFiles = useCallback(async (fileList: FileList | File[]) => {
@@ -667,15 +721,17 @@ export default function RinexReaderPage() {
         setProgress(0);
 
         try {
-          const { header: h, stats: s, grid: g, qaResult: qa, positions, observedPrns: prns } =
-            await addObsFiles(newObsEntries.map(e => e.file), setProgress);
-          setHeader(h);
-          setStats(s);
-          setGrid(g);
-          setQaResult(qa);
-          setObsFiles(prev => [...prev, ...newObsEntries.map(e => e.file)]);
+          const result = await addObsFiles(newObsEntries.map(e => e.file), setProgress);
+          setHeader(result.header);
+          setStats(result.stats);
+          setAllSystems(result.stats.systems);
+          setGrid(result.grid);
+          setQaResult(result.qaResult);
+          setWarnings(result.warnings);
+          setAvailablePrns(result.availablePrns);
+          setAvailableCodes(result.availableCodes);
           setObsFileNames(prev => [...prev, ...newObsEntries.map(e => e.name)]);
-          if (positions) { setAllPositions(positions); setObservedPrns(prns); }
+          if (result.positions) { setAllPositions(result.positions); setObservedPrns(result.observedPrns); }
         } catch (e: unknown) {
           setError(e instanceof Error ? e.message : 'Failed to parse observation file(s).');
         } finally {
@@ -748,12 +804,40 @@ export default function RinexReaderPage() {
   }, []);
 
   const handleReset = useCallback(() => {
-    setStaged([]); setHeader(null); setStats(null); setGrid(null);
+    setStaged([]); setHeader(null); setStats(null); setAllSystems([]); setGrid(null);
     setNavResult(null); setAllPositions(null); setObservedPrns(null);
-    setError(null); setObsFiles([]); setObsFileNames([]);
+    setError(null); setObsFileNames([]);
     setNavFileNames([]); setLoadedFiles([]);
-    setProgress(0); setQaResult(null);
+    setProgress(0); setQaResult(null); setWarnings(EMPTY_WARNINGS);
+    setFilters({ ...DEFAULT_FILTER }); setHeaderEdits(null);
+    setAvailablePrns([]); setAvailableCodes({});
     clearWorker();
+  }, []);
+
+  // Debounced filter application with version tracking to discard stale results
+  const handleFilterChange = useCallback((next: FilterState) => {
+    setFilters(next);
+    if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
+    const version = ++filterVersionRef.current;
+    filterTimerRef.current = setTimeout(async () => {
+      setFiltering(true);
+      try {
+        const r = await applyFilters(next);
+        // Discard if a newer filter was applied while we were computing
+        if (filterVersionRef.current !== version) return;
+        startTransition(() => {
+          setStats(r.stats);
+          setGrid(r.grid);
+          setQaResult(r.qaResult);
+          if (r.positions) { setAllPositions(r.positions); setObservedPrns(r.observedPrns); }
+        });
+      } catch (e: unknown) {
+        if (filterVersionRef.current !== version) return;
+        setError(e instanceof Error ? e.message : 'Filter error');
+      } finally {
+        if (filterVersionRef.current === version) setFiltering(false);
+      }
+    }, 300);
   }, []);
 
   const [igsLoading, setIgsLoading] = useState(false);
@@ -781,11 +865,11 @@ export default function RinexReaderPage() {
   }, [stats, navResult, stageFiles]);
 
   const [navExporting, setNavExporting] = useState(false);
-  const handleDownloadNav = useCallback(async () => {
+  const handleDownloadNav = useCallback(async (fnOpts?: FilenameOptions) => {
     if (!navResult) return;
     setNavExporting(true);
     try {
-      await exportNav(header?.markerName || '');
+      await exportNav(header?.markerName || '', fnOpts);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to export navigation file.');
     } finally {
@@ -794,19 +878,49 @@ export default function RinexReaderPage() {
   }, [navResult, header]);
 
   const [obsExporting, setObsExporting] = useState(false);
-  const [obsExportProgress, setObsExportProgress] = useState(0);
-  const handleDownloadObs = useCallback(async () => {
+  const handleDownloadObs = useCallback(async (format: ExportFormat = 'rinex3', splitInterval: number | null = null, fnOpts?: FilenameOptions) => {
     if (!header) return;
     setObsExporting(true);
-    setObsExportProgress(0);
     try {
-      await exportObs();
+      const hasFilters = filters.excludedSystems.length > 0
+        || filters.excludedPrns.length > 0
+        || filters.excludedSignalTypes.length > 0
+        || filters.excludedBands.length > 0
+        || Object.keys(filters.excludedSignalsPerSystem).length > 0
+        || filters.timeStart != null || filters.timeEnd != null
+        || filters.samplingInterval != null || filters.sparseThreshold > 0;
+
+      // Convert EditableHeaderFields to HeaderOverrides
+      let headerOverrides: HeaderOverrides | undefined;
+      if (headerEdits) {
+        headerOverrides = {
+          markerName: headerEdits.markerName,
+          markerType: headerEdits.markerType,
+          receiverNumber: headerEdits.receiverNumber,
+          receiverType: headerEdits.receiverType,
+          receiverVersion: headerEdits.receiverVersion,
+          antNumber: headerEdits.antNumber,
+          antType: headerEdits.antType,
+          approxPosition: [headerEdits.positionX, headerEdits.positionY, headerEdits.positionZ],
+          antDelta: [headerEdits.antDeltaH, headerEdits.antDeltaE, headerEdits.antDeltaN],
+          observer: headerEdits.observer,
+          agency: headerEdits.agency,
+        };
+      }
+
+      await exportObs({
+        format,
+        splitInterval,
+        filters: hasFilters ? filters : undefined,
+        filename: fnOpts,
+        headerOverrides,
+      });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to export observation file.');
     } finally {
       setObsExporting(false);
     }
-  }, [header]);
+  }, [header, filters, headerEdits]);
 
   /* ─── Initial upload state (nothing loaded yet) ─────────────── */
   const hasAnyData = !!header || !!navResult;
@@ -852,7 +966,6 @@ export default function RinexReaderPage() {
                 {header.markerName || obsLabel}
               </span>
               <span className="text-[10px] text-fg/30 shrink-0">v{header.version.toFixed(0)}</span>
-              <ConstellationBadges activeSystems={stats?.systems ?? []} />
             </>
           ) : navResult ? (
             <>
@@ -905,6 +1018,20 @@ export default function RinexReaderPage() {
           </div>
         )}
 
+        {/* ── Validation warnings ───────────────────────────── */}
+        {warnings.items.length > 0 && <WarningsPanel warnings={warnings} />}
+
+        {/* ── Station & Header editor (inside summary card) ──── */}
+        {header && stats && (
+          <div className="mt-2 pt-2 border-t border-border/20">
+            <ErrorBoundary>
+              <Suspense fallback={null}>
+                <RinexHeaderEditor header={header} onFieldsChange={setHeaderEdits} />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        )}
+
         {/* Fetch IGS ephemeris prompt */}
         {header && !navResult && !navLoading && (
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/20">
@@ -928,13 +1055,23 @@ export default function RinexReaderPage() {
           loading={loading}
           navLoading={navLoading}
           computing={computing}
+        />
+
+        {/* Export panel */}
+        <ExportPanel
           hasObs={!!header && obsFileNames.length > 0}
           hasNav={!!navResult}
+          filters={filters}
           obsExporting={obsExporting}
-          obsExportProgress={obsExportProgress}
           navExporting={navExporting}
-          onDownloadObs={handleDownloadObs}
-          onDownloadNav={handleDownloadNav}
+          markerName={header?.markerName}
+          hasHeaderEdits={!!headerEdits}
+          originalFilename={obsFileNames[0]}
+          startTime={stats?.startTime}
+          durationSec={stats?.duration}
+          intervalSec={stats?.interval}
+          onExportObs={handleDownloadObs}
+          onExportNav={handleDownloadNav}
         />
       </div>
 
@@ -959,8 +1096,36 @@ export default function RinexReaderPage() {
         <div className="card border-red-500/40 bg-red-500/10 text-red-400 text-sm">{error}</div>
       )}
 
+      {/* ── Filter bar ─────────────────────────────────────────── */}
+      {header && stats && availablePrns.length > 0 && (
+        <FilterBar
+          filters={filters}
+          onChange={handleFilterChange}
+          availablePrns={availablePrns}
+          availableCodes={availableCodes}
+          allSystems={allSystems}
+          timeStart={stats.startTime?.getTime() ?? null}
+          timeEnd={stats.endTime?.getTime() ?? null}
+          interval={stats.interval}
+        />
+      )}
+
+      {filtering && (
+        <div className="flex items-center gap-2 text-[11px] text-fg/40">
+          <SpinnerIcon className="size-3 animate-spin" /> Applying filters…
+        </div>
+      )}
+
       {header && stats && grid && (
         <>
+          {/* ── Observation inventory (standalone card) ─────────── */}
+          {header.obsTypes && Object.keys(header.obsTypes).length > 0 && (
+            <div className="rounded-xl bg-bg-raised/60 border border-border/40 px-4 py-3">
+              <div className="text-sm font-semibold text-fg mb-1">Observation Inventory</div>
+              <ObsTypeMatrix obsTypes={header.obsTypes} systems={stats.systems} />
+            </div>
+          )}
+
           {/* ── Charts (the main content — immediately visible) ── */}
           <ErrorBoundary>
             <Suspense
@@ -1021,16 +1186,14 @@ export default function RinexReaderPage() {
                   </div>
                 }
               >
-                <SkyPlotCharts allPositions={allPositions} observedPrns={observedPrns} rxPos={header.approxPosition ?? undefined} grid={grid} />
-              </Suspense>
-            </ErrorBoundary>
-          )}
-
-          {/* ── Header details + editor (below charts) ─────────── */}
-          {obsFiles.length > 0 && (
-            <ErrorBoundary>
-              <Suspense fallback={null}>
-                <RinexHeaderEditor header={header} stats={stats} file={obsFiles[0]!} readFileText={readFileText} />
+                <SkyPlotCharts
+                  allPositions={allPositions}
+                  observedPrns={observedPrns}
+                  rxPos={headerEdits
+                    ? [headerEdits.positionX, headerEdits.positionY, headerEdits.positionZ]
+                    : header.approxPosition ?? undefined}
+                  grid={grid}
+                />
               </Suspense>
             </ErrorBoundary>
           )}
