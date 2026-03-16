@@ -20,11 +20,11 @@ const { title, description: pageDescription, faq, faqTitle, breadcrumbLabel } = 
 
 const baseUrl = 'https://gnsscalc.com';
 const canonicalUrl = baseUrl + Astro.url.pathname;
-const defaultDescription = 'GNSS Calculator is a tool to perform time conversions between different scales and several time computations.';
+const defaultDescription = 'Free online GNSS tools: GPS time converter, positioning calculator, RINEX viewer, NTRIP client, broadcast ephemeris, signal spectrum, NMEA viewer and ANTEX antenna analyzer. All processing runs locally in your browser.';
 const description = pageDescription || defaultDescription;
 
 const pathname = Astro.url.pathname;
-const schemaNames: Record<string, string> = { '/': 'GPS Time Converter', '/positioning': 'GNSS Positioning Calculator', '/nmea': 'NMEA Log Viewer', '/rinex': 'RINEX Observation Viewer', '/ntrip': 'NTRIP Client', '/status': 'Broadcast Ephemeris', '/antex': 'ANTEX Antenna Viewer', '/about': 'About GNSS Calculator' };
+const schemaNames: Record<string, string> = { '/': 'GNSS Calculator — GPS Time Converter', '/positioning': 'GNSS Positioning & Coordinate Converter', '/nmea': 'NMEA Log Viewer & Track Analyzer', '/rinex': 'RINEX Viewer & Quality Analyzer', '/ntrip': 'NTRIP Client & Stream Monitor', '/status': 'Live Broadcast Ephemeris', '/spectrum': 'GNSS Signal Spectrum Viewer', '/antex': 'ANTEX Antenna Phase Center Viewer', '/about': 'About GNSS Calculator' };
 const schemaName = schemaNames[pathname] ?? 'GNSS Calculator';
 const schema = {
   "@context": "https://schema.org",

@@ -65,6 +65,94 @@ const QZSS_SAT: Record<number, string> = {
   7: 'QZS-1R (Block II)',
 };
 
+/** SBAS PRN → system group (for filtering) */
+function sbasSystem(prn: number): string {
+  if ([120, 121, 123, 124, 126, 136].includes(prn)) return 'EGNOS';
+  if ([131, 133, 135, 138].includes(prn)) return 'WAAS';
+  if ([127, 128, 140].includes(prn)) return 'GAGAN';
+  if ([129, 137].includes(prn)) return 'MSAS';
+  if ([125, 141].includes(prn)) return 'SDCM';
+  if ([130, 143, 144].includes(prn)) return 'BDSBAS';
+  if ([147, 148].includes(prn)) return 'KASS';
+  if (prn === 122) return 'SPAN';
+  return 'Other';
+}
+
+/** BeiDou PRN → filter group */
+function bdsGroup(prn: number): string {
+  if (prn >= 1 && prn <= 5) return 'GEO';
+  if ((prn >= 6 && prn <= 10) || prn === 16) return 'IGSO';
+  if (prn >= 11 && prn <= 14) return 'MEO (BDS-2)';
+  if (prn >= 38 && prn <= 40) return 'IGSO (BDS-3)';
+  if ((prn >= 19 && prn <= 37) || (prn >= 41 && prn <= 46)) return 'MEO (BDS-3)';
+  if (prn >= 56 && prn <= 63) return 'BDS-3';
+  return 'Other';
+}
+
+/** GPS PRN → block group (for filtering) */
+function gpsGroup(prn: number): string {
+  return GPS_BLOCK[prn] ?? 'Unknown';
+}
+
+/** GLONASS satellite type group (for filtering) */
+function glonassGroup(eph: EphemerisInfo): string {
+  if (eph.satType === 1) return 'GLONASS-M';
+  if (eph.satType === 0) return 'GLONASS';
+  return 'Unknown';
+}
+
+/** Galileo PRN → filter group */
+function galGroup(prn: number): string {
+  if ([14, 18].includes(prn)) return 'FOC (eccentric)';
+  if ([11, 12, 19, 20].includes(prn)) return 'IOV';
+  return 'FOC';
+}
+
+/** QZSS PRN → filter group */
+function qzssGroup(prn: number): string {
+  if (prn === 3) return 'GEO';
+  return 'QZO';
+}
+
+/** Get available filter groups for a constellation */
+function getFilterGroups(sys: string, satellites: Map<string, EphemerisInfo>): string[] {
+  const groups = new Set<string>();
+  for (const [prn, eph] of satellites) {
+    if (!prn.startsWith(sys)) continue;
+    const num = parseInt(prn.slice(1), 10);
+    if (sys === 'G') groups.add(gpsGroup(num));
+    else if (sys === 'E') groups.add(galGroup(num));
+    else if (sys === 'R') groups.add(glonassGroup(eph));
+    else if (sys === 'C') groups.add(bdsGroup(num));
+    else if (sys === 'J') groups.add(qzssGroup(num));
+    else if (sys === 'S') groups.add(sbasSystem(num));
+  }
+  if (sys === 'G') return ['IIR', 'IIR-M', 'IIF', 'III'].filter(g => groups.has(g));
+  if (sys === 'E') return ['IOV', 'FOC', 'FOC (eccentric)'].filter(g => groups.has(g));
+  if (sys === 'R') return ['GLONASS', 'GLONASS-M'].filter(g => groups.has(g));
+  if (sys === 'C') return ['GEO', 'IGSO', 'IGSO (BDS-3)', 'MEO (BDS-2)', 'MEO (BDS-3)', 'BDS-3'].filter(g => groups.has(g));
+  if (sys === 'J') return ['QZO', 'GEO'].filter(g => groups.has(g));
+  if (sys === 'S') return ['EGNOS', 'WAAS', 'GAGAN', 'MSAS', 'SDCM', 'BDSBAS', 'KASS', 'SPAN'].filter(g => groups.has(g));
+  return [];
+}
+
+/** Check if a PRN matches the active filter */
+function matchesFilter(prn: string, filter: string | null, satellites: Map<string, EphemerisInfo>): boolean {
+  if (!filter) return true;
+  const sys = prn.charAt(0);
+  const num = parseInt(prn.slice(1), 10);
+  if (sys === 'G') return gpsGroup(num) === filter;
+  if (sys === 'E') return galGroup(num) === filter;
+  if (sys === 'R') {
+    const eph = satellites.get(prn);
+    return eph ? glonassGroup(eph) === filter : false;
+  }
+  if (sys === 'C') return bdsGroup(num) === filter;
+  if (sys === 'J') return qzssGroup(num) === filter;
+  if (sys === 'S') return sbasSystem(num) === filter;
+  return true;
+}
+
 /** SBAS PRN → satellite/system mapping */
 const SBAS_SAT: Record<number, string> = {
   120: 'EGNOS (PRN120)',
@@ -465,6 +553,7 @@ export default function ConstellationStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPrn, setSelectedPrn] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Record<string, string | null>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -549,10 +638,15 @@ export default function ConstellationStatusPage() {
         const color = CONSTELLATION_COLORS[sys] ?? '#7c8aff';
         const sysEphs = [...satellites.values()].filter(e => e.prn.startsWith(sys));
         const unhealthy = sysEphs.filter(e => !isSatHealthy(e)).length;
+        const filterGroups = getFilterGroups(sys, satellites);
+        const activeFilter = filters[sys] ?? null;
+        const toggleFilter = (group: string) => {
+          setFilters(prev => ({ ...prev, [sys]: prev[sys] === group ? null : group }));
+        };
 
         return (
           <section key={sys} className="space-y-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h3 className="text-base font-semibold" style={{ color }}>
                 {slots.label}
               </h3>
@@ -563,6 +657,24 @@ export default function ConstellationStatusPage() {
                     <span className="text-red-400 ml-1">({unhealthy} unhealthy)</span>
                   )}
                 </span>
+              )}
+              {filterGroups.length > 1 && (
+                <div className="flex gap-1 ml-auto">
+                  {filterGroups.map(group => (
+                    <button
+                      key={group}
+                      type="button"
+                      onClick={() => toggleFilter(group)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-colors ${
+                        activeFilter === group
+                          ? 'border-accent/50 bg-accent/15 text-accent'
+                          : 'border-fg/10 text-fg/30 hover:text-fg/50 hover:border-fg/20'
+                      }`}
+                    >
+                      {group}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -577,9 +689,12 @@ export default function ConstellationStatusPage() {
                 const isHealthy = eph ? isSatHealthy(eph) : false;
                 const isSelected = prn === selectedPrn;
                 const date = eph ? ephDate(eph) : null;
+                const dimmed = activeFilter !== null && !matchesFilter(prn, activeFilter, satellites);
 
                 // Three visual states: healthy (green), unhealthy (red), expired (amber/dimmed)
-                const cellStyle = isSelected
+                const cellStyle = dimmed
+                  ? 'bg-fg/[0.02] border border-fg/[0.04] opacity-30'
+                  : isSelected
                   ? 'ring-2 ring-accent bg-accent/10 border border-accent/30 scale-105'
                   : !hasEph
                     ? 'bg-fg/[0.03] border border-fg/[0.06] cursor-default'
