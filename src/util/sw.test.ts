@@ -92,6 +92,7 @@ Object.assign(globalThis, {
 const originalFetch = globalThis.fetch;
 
 // Load the service worker (registers listeners via self.addEventListener)
+// @ts-expect-error -- plain JS service worker, no type declarations
 await import('../../../public/sw.js');
 
 describe('Service Worker', () => {
