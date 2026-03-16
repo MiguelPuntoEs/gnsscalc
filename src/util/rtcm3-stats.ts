@@ -89,6 +89,7 @@ export const RTCM3_MESSAGE_NAMES: Record<number, string> = {
   1032: 'Physical Reference Station',
   1033: 'Receiver+Antenna Descriptor',
   1042: 'BeiDou Ephemeris',
+  1043: 'SBAS Ephemeris',
   1044: 'QZSS Ephemeris',
   1045: 'Galileo F/NAV Ephemeris',
   1046: 'Galileo I/NAV Ephemeris',
@@ -123,6 +124,7 @@ export function rtcm3Constellation(msgType: number): string | null {
   if (msgType === 1019) return 'GPS';
   if (msgType === 1020) return 'GLONASS';
   if (msgType === 1042) return 'BeiDou';
+  if (msgType === 1043) return 'SBAS';
   if (msgType === 1044) return 'QZSS';
   if (msgType === 1045 || msgType === 1046) return 'Galileo';
   if (msgType >= 1071 && msgType <= 1077) return 'GPS';

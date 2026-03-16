@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ConstellationStatusPage from '../components/ConstellationStatusPage';
+
+const statusFaq = [
+  { question: 'What is constellation status?', answer: 'Constellation status shows the health and availability of all GNSS satellites based on their broadcast ephemeris. A healthy satellite is usable for positioning; an unhealthy one has been flagged by the control segment and should be excluded.' },
+  { question: 'Where does the data come from?', answer: 'The data is sourced from the IGS (International GNSS Service) real-time broadcast ephemeris stream BCEP00BKG0, which aggregates navigation messages from a global network of reference stations.' },
+  { question: 'How often is it updated?', answer: 'The server collects fresh ephemeris data every 2 minutes from the IGS stream. Broadcast ephemeris update intervals vary by constellation: GPS every 2 hours, Galileo every 10 minutes, GLONASS every 30 minutes, and BeiDou every 1 hour.' },
+  { question: 'What do the health flags mean?', answer: 'A health value of 0 means the satellite is healthy and usable. Any non-zero value indicates the satellite has been marked unhealthy by its control segment — it may be undergoing maintenance, orbit maneuvers, or experiencing clock issues.' },
+];
+---
+
+<BaseLayout
+  title="Broadcast Ephemeris | Live GNSS Satellite Data"
+  description="Live broadcast ephemeris for GPS, Galileo, GLONASS, BeiDou, QZSS, and SBAS satellites from the IGS real-time service. Click any satellite for full orbital parameters, clock corrections, and health status."
+  faq={statusFaq}
+  breadcrumbLabel="Broadcast Ephemeris"
+>
+  <h1>Broadcast Ephemeris</h1>
+  <p>
+    Live broadcast ephemeris for all GNSS constellations, sourced from the
+    IGS real-time stream. Click any satellite for full orbital parameters
+    and clock corrections.
+  </p>
+
+  <ConstellationStatusPage client:load />
+
+  <section>
+    <h2>Related Tools</h2>
+    <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
+      <li><a href="/ntrip" class="text-accent hover:text-fg">NTRIP Client</a> — connect to casters and monitor live RTCM3 streams</li>
+      <li><a href="/rinex" class="text-accent hover:text-fg">RINEX Viewer</a> — analyze RINEX observation and navigation files</li>
+      <li><a href="/spectrum" class="text-accent hover:text-fg">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>
+      <li><a href="/" class="text-accent hover:text-fg">GPS Time Converter</a> — convert between GPS time scales</li>
+    </ul>
+  </section>
+</BaseLayout>

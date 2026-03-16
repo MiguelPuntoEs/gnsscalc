@@ -1,7 +1,29 @@
 {
   "name": "gnsscalc",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-03-10",
   "assets": {
-    "directory": "./dist"
-  }
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "EPHEMERIS_KV",
+      "id": "4d75d33fc7ef4bcd87c5bc0fedc3657e"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EPHEMERIS_COLLECTOR",
+        "class_name": "EphemerisCollector"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["EphemerisCollector"]
+    }
+  ]
 }

@@ -143,9 +143,11 @@ function decodeGlonassEphemeris(payload: Uint8Array): EphemerisInfo | null {
   const healthLn = r.readU(1);
   const tauN = r.readS(22) * 2 ** -30; // clock bias
 
+  // Use only healthBn (operational health) — healthLn is almanac-derived
+  // and is commonly set to 1 even for operational satellites.
   return {
     prn: `R${String(slot).padStart(2, '0')}`,
-    constellation: 'GLONASS', health: healthBn | healthLn,
+    constellation: 'GLONASS', health: healthBn,
     lastReceived: Date.now(), messageType: 1020,
     freqChannel, x, y, z, vx, vy, vz, ax, ay, az: azz,
     tb, gammaN, af0: tauN,
@@ -256,6 +258,51 @@ function decodeBdsEphemeris(payload: Uint8Array): EphemerisInfo | null {
 /*  Public entry point                                                 */
 /* ================================================================== */
 
+/* ================================================================== */
+/*  SBAS ephemeris (1043)                                              */
+/* ================================================================== */
+
+/**
+ * Decode SBAS ephemeris (message 1043).
+ * SBAS uses geo-ranging parameters (XG, YG, ZG + velocities + accelerations),
+ * NOT Keplerian elements. Structure is 29 bytes (232 bits).
+ * SV ID 1-39 → PRN 120+svId.
+ */
+function decodeSbasEphemeris(payload: Uint8Array): EphemerisInfo | null {
+  if (payload.length < 29) return null;
+  const r = new BitReader(payload);
+  r.skip(12);                           // message type
+  const svId = r.readU(6);              // satellite ID (1-39)
+  const iodn = r.readU(8);             // IODN
+  const t0 = r.readU(16) * 16;         // reference time (seconds, scale 16)
+  const ura = r.readU(4);              // URA index
+  const xg = r.readS(30) * 0.08;       // m (scale 0.08)
+  const yg = r.readS(30) * 0.08;       // m
+  const zg = r.readS(25) * 0.4;        // m (scale 0.4)
+  const dxg = r.readS(17) * 0.000625;  // m/s
+  const dyg = r.readS(17) * 0.000625;  // m/s
+  const dzg = r.readS(18) * 0.004;     // m/s (scale 0.004)
+  const ddxg = r.readS(10) * 0.0000125;// m/s²
+  const ddyg = r.readS(10) * 0.0000125;// m/s²
+  const ddzg = r.readS(10) * 0.0000625;// m/s²
+  const af0 = r.readS(12) * 2 ** -31;  // seconds
+  const af1 = r.readS(8) * 2 ** -40;   // s/s
+
+  const prn = 120 + svId;
+
+  return {
+    prn: `S${String(prn).padStart(3, '0')}`,
+    constellation: 'SBAS', health: 0, // SBAS 1043 has no explicit health bit
+    lastReceived: Date.now(), messageType: 1043,
+    iode: iodn, toc: t0, ura,
+    // Store SBAS geo position as GLONASS-like state vector (km, km/s, km/s²)
+    x: xg / 1000, y: yg / 1000, z: zg / 1000,
+    vx: dxg / 1000, vy: dyg / 1000, vz: dzg / 1000,
+    ax: ddxg / 1000, ay: ddyg / 1000, az: ddzg / 1000,
+    af0, af1,
+  };
+}
+
 /** Decode any supported ephemeris message. Returns null for non-ephemeris or decode errors. */
 export function decodeEphemeris(frame: Rtcm3Frame): EphemerisInfo | null {
   try {
@@ -263,6 +310,7 @@ export function decodeEphemeris(frame: Rtcm3Frame): EphemerisInfo | null {
       case 1019: return decodeGpsLikeEphemeris(frame.payload, 'GPS', 'G', 1019);
       case 1020: return decodeGlonassEphemeris(frame.payload);
       case 1042: return decodeBdsEphemeris(frame.payload);
+      case 1043: return decodeSbasEphemeris(frame.payload);
       case 1044: return decodeGpsLikeEphemeris(frame.payload, 'QZSS', 'J', 1044);
       case 1045: return decodeGalileoEphemeris(frame.payload, 1045);
       case 1046: return decodeGalileoEphemeris(frame.payload, 1046);
