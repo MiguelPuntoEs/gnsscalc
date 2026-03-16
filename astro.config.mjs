@@ -13,6 +13,9 @@ export default defineConfig({
         if (item.url === 'https://gnsscalc.com/') {
           item.priority = 1.0;
           item.changefreq = 'weekly';
+        } else if (item.url === 'https://gnsscalc.com/status') {
+          item.priority = 0.9;
+          item.changefreq = 'daily';
         } else {
           item.priority = 0.8;
           item.changefreq = 'monthly';

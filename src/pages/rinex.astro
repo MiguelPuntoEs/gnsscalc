@@ -20,8 +20,8 @@ const rinexFaq = [
 ---
 
 <BaseLayout
-  title="RINEX Viewer & Quality Analyzer | Multipath, Cycle Slips, Completeness"
-  description="Analyze RINEX observation files: multipath (CMC), cycle slip detection (MW/GF/SF), data completeness, C/N0, satellite visibility, sky plots, DOP and header editing. Supports RINEX 2–4, Hatanaka CRX and gzip. All GNSS constellations. Free online tool — fully local, no upload."
+  title="RINEX Viewer & Quality Analyzer | Multipath & Cycle Slips"
+  description="Analyze RINEX observation files: multipath, cycle slips, completeness, C/N0, sky plots and DOP. Supports RINEX 2-4, Hatanaka and gzip. Free, no upload."
   faq={rinexFaq}
   faqTitle="RINEX FAQ"
   breadcrumbLabel="RINEX Viewer & Analyzer"
@@ -97,6 +97,8 @@ const rinexFaq = [
     <h2>Related Tools</h2>
     <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
       <li><a href="/ntrip" class="text-accent hover:text-fg">NTRIP Client</a> — record live RINEX observations from GNSS correction streams</li>
+      <li><a href="/status" class="text-accent hover:text-fg">Broadcast Ephemeris</a> — live satellite health and orbital parameters</li>
+      <li><a href="/antex" class="text-accent hover:text-fg">ANTEX Antenna Viewer</a> — phase center offsets and variations for precise positioning</li>
       <li><a href="/nmea" class="text-accent hover:text-fg">NMEA Log Viewer</a> — parse NMEA logs and plot tracks on a map</li>
       <li><a href="/" class="text-accent hover:text-fg">GPS Time Converter</a> — convert GPS week, TOW, Julian Date and other time scales</li>
       <li><a href="/spectrum" class="text-accent hover:text-fg">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>

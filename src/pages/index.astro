@@ -16,7 +16,7 @@ const timeFaq = [
 
 <BaseLayout
   title="GNSS Calculator | GPS Time Converter, Week & Epoch Tool"
-  description="Convert GPS, Galileo, BeiDou and UNIX time to UTC, Julian Date, MJD and TAI. GPS week calculator, current GPS time, leap seconds. Free online GNSS time conversion tool."
+  description="Convert GPS, Galileo, BeiDou and UNIX time to UTC, Julian Date, MJD and TAI. GPS week calculator, current GPS time and leap seconds."
   faq={timeFaq}
   faqTitle="GPS Time FAQ"
   breadcrumbLabel="GPS Time Converter"
@@ -115,9 +115,11 @@ const timeFaq = [
   <section>
     <h2>Related Tools</h2>
     <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
+      <li><a href="/status" class="text-accent hover:text-fg">Broadcast Ephemeris</a> — live satellite health and orbital parameters from the IGS</li>
       <li><a href="/positioning" class="text-accent hover:text-fg">Positioning Calculator</a> — convert ECEF, geodetic, UTM and compute distances</li>
       <li><a href="/rinex" class="text-accent hover:text-fg">RINEX Viewer</a> — analyze observation files with signal strength and satellite visibility</li>
       <li><a href="/ntrip" class="text-accent hover:text-fg">NTRIP Client</a> — connect to GNSS correction streams and record RINEX observations</li>
+      <li><a href="/nmea" class="text-accent hover:text-fg">NMEA Log Viewer</a> — parse GGA/RMC sentences and view GPS tracks on a map</li>
       <li><a href="/spectrum" class="text-accent hover:text-fg">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>
     </ul>
   </section>

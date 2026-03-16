@@ -20,25 +20,28 @@ const { title, description: pageDescription, faq, faqTitle, breadcrumbLabel } = 
 
 const baseUrl = 'https://gnsscalc.com';
 const canonicalUrl = baseUrl + Astro.url.pathname;
-const defaultDescription = 'Free online GNSS tools: GPS time converter, positioning calculator, RINEX viewer, NTRIP client, broadcast ephemeris, signal spectrum, NMEA viewer and ANTEX antenna analyzer. All processing runs locally in your browser.';
+const defaultDescription = 'Free online GNSS tools: GPS time converter, RINEX viewer, NTRIP client, positioning calculator, broadcast ephemeris, signal spectrum and more.';
 const description = pageDescription || defaultDescription;
 
 const pathname = Astro.url.pathname;
 const schemaNames: Record<string, string> = { '/': 'GNSS Calculator — GPS Time Converter', '/positioning': 'GNSS Positioning & Coordinate Converter', '/nmea': 'NMEA Log Viewer & Track Analyzer', '/rinex': 'RINEX Viewer & Quality Analyzer', '/ntrip': 'NTRIP Client & Stream Monitor', '/status': 'Live Broadcast Ephemeris', '/spectrum': 'GNSS Signal Spectrum Viewer', '/antex': 'ANTEX Antenna Phase Center Viewer', '/about': 'About GNSS Calculator' };
 const schemaName = schemaNames[pathname] ?? 'GNSS Calculator';
+const isAboutPage = pathname === '/about';
 const schema = {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
+  "@type": isAboutPage ? "AboutPage" : "WebApplication",
   "name": schemaName,
   "url": canonicalUrl,
   "description": description,
-  "applicationCategory": "UtilityApplication",
-  "operatingSystem": "Any",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "USD"
-  },
+  ...(!isAboutPage && {
+    "applicationCategory": "UtilityApplication",
+    "operatingSystem": "Any",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+  }),
   "author": {
     "@type": "Person",
     "name": "Miguel González",
@@ -107,6 +110,7 @@ const schema = {
     <meta property="og:image" content={`${baseUrl}/img/og.webp`} />
     <meta property="og:image:width" content="1536" />
     <meta property="og:image:height" content="1024" />
+    <meta property="og:image:alt" content="GNSS Calculator — free online GNSS tools" />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:site_name" content="GNSS Calculator" />
 

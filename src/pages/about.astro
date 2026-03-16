@@ -4,7 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 <BaseLayout
   title="About | GNSS Calculator — Free Open-Source GNSS Tools"
-  description="GNSS Calculator is a free, open-source suite of GNSS tools built by Miguel González, aerospace engineer and former Leica Geosystems product engineer. GPS time, positioning, RINEX, NTRIP, ephemeris, spectrum and NMEA analysis — all in the browser."
+  description="GNSS Calculator: free, open-source GNSS tools by Miguel González. GPS time, positioning, RINEX, NTRIP, ephemeris, spectrum and NMEA analysis."
   breadcrumbLabel="About"
 >
   <h1>About GNSS Calculator</h1>
@@ -49,7 +49,19 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   <h2>Open source</h2>
   <p>
     The full source code is available on
-    <a href="https://github.com/MiguelPuntoEs/gnsscalc" target="_blank" rel="noreferrer">GitHub</a>.
+    <a href="https://github.com/MiguelPuntoEs/gnsscalc" target="_blank" rel="noopener noreferrer">GitHub</a>.
     Contributions, bug reports and feature requests are welcome.
   </p>
+
+  <h2>Tools</h2>
+  <ul class="list-disc list-inside space-y-1 text-sm text-fg/60">
+    <li><a href="/" class="text-accent hover:text-fg">GPS Time Converter</a> — convert between GPS, Galileo, BeiDou, UNIX, UTC, Julian Date and more</li>
+    <li><a href="/positioning" class="text-accent hover:text-fg">Positioning Calculator</a> — ECEF, geodetic, UTM, AER, ENU, distances and bearings</li>
+    <li><a href="/rinex" class="text-accent hover:text-fg">RINEX Viewer</a> — multipath, cycle slips, completeness, C/N0, sky plots and DOP</li>
+    <li><a href="/ntrip" class="text-accent hover:text-fg">NTRIP Client</a> — browse casters, view mountpoints on a map, monitor RTCM streams</li>
+    <li><a href="/status" class="text-accent hover:text-fg">Broadcast Ephemeris</a> — live satellite health and orbital parameters from the IGS</li>
+    <li><a href="/nmea" class="text-accent hover:text-fg">NMEA Log Viewer</a> — parse GGA/RMC sentences, view tracks on a map</li>
+    <li><a href="/spectrum" class="text-accent hover:text-fg">Signal Spectrum</a> — interactive PSD chart of all GNSS L-band signals</li>
+    <li><a href="/antex" class="text-accent hover:text-fg">ANTEX Antenna Viewer</a> — phase center offsets and variations for receiver and satellite antennas</li>
+  </ul>
 </BaseLayout>

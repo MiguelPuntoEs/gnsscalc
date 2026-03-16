@@ -19,7 +19,7 @@ const links = [
     <a href="/" class="text-xl font-bold tracking-tight text-fg-strong">gnsscalc</a>
 
     {/* Desktop nav */}
-    <nav class="hidden sm:flex gap-6 text-sm font-medium">
+    <nav aria-label="Main navigation" class="hidden sm:flex gap-6 text-sm font-medium">
       {links.map(({ href, label }) => (
         <a href={href} class={pathname === href ? 'text-fg-strong' : 'text-fg/60 hover:text-fg-strong'}>{label}</a>
       ))}
@@ -43,6 +43,7 @@ const links = [
   {/* Mobile dropdown */}
   <nav
     id="mobile-nav"
+    aria-label="Mobile navigation"
     class="sm:hidden hidden border-t border-border/40"
   >
     <div class="max-w-4xl mx-auto px-6 py-3 flex flex-col gap-1">
