@@ -12,18 +12,10 @@
       "invocation_logs": true
     }
   },
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "EPHEMERIS_COLLECTOR",
-        "class_name": "EphemerisCollector"
-      }
-    ]
-  },
-  "migrations": [
+  "services": [
     {
-      "tag": "v1",
-      "new_sqlite_classes": ["EphemerisCollector"]
+      "binding": "EPHEMERIS",
+      "service": "gnsscalc-ephemeris"
     }
   ]
 }
