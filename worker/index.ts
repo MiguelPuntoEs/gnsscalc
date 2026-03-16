@@ -86,7 +86,15 @@ export class EphemerisCollector implements DurableObject {
       const raw = await this.env.EPHEMERIS_KV.get(KV_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as ConstellationStatusData;
-        this.satellites = parsed.satellites;
+        // Filter out invalid PRNs from older decoder bugs
+        for (const [prn] of Object.entries(parsed.satellites)) {
+          const sys = prn.charAt(0);
+          const num = parseInt(prn.slice(1), 10);
+          if (sys === 'J' && num > 10) continue; // QZSS max PRN is 10
+          if (sys === 'G' && num > 32) continue;
+          if (sys === 'R' && num > 27) continue;
+          this.satellites[prn] = parsed.satellites[prn];
+        }
         console.log(`Loaded ${Object.keys(this.satellites).length} satellites from KV`);
       }
     } catch { /* start fresh */ }

@@ -149,6 +149,18 @@ function ephDate(eph: EphemerisInfo): Date | null {
   return null;
 }
 
+/**
+ * Determine if a satellite is healthy based on constellation-specific rules.
+ * QZSS: only the MSB (bit 5) indicates L1 health. Lower 5 bits indicate
+ * per-signal availability (L1C/A, L2C, L5, L1C, L1C/B) — non-zero is normal.
+ * See IS-QZSS-PNT-006 Table 4.1.2-5-1/5-2.
+ */
+function isSatHealthy(eph: EphemerisInfo): boolean {
+  const sys = eph.prn.charAt(0);
+  if (sys === 'J') return (eph.health & 0b100000) === 0; // MSB only
+  return isSatHealthy(eph);
+}
+
 function formatEphTime(d: Date | null): string {
   if (!d) return '—';
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
@@ -195,8 +207,8 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold font-mono" style={{ color }}>{eph.prn}</span>
-          <span className={`text-xs px-1.5 py-0.5 rounded ${eph.health === 0 ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
-            {eph.health === 0 ? 'Healthy' : `Unhealthy (${eph.health})`}
+          <span className={`text-xs px-1.5 py-0.5 rounded ${isSatHealthy(eph) ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
+            {isSatHealthy(eph) ? 'Healthy' : `Unhealthy (${eph.health})`}
           </span>
           <span className="text-xs text-fg/30">msg {eph.messageType}</span>
         </div>
@@ -273,6 +285,18 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
               {eph.aodc !== undefined && <Field name="AODC" value={String(eph.aodc)} />}
               {eph.tgd1 !== undefined && <Field name="TGD1" value={`${fmtSci(eph.tgd1)} s`} />}
               {eph.tgd2 !== undefined && <Field name="TGD2" value={`${fmtSci(eph.tgd2)} s`} />}
+            </FieldGroup>
+          )}
+
+          {/* QZSS-specific signal health breakdown */}
+          {sys === 'J' && (
+            <FieldGroup label="Signal health">
+              <Field name="L1 (MSB)" value={(eph.health & 0b100000) ? 'Unhealthy' : 'OK'} />
+              <Field name="L1C/A" value={(eph.health & 0b010000) ? 'Unhealthy' : 'OK'} />
+              <Field name="L2C" value={(eph.health & 0b001000) ? 'Unhealthy' : 'OK'} />
+              <Field name="L5" value={(eph.health & 0b000100) ? 'Unhealthy' : 'OK'} />
+              <Field name="L1C" value={(eph.health & 0b000010) ? 'Unhealthy' : 'OK'} />
+              <Field name="L1C/B" value={(eph.health & 0b000001) ? 'Unhealthy' : 'OK'} />
             </FieldGroup>
           )}
         </div>
@@ -386,7 +410,7 @@ export default function ConstellationStatusPage() {
   }, [data]);
 
   const totalSats = satellites.size;
-  const healthySats = [...satellites.values()].filter(e => e.health === 0).length;
+  const healthySats = [...satellites.values()].filter(e => isSatHealthy(e)).length;
   const unhealthySats = totalSats - healthySats;
   const updatedAge = data?.updatedAt ? Date.now() - data.updatedAt : null;
 
@@ -459,7 +483,7 @@ export default function ConstellationStatusPage() {
                 const prn = `${slots.prefix}${String(slots.min + i).padStart(slots.padWidth, '0')}`;
                 const eph = satellites.get(prn);
                 const hasEph = !!eph;
-                const isHealthy = eph ? eph.health === 0 : false;
+                const isHealthy = eph ? isSatHealthy(eph) : false;
                 const isSelected = prn === selectedPrn;
                 const date = eph ? ephDate(eph) : null;
 
