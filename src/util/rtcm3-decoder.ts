@@ -48,6 +48,14 @@ export class BitReader {
     return val >= half ? val - 2 ** n : val;
   }
 
+  /** Read `n` bits as sign-magnitude integer (MSB = sign, rest = magnitude). */
+  readSM(n: number): number {
+    const val = this.readU(n);
+    const sign = val >> (n - 1);
+    const mag = val & ((1 << (n - 1)) - 1);
+    return sign ? -mag : mag;
+  }
+
   /** Skip `n` bits. */
   skip(n: number): void { this.bitPos += n; }
 

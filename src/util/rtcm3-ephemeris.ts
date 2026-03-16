@@ -40,13 +40,39 @@ export interface EphemerisInfo {
   af1?: number;          // s/s
   af2?: number;          // s/s^2
   iode?: number;
+  iodc?: number;
+  tgd?: number;          // seconds (GPS/QZSS group delay)
+  l2Codes?: number;
+  l2PFlag?: number;
+  fitInterval?: number;
+  // Galileo specific
+  bgdE5aE1?: number;    // seconds
+  bgdE5bE1?: number;    // seconds
+  e5aDataInvalid?: number;
+  e5bDataInvalid?: number;
+  e1bHealth?: number;
+  e1bDataInvalid?: number;
+  // BeiDou specific
+  aodc?: number;
+  tgd1?: number;         // seconds
+  tgd2?: number;         // seconds
   // GLONASS specific
   freqChannel?: number;
   x?: number; y?: number; z?: number;       // km
   vx?: number; vy?: number; vz?: number;    // km/s
   ax?: number; ay?: number; az?: number;    // km/s^2
   gammaN?: number;
-  tb?: number;           // time interval index
+  tb?: number;           // minutes
+  tk?: number;           // seconds (UTC)
+  deltaTauN?: number;    // seconds
+  en?: number;           // age of data (days)
+  p4?: number;
+  ft?: number;           // URA index
+  nt?: number;           // calendar day within 4-yr cycle
+  satType?: number;      // M field (GLONASS satellite type)
+  tauC?: number;         // seconds (GLONASS time to UTC)
+  n4?: number;           // 4-year interval number
+  tauGPS?: number;       // seconds (GLONASS-GPS time diff)
 }
 
 /* ================================================================== */
@@ -77,14 +103,14 @@ function decodeGpsLikeEphemeris(payload: Uint8Array, constellation: string, pref
   const svId = r.readU(6);
   const week = r.readU(10);
   const ura = r.readU(4);
-  r.skip(2);                           // code on L2
+  const l2Codes = r.readU(2);
   const idot = r.readS(14) * 2 ** -43 * PI;
   const iode = r.readU(8);
   const toc = r.readU(16) * 16;
   const af2 = r.readS(8) * 2 ** -55;
   const af1 = r.readS(16) * 2 ** -43;
   const af0 = r.readS(22) * 2 ** -31;
-  r.skip(10);                          // IODC
+  const iodc = r.readU(10);
   const crs = r.readS(16) * 2 ** -5;
   const deltaN = r.readS(16) * 2 ** -43 * PI;
   const m0 = r.readS(32) * 2 ** -31 * PI;
@@ -100,15 +126,18 @@ function decodeGpsLikeEphemeris(payload: Uint8Array, constellation: string, pref
   const crc = r.readS(16) * 2 ** -5;
   const argPerigee = r.readS(32) * 2 ** -31 * PI;
   const omegaDot = r.readS(24) * 2 ** -43 * PI;
-  r.skip(8);                           // tGD
+  const tgd = r.readS(8) * 2 ** -31;
   const health = r.readU(6);
+  const l2PFlag = r.readU(1);
+  const fitInterval = r.readU(1);
 
   return {
     prn: `${prefix}${String(svId).padStart(2, '0')}`,
     constellation, health, lastReceived: Date.now(), messageType: msgType,
     week, ura, toc, toe, sqrtA, eccentricity: e,
     inclination: i0, omega0, omegaDot, argPerigee, meanAnomaly: m0,
-    deltaN, idot, crs, crc, cuc, cus, cic, cis, af0, af1, af2, iode,
+    deltaN, idot, crs, crc, cuc, cus, cic, cis, af0, af1, af2,
+    iode, iodc, tgd, l2Codes, l2PFlag, fitInterval,
   };
 }
 
@@ -124,33 +153,47 @@ function decodeGlonassEphemeris(payload: Uint8Array): EphemerisInfo | null {
   const slot = r.readU(6);
   const freqChannel = r.readU(5) - 7;  // DF040: 0-20 → -7 to +13
   r.skip(1 + 1 + 2);                  // almanac health, health avail, P1
-  r.skip(12);                          // tk
+  // tk: hours(5) + minutes(6) + 30s-flag(1), Moscow time → UTC
+  const tkHours = r.readU(5);
+  const tkMins = r.readU(6);
+  const tk30s = r.readU(1);
+  const tk = (tkHours * 3600 + tkMins * 60 + tk30s * 30) - 3 * 3600; // Moscow→UTC
   const healthBn = r.readU(1);
   r.skip(1);                           // P2
-  const tb = r.readU(7);
-  const vx = r.readS(24) * 2 ** -20;  // km/s
-  const x = r.readS(27) * 2 ** -11;   // km
-  const ax = r.readS(5) * 2 ** -30;   // km/s^2
-  const vy = r.readS(24) * 2 ** -20;
-  const y = r.readS(27) * 2 ** -11;
-  const ay = r.readS(5) * 2 ** -30;
-  const vz = r.readS(24) * 2 ** -20;
-  const z = r.readS(27) * 2 ** -11;
-  const azz = r.readS(5) * 2 ** -30;
+  const tb = r.readU(7) * 15;           // time interval index → minutes
+  const vx = r.readSM(24) * 2 ** -20;  // km/s (sign-magnitude)
+  const x = r.readSM(27) * 2 ** -11;   // km
+  const ax = r.readSM(5) * 2 ** -30;   // km/s^2
+  const vy = r.readSM(24) * 2 ** -20;
+  const y = r.readSM(27) * 2 ** -11;
+  const ay = r.readSM(5) * 2 ** -30;
+  const vz = r.readSM(24) * 2 ** -20;
+  const z = r.readSM(27) * 2 ** -11;
+  const azz = r.readSM(5) * 2 ** -30;
   r.skip(1);                           // P3
-  const gammaN = r.readS(11) * 2 ** -40;
-  r.skip(3);                           // P
-  const healthLn = r.readU(1);
-  const tauN = r.readS(22) * 2 ** -30; // clock bias
+  const gammaN = r.readSM(11) * 2 ** -40;
+  r.skip(2);                           // P (GLONASS-M indicator)
+  r.skip(1);                           // ln (third string)
+  const tauN = r.readSM(22) * 2 ** -30; // clock bias (sign-magnitude)
+  const deltaTauN = r.readSM(5) * 2 ** -30;
+  const en = r.readU(5);               // age of data (days)
+  const p4 = r.readU(1);
+  const ft = r.readU(4);               // URA index
+  const nt = r.readU(11);              // calendar day within 4-yr cycle
+  const satType = r.readU(2);          // M field (satellite type)
+  const additionalData = r.readU(1);
+  const tauC = additionalData ? r.readSM(32) * 2 ** -31 : undefined;  // GLONASS→UTC correction
+  const n4 = additionalData ? r.readU(5) : undefined;                  // 4-year interval number
+  const tauGPS = additionalData ? r.readSM(22) * 2 ** -30 : undefined; // GLONASS−GPS time diff
+  // ln5 (fifth string health) — 1 bit, skip
 
-  // Use only healthBn (operational health) — healthLn is almanac-derived
-  // and is commonly set to 1 even for operational satellites.
   return {
     prn: `R${String(slot).padStart(2, '0')}`,
     constellation: 'GLONASS', health: healthBn,
     lastReceived: Date.now(), messageType: 1020,
-    freqChannel, x, y, z, vx, vy, vz, ax, ay, az: azz,
-    tb, gammaN, af0: tauN,
+    freqChannel, tk, x, y, z, vx, vy, vz, ax, ay, az: azz,
+    tb, gammaN, af0: tauN, deltaTauN, en, p4, ft, nt, satType,
+    tauC, n4, tauGPS,
   };
 }
 
@@ -187,15 +230,24 @@ function decodeGalileoEphemeris(payload: Uint8Array, msgType: number): Ephemeris
   const crc = r.readS(16) * 2 ** -5;
   const argPerigee = r.readS(32) * 2 ** -31 * PI;
   const omegaDot = r.readS(24) * 2 ** -43 * PI;
-  r.skip(10);                          // BGD E5a/E1
+  const bgdE5aE1 = r.readS(10) * 2 ** -32;
 
-  // Health bits differ between F/NAV and I/NAV
   let health: number;
+  let bgdE5bE1: number | undefined;
+  let e5aDataInvalid: number | undefined;
+  let e5bDataInvalid: number | undefined;
+  let e1bHealth: number | undefined;
+  let e1bDataInvalid: number | undefined;
+
   if (msgType === 1045) {
     health = r.readU(2);               // E5a signal health
+    e5aDataInvalid = r.readU(1);
   } else {
-    r.skip(10);                        // BGD E5b/E1
+    bgdE5bE1 = r.readS(10) * 2 ** -32;
     health = r.readU(2);               // E5b signal health
+    e5bDataInvalid = r.readU(1);
+    e1bHealth = r.readU(2);
+    e1bDataInvalid = r.readU(1);
   }
 
   return {
@@ -204,6 +256,7 @@ function decodeGalileoEphemeris(payload: Uint8Array, msgType: number): Ephemeris
     week, ura: sisa, toc, toe, sqrtA, eccentricity: e,
     inclination: i0, omega0, omegaDot, argPerigee, meanAnomaly: m0,
     deltaN, idot, crs, crc, cuc, cus, cic, cis, af0, af1, af2, iode,
+    bgdE5aE1, bgdE5bE1, e5aDataInvalid, e5bDataInvalid, e1bHealth, e1bDataInvalid,
   };
 }
 
@@ -220,12 +273,12 @@ function decodeBdsEphemeris(payload: Uint8Array): EphemerisInfo | null {
   const week = r.readU(13);
   const ura = r.readU(4);
   const idot = r.readS(14) * 2 ** -43 * PI;
-  const iode = r.readU(8);             // AODE
+  const iode = r.readU(5);             // AODE (5 bits per RTCM DF489)
   const toc = r.readU(17) * 8;
   const af2 = r.readS(11) * 2 ** -66;
   const af1 = r.readS(22) * 2 ** -50;
   const af0 = r.readS(24) * 2 ** -33;
-  r.skip(8);                           // AODC
+  const aodc = r.readU(5);            // AODC (5 bits per RTCM DF490)
   const crs = r.readS(18) * 2 ** -6;
   const deltaN = r.readS(16) * 2 ** -43 * PI;
   const m0 = r.readS(32) * 2 ** -31 * PI;
@@ -241,8 +294,8 @@ function decodeBdsEphemeris(payload: Uint8Array): EphemerisInfo | null {
   const crc = r.readS(18) * 2 ** -6;
   const argPerigee = r.readS(32) * 2 ** -31 * PI;
   const omegaDot = r.readS(24) * 2 ** -43 * PI;
-  r.skip(10);                          // tGD1
-  r.skip(10);                          // tGD2
+  const tgd1 = r.readS(10) * 1e-10;
+  const tgd2 = r.readS(10) * 1e-10;
   const health = r.readU(1);
 
   return {
@@ -250,7 +303,8 @@ function decodeBdsEphemeris(payload: Uint8Array): EphemerisInfo | null {
     constellation: 'BeiDou', health, lastReceived: Date.now(), messageType: 1042,
     week, ura, toc, toe, sqrtA, eccentricity: e,
     inclination: i0, omega0, omegaDot, argPerigee, meanAnomaly: m0,
-    deltaN, idot, crs, crc, cuc, cus, cic, cis, af0, af1, af2, iode,
+    deltaN, idot, crs, crc, cuc, cus, cic, cis, af0, af1, af2,
+    iode, aodc, tgd1, tgd2,
   };
 }
 
@@ -274,7 +328,7 @@ function decodeSbasEphemeris(payload: Uint8Array): EphemerisInfo | null {
   r.skip(12);                           // message type
   const svId = r.readU(6);              // satellite ID (1-39)
   const iodn = r.readU(8);             // IODN
-  const t0 = r.readU(16) * 16;         // reference time (seconds, scale 16)
+  const t0 = r.readU(13) * 16;         // reference time (13 bits per DF198, scale 16)
   const ura = r.readU(4);              // URA index
   const xg = r.readS(30) * 0.08;       // m (scale 0.08)
   const yg = r.readS(30) * 0.08;       // m
@@ -303,6 +357,56 @@ function decodeSbasEphemeris(payload: Uint8Array): EphemerisInfo | null {
   };
 }
 
+/* ================================================================== */
+/*  QZSS ephemeris (1044) — different field order from GPS 1019!       */
+/*  Reference: BNC 2.13.4 RTCM3Decoder::DecodeQZSSEphemeris            */
+/* ================================================================== */
+
+function decodeQzssEphemeris(payload: Uint8Array): EphemerisInfo | null {
+  if (payload.length < 60) return null;
+  const r = new BitReader(payload);
+  r.skip(12);                          // message type (1044)
+  const svId = r.readU(4);             // 4-bit satellite ID (1-10)
+  if (svId < 1 || svId > 10) return null;
+  const toc = r.readU(16) * 16;
+  const af2 = r.readS(8) * 2 ** -55;
+  const af1 = r.readS(16) * 2 ** -43;
+  const af0 = r.readS(22) * 2 ** -31;
+  const iode = r.readU(8);
+  const crs = r.readS(16) * 2 ** -5;
+  const deltaN = r.readS(16) * 2 ** -43 * PI;
+  const m0 = r.readS(32) * 2 ** -31 * PI;
+  const cuc = r.readS(16) * 2 ** -29;
+  const e = r.readU(32) * 2 ** -33;
+  const cus = r.readS(16) * 2 ** -29;
+  const sqrtA = r.readU(32) * 2 ** -19;
+  const toe = r.readU(16) * 16;
+  const cic = r.readS(16) * 2 ** -29;
+  const omega0 = r.readS(32) * 2 ** -31 * PI;
+  const cis = r.readS(16) * 2 ** -29;
+  const i0 = r.readS(32) * 2 ** -31 * PI;
+  const crc = r.readS(16) * 2 ** -5;
+  const argPerigee = r.readS(32) * 2 ** -31 * PI;
+  const omegaDot = r.readS(24) * 2 ** -43 * PI;
+  const idot = r.readS(14) * 2 ** -43 * PI;
+  const l2Codes = r.readU(2);
+  const week = r.readU(10);
+  const ura = r.readU(4);
+  const health = r.readU(6);
+  const tgd = r.readS(8) * 2 ** -31;
+  const iodc = r.readU(10);
+  const fitInterval = r.readU(1);
+
+  return {
+    prn: `J${String(svId).padStart(2, '0')}`,
+    constellation: 'QZSS', health, lastReceived: Date.now(), messageType: 1044,
+    week, ura, toc, toe, sqrtA, eccentricity: e,
+    inclination: i0, omega0, omegaDot, argPerigee, meanAnomaly: m0,
+    deltaN, idot, crs, crc, cuc, cus, cic, cis, af0, af1, af2,
+    iode, iodc, tgd, l2Codes, fitInterval,
+  };
+}
+
 /** Decode any supported ephemeris message. Returns null for non-ephemeris or decode errors. */
 export function decodeEphemeris(frame: Rtcm3Frame): EphemerisInfo | null {
   try {
@@ -311,7 +415,7 @@ export function decodeEphemeris(frame: Rtcm3Frame): EphemerisInfo | null {
       case 1020: return decodeGlonassEphemeris(frame.payload);
       case 1042: return decodeBdsEphemeris(frame.payload);
       case 1043: return decodeSbasEphemeris(frame.payload);
-      case 1044: return decodeGpsLikeEphemeris(frame.payload, 'QZSS', 'J', 1044);
+      case 1044: return decodeQzssEphemeris(frame.payload);
       case 1045: return decodeGalileoEphemeris(frame.payload, 1045);
       case 1046: return decodeGalileoEphemeris(frame.payload, 1046);
       default: return null;

@@ -247,7 +247,34 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
             <Field name="af₁" value={eph.af1 !== undefined ? `${fmtSci(eph.af1)} s/s` : '—'} />
             <Field name="af₂" value={eph.af2 !== undefined ? `${fmtSci(eph.af2)} s/s²` : '—'} />
             <Field name="URA/SISA" value={eph.ura !== undefined ? String(eph.ura) : '—'} />
+            <Field name="Health" value={`${eph.health} (0x${eph.health.toString(16).toUpperCase()})`} />
+            {eph.iodc !== undefined && <Field name="IODC" value={String(eph.iodc)} />}
+            {eph.tgd !== undefined && <Field name="TGD" value={`${fmtSci(eph.tgd)} s`} />}
+            {eph.l2Codes !== undefined && <Field name="L2 codes" value={String(eph.l2Codes)} />}
+            {eph.l2PFlag !== undefined && <Field name="L2P flag" value={String(eph.l2PFlag)} />}
+            {eph.fitInterval !== undefined && <Field name="Fit int." value={String(eph.fitInterval)} />}
           </FieldGroup>
+
+          {/* Galileo-specific group delay */}
+          {sys === 'E' && (
+            <FieldGroup label="Group delay">
+              {eph.bgdE5aE1 !== undefined && <Field name="BGD E5a/E1" value={`${fmtSci(eph.bgdE5aE1)} s`} />}
+              {eph.bgdE5bE1 !== undefined && <Field name="BGD E5b/E1" value={`${fmtSci(eph.bgdE5bE1)} s`} />}
+              {eph.e5aDataInvalid !== undefined && <Field name="E5a valid" value={eph.e5aDataInvalid === 0 ? 'Yes' : 'No'} />}
+              {eph.e5bDataInvalid !== undefined && <Field name="E5b valid" value={eph.e5bDataInvalid === 0 ? 'Yes' : 'No'} />}
+              {eph.e1bHealth !== undefined && <Field name="E1B health" value={String(eph.e1bHealth)} />}
+              {eph.e1bDataInvalid !== undefined && <Field name="E1B valid" value={eph.e1bDataInvalid === 0 ? 'Yes' : 'No'} />}
+            </FieldGroup>
+          )}
+
+          {/* BeiDou-specific */}
+          {sys === 'C' && (
+            <FieldGroup label="Group delay">
+              {eph.aodc !== undefined && <Field name="AODC" value={String(eph.aodc)} />}
+              {eph.tgd1 !== undefined && <Field name="TGD1" value={`${fmtSci(eph.tgd1)} s`} />}
+              {eph.tgd2 !== undefined && <Field name="TGD2" value={`${fmtSci(eph.tgd2)} s`} />}
+            </FieldGroup>
+          )}
         </div>
       )}
 
@@ -270,8 +297,11 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
               <>
                 <Field name="τₙ" value={eph.af0 !== undefined ? `${fmtSci(eph.af0)} s` : '—'} />
                 <Field name="γₙ" value={eph.gammaN !== undefined ? fmtSci(eph.gammaN) : '—'} />
+                {eph.deltaTauN !== undefined && <Field name="Δτₙ" value={`${fmtSci(eph.deltaTauN)} s`} />}
                 <Field name="Freq. ch." value={eph.freqChannel !== undefined ? String(eph.freqChannel) : '—'} />
-                <Field name="tb" value={eph.tb !== undefined ? String(eph.tb) : '—'} />
+                <Field name="tb" value={eph.tb !== undefined ? `${eph.tb} min` : '—'} />
+                {eph.tk !== undefined && <Field name="tk" value={`${eph.tk} s`} />}
+                <Field name="Bn (health)" value={String(eph.health)} />
               </>
             )}
             {isSbas && (
@@ -283,6 +313,18 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
               </>
             )}
           </FieldGroup>
+
+          {isGlonass && (
+            <FieldGroup label="Additional">
+              {eph.ft !== undefined && <Field name="FT (URA)" value={String(eph.ft)} />}
+              {eph.en !== undefined && <Field name="En (age)" value={`${eph.en} d`} />}
+              {eph.nt !== undefined && <Field name="NT (day)" value={String(eph.nt)} />}
+              {eph.n4 !== undefined && <Field name="N4 (4-yr)" value={String(eph.n4)} />}
+              {eph.satType !== undefined && <Field name="Type (M)" value={String(eph.satType)} />}
+              {eph.tauC !== undefined && <Field name="τc" value={`${fmtSci(eph.tauC)} s`} />}
+              {eph.tauGPS !== undefined && <Field name="τGPS" value={`${fmtSci(eph.tauGPS)} s`} />}
+            </FieldGroup>
+          )}
         </div>
       )}
     </div>
