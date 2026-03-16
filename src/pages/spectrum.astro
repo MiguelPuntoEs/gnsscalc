@@ -17,6 +17,7 @@ const spectrumFaq = [
   title="GNSS Signal Spectrum | L-Band PSD Viewer"
   description="Interactive Power Spectral Density (PSD) chart of all GNSS signals across the L-band. Visualise GPS, GLONASS, Galileo, BeiDou, QZSS and NavIC signal spectra with BPSK, BOC and AltBOC modulations. Free online GNSS spectrum viewer."
   faq={spectrumFaq}
+  faqTitle="GNSS Spectrum FAQ"
   breadcrumbLabel="Signal Spectrum"
 >
   <h1>GNSS Signal Spectrum</h1>
@@ -82,54 +83,4 @@ const spectrumFaq = [
     </ul>
   </section>
 
-  <section>
-    <h2>GNSS Spectrum FAQ</h2>
-    <dl>
-      <dt>What is the GNSS L-band?</dt>
-      <dd>
-        The GNSS L-band is the portion of the radio spectrum between approximately
-        1150 MHz and 1610 MHz used by all major satellite navigation systems. It is
-        divided into sub-bands allocated to different constellations and signal types.
-      </dd>
-      <dt>What is Power Spectral Density (PSD)?</dt>
-      <dd>
-        Power Spectral Density describes how the power of a signal is distributed
-        across frequency. For GNSS signals, the PSD shape is determined by the
-        modulation type and chipping rate. This chart shows each signal's spectral
-        footprint in dB.
-      </dd>
-      <dt>What is BPSK modulation?</dt>
-      <dd>
-        BPSK (Binary Phase Shift Keying) is the simplest GNSS spreading modulation.
-        Its PSD is a sinc² function centered on the carrier frequency. Examples
-        include GPS L1 C/A, GPS L5, and GLONASS C/A.
-      </dd>
-      <dt>What is BOC modulation?</dt>
-      <dd>
-        BOC (Binary Offset Carrier) shifts spectral energy away from the center
-        frequency, creating a split-spectrum shape. BOCs (sine-phased) is used by
-        GPS L1C and Galileo E1 OS; BOCc (cosine-phased) is used by Galileo PRS
-        signals.
-      </dd>
-      <dt>What is AltBOC modulation?</dt>
-      <dd>
-        AltBOC (Alternate BOC) is a wideband modulation used by Galileo E5 and
-        BeiDou B2. AltBOC(15,10) places four signal components across ~51 MHz,
-        enabling very precise ranging.
-      </dd>
-      <dt>Why do some signals share the same center frequency?</dt>
-      <dd>
-        Several constellations transmit on shared frequencies by international
-        agreement. For example, GPS L1, Galileo E1, BeiDou B1C and QZSS L1 all
-        share 1575.42 MHz. Different modulations ensure the signals remain
-        separable.
-      </dd>
-      <dt>What constellations are shown?</dt>
-      <dd>
-        GPS, GLONASS (FDMA and CDMA), Galileo, BeiDou-2, BeiDou-3, QZSS, and
-        NavIC. Each constellation is plotted in its own row with signals labeled
-        and color-coded by component.
-      </dd>
-    </dl>
-  </section>
 </BaseLayout>

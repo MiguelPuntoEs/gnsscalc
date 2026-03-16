@@ -18,6 +18,7 @@ const timeFaq = [
   title="GPS Time Converter | GNSS Time Calculator"
   description="Convert GPS time to UTC, UNIX, Julian Date, MJD, TAI, Galileo and BDS time. GPS week calculator, current GPS time, timestamp converter. Free online GNSS tool."
   faq={timeFaq}
+  faqTitle="GPS Time FAQ"
   breadcrumbLabel="GPS Time Converter"
 >
   <h1>GPS Time Converter</h1>
@@ -121,48 +122,4 @@ const timeFaq = [
     </ul>
   </section>
 
-  <section>
-    <h2>GPS Time FAQ</h2>
-    <dl>
-      <dt>What is GPS time?</dt>
-      <dd>
-        GPS time is a continuous time scale maintained by GPS satellites, starting
-        from January 6, 1980, 00:00:00 UTC. Unlike UTC, GPS time does not include
-        leap seconds, so it currently runs 18 seconds ahead of UTC.
-      </dd>
-      <dt>What is the difference between GPS time and UTC?</dt>
-      <dd>
-        UTC includes leap seconds to stay aligned with Earth's rotation, while GPS
-        time is continuous and never adjusted. The current offset is 18 seconds
-        (GPS time = UTC + 18 s). This offset changes only when a new leap second
-        is introduced by the IERS.
-      </dd>
-      <dt>What is the GPS epoch?</dt>
-      <dd>
-        The GPS epoch is the reference start point of GPS time: January 6, 1980,
-        00:00:00 UTC. All GPS timestamps are counted as seconds elapsed since this
-        epoch.
-      </dd>
-      <dt>How do I convert GPS time to UTC?</dt>
-      <dd>
-        Subtract the current number of leap seconds from the GPS timestamp. Enter
-        a GPS time value in the converter above and the tool will automatically
-        compute the UTC equivalent, accounting for all historical leap seconds.
-      </dd>
-      <dt>What is GPS week number?</dt>
-      <dd>
-        The GPS week number counts complete weeks since the GPS epoch (January 6,
-        1980). It is transmitted by GPS satellites along with the time of week
-        (TOW) in seconds. The week number rolled over from 1023 to 0 on
-        August 21, 1999, and will roll over again on November 20, 2137.
-      </dd>
-      <dt>What is the difference between Julian Date and Modified Julian Date?</dt>
-      <dd>
-        Julian Date (JD) counts days since January 1, 4713 B.C., 12:00:00,
-        resulting in large numbers. Modified Julian Date (MJD) simplifies this by
-        subtracting 2 400 000.5, so MJD = JD − 2 400 000.5, with its epoch on
-        November 17, 1858, 00:00:00.
-      </dd>
-    </dl>
-  </section>
 </BaseLayout>

@@ -12,10 +12,11 @@ interface Props {
   title: string;
   description?: string;
   faq?: FaqItem[];
+  faqTitle?: string;
   breadcrumbLabel?: string;
 }
 
-const { title, description: pageDescription, faq, breadcrumbLabel } = Astro.props;
+const { title, description: pageDescription, faq, faqTitle, breadcrumbLabel } = Astro.props;
 
 const baseUrl = 'https://gnsscalc.com';
 const canonicalUrl = baseUrl + Astro.url.pathname;
@@ -123,6 +124,19 @@ const schema = {
     <Header />
     <main class="max-w-4xl mx-auto px-6 pb-12">
       <slot />
+      {faq && faq.length > 0 && (
+        <section>
+          <h2>{faqTitle || 'Frequently Asked Questions'}</h2>
+          <dl>
+            {faq.map(({ question, answer }) => (
+              <Fragment>
+                <dt>{question}</dt>
+                <dd>{answer}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        </section>
+      )}
     </main>
     <Footer />
   </body>

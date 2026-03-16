@@ -16,6 +16,7 @@ const antexFaq = [
   title="ANTEX Antenna Viewer | Phase Center Offset & Variation Analyzer"
   description="Upload and analyze ANTEX antenna calibration files. Visualize Phase Center Offsets (PCO) and Phase Center Variations (PCV) for receiver and satellite antennas. Supports ANTEX 1.4. Free online ANTEX viewer — no upload, fully local."
   faq={antexFaq}
+  faqTitle="ANTEX FAQ"
   breadcrumbLabel="ANTEX Antenna Viewer"
 >
   <h1>ANTEX Antenna Viewer</h1>
@@ -72,52 +73,4 @@ const antexFaq = [
     </ul>
   </section>
 
-  <section>
-    <h2>ANTEX FAQ</h2>
-    <dl>
-      <dt>What is ANTEX?</dt>
-      <dd>
-        ANTEX (Antenna Exchange Format) is a standard text format for storing
-        GNSS antenna calibration data. It contains Phase Center Offsets (PCO) and
-        Phase Center Variations (PCV) for both receiver and satellite antennas,
-        which are essential corrections for high-precision positioning.
-      </dd>
-      <dt>What are Phase Center Offsets (PCO)?</dt>
-      <dd>
-        Phase Center Offsets describe the mean displacement of the antenna phase
-        center from a reference point — the Antenna Reference Point (ARP) for
-        receiver antennas, or the satellite center of mass for satellite antennas.
-        PCO is given in millimeters as North/East/Up (receiver) or X/Y/Z
-        (satellite) components.
-      </dd>
-      <dt>What are Phase Center Variations (PCV)?</dt>
-      <dd>
-        Phase Center Variations describe the direction-dependent deviations of
-        the actual phase center from the mean phase center. PCV values are given
-        in millimeters as a function of zenith (or nadir) angle and optionally
-        azimuth, forming a correction pattern that depends on the signal direction.
-      </dd>
-      <dt>Why do antenna corrections matter?</dt>
-      <dd>
-        Without antenna corrections, positioning errors of several centimeters
-        can occur. For geodetic applications requiring millimeter-level accuracy
-        (reference station networks, tectonic monitoring, precise point
-        positioning), applying IGS-standard antenna models is essential.
-      </dd>
-      <dt>What is the difference between absolute and relative calibrations?</dt>
-      <dd>
-        Absolute calibrations (PCV type "A") provide the full correction pattern
-        independent of any reference antenna. Relative calibrations (PCV type "R")
-        express corrections relative to a reference antenna (typically AOAD/M_T).
-        Modern IGS standards use absolute calibrations.
-      </dd>
-      <dt>Where can I get ANTEX files?</dt>
-      <dd>
-        The IGS publishes official antenna models (e.g. igs20.atx) that cover
-        most geodetic antennas and all active GNSS satellites. National agencies
-        like NGS (US) and Geo++ also publish antenna calibration databases. Files
-        typically have the .atx extension.
-      </dd>
-    </dl>
-  </section>
 </BaseLayout>

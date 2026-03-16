@@ -16,6 +16,7 @@ const nmeaFaq = [
   title="NMEA Log Viewer | GNSS Track Analyzer"
   description="Upload and analyze NMEA log files. Parse GGA and RMC sentences, view track on a map, and see statistics including fix count, duration, altitude range and satellite count. Free online NMEA viewer."
   faq={nmeaFaq}
+  faqTitle="NMEA FAQ"
   breadcrumbLabel="NMEA Log Viewer"
 >
   <h1>NMEA Log Viewer</h1>
@@ -67,47 +68,4 @@ const nmeaFaq = [
     </ul>
   </section>
 
-  <section>
-    <h2>NMEA FAQ</h2>
-    <dl>
-      <dt>What is NMEA 0183?</dt>
-      <dd>
-        NMEA 0183 is a standard protocol for communication between marine
-        electronics and GNSS receivers. It defines ASCII sentence formats that
-        carry position, time, satellite and navigation data over serial links.
-      </dd>
-      <dt>What is a GGA sentence?</dt>
-      <dd>
-        GGA (Global Positioning System Fix Data) is an NMEA sentence that
-        reports time, latitude, longitude, fix quality, number of satellites,
-        HDOP and altitude for each epoch. It is the most common sentence for
-        position fixes.
-      </dd>
-      <dt>What is an RMC sentence?</dt>
-      <dd>
-        RMC (Recommended Minimum Specific GNSS Data) is an NMEA sentence that
-        provides time, date, position, speed over ground and course over
-        ground. It is the minimum data recommended for navigation.
-      </dd>
-      <dt>What NMEA sentences does this tool parse?</dt>
-      <dd>
-        This tool parses GGA and RMC sentences from any talker ID (GP, GN, GL,
-        GA, GB). It merges GGA and RMC data from the same epoch to produce a
-        combined fix with altitude, satellite count, speed and course.
-      </dd>
-      <dt>What is fix quality in GGA?</dt>
-      <dd>
-        Fix quality indicates the type of positioning solution: 0 = no fix,
-        1 = standalone GPS, 2 = DGPS, 4 = RTK fixed, 5 = RTK float,
-        6 = dead reckoning. Higher values generally indicate better accuracy.
-      </dd>
-      <dt>How do I get an NMEA log file?</dt>
-      <dd>
-        Most GNSS receivers can output NMEA sentences over a serial or USB
-        connection. You can log these to a text file using a terminal program
-        or dedicated logging software. Many smartphone apps also export NMEA
-        logs.
-      </dd>
-    </dl>
-  </section>
 </BaseLayout>

@@ -48,12 +48,9 @@ export class EphemerisCollector implements DurableObject {
   }
 
   async fetch(_request: Request): Promise<Response> {
-    // Ensure the alarm is armed so the stream starts
-    const current = await this.state.storage.getAlarm();
-    if (!current) {
-      console.log('Ping: arming alarm to start stream');
-      await this.state.storage.setAlarm(Date.now() + 100);
-    }
+    // Always arm the alarm to ensure the stream starts/restarts
+    console.log(`Fetch: satellites=${Object.keys(this.satellites).length}, lastEph=${this.lastEphReceived}`);
+    await this.state.storage.setAlarm(Date.now() + 100);
 
     const data: ConstellationStatusData = {
       updatedAt: this.lastEphReceived,

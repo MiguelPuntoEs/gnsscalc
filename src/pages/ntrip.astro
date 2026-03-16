@@ -15,6 +15,7 @@ const ntripFaq = [
   title="NTRIP Client | GNSS Caster Browser & Stream Monitor"
   description="Connect to NTRIP casters to browse sourcetables, view mountpoint locations on a map, and monitor live RTCM3 data streams. Supports NTRIP 1.0 and 2.0 protocols."
   faq={ntripFaq}
+  faqTitle="NTRIP FAQ"
   breadcrumbLabel="NTRIP Client"
 >
   <h1>NTRIP Client</h1>
@@ -50,38 +51,4 @@ const ntripFaq = [
     </ul>
   </section>
 
-  <section>
-    <h2>NTRIP FAQ</h2>
-    <dl>
-      <dt>What is NTRIP?</dt>
-      <dd>
-        NTRIP (Networked Transport of RTCM via Internet Protocol) is a protocol
-        for streaming GNSS correction data over the Internet. A caster distributes
-        data from reference stations to connected clients for RTK and DGNSS positioning.
-      </dd>
-      <dt>What is the difference between NTRIP 1.0 and 2.0?</dt>
-      <dd>
-        NTRIP 1.0 uses non-standard ICY responses. NTRIP 2.0 uses standard
-        HTTP/1.1 with chunked transfer encoding. Most modern casters support both.
-      </dd>
-      <dt>What is a sourcetable?</dt>
-      <dd>
-        The sourcetable lists all available data streams on a caster — each entry
-        includes the mountpoint name, format, GNSS systems, coordinates, bitrate
-        and authentication requirements.
-      </dd>
-      <dt>What is RTCM?</dt>
-      <dd>
-        RTCM is a binary format for GNSS correction data. RTCM 3.x uses MSM
-        (Multiple Signal Messages) to carry observations for GPS, GLONASS,
-        Galileo, BeiDou and more.
-      </dd>
-      <dt>What are MSM messages?</dt>
-      <dd>
-        MSM messages (types 1071–1137) carry full GNSS observations per
-        constellation. MSM4 provides pseudorange and carrier phase; MSM5 adds
-        Doppler and C/N0; MSM7 provides full-resolution data.
-      </dd>
-    </dl>
-  </section>
 </BaseLayout>

@@ -21,6 +21,7 @@ const positioningFaq = [
   title="ECEF to Geodetic Converter | GNSS Positioning Calculator"
   description="Convert ECEF (X, Y, Z) to latitude, longitude, height, UTM, Maidenhead and geohash. Calculate azimuth, elevation, slant range (AER), East-North-Up (ENU) coordinates, orthodromic and loxodromic distances, bearings and horizon distance. Free online WGS84 coordinate converter."
   faq={positioningFaq}
+  faqTitle="Positioning FAQ"
   breadcrumbLabel="Positioning Calculator"
 >
   <h1>GNSS Positioning Calculator</h1>
@@ -149,89 +150,4 @@ const positioningFaq = [
     </ul>
   </section>
 
-  <section>
-    <h2>Positioning FAQ</h2>
-    <dl>
-      <dt>What is ECEF?</dt>
-      <dd>
-        ECEF (Earth-Centered, Earth-Fixed) is a 3D cartesian coordinate system
-        with its origin at the Earth's center of mass. The X axis points to the
-        intersection of the prime meridian and equator, Z points to the North
-        Pole, and Y completes the right-handed system. GPS satellites broadcast
-        positions in ECEF.
-      </dd>
-      <dt>How do I convert ECEF to latitude and longitude?</dt>
-      <dd>
-        An iterative or closed-form algorithm converts X, Y, Z coordinates to
-        geodetic latitude, longitude and ellipsoidal height on a reference
-        ellipsoid (usually WGS84). Enter your ECEF values in the calculator above
-        for an instant conversion.
-      </dd>
-      <dt>What is WGS84?</dt>
-      <dd>
-        WGS84 (World Geodetic System 1984) is the reference ellipsoid and
-        coordinate system used by GPS. It defines the size and shape of the
-        Earth model (semi-major axis 6 378 137 m, flattening 1/298.257223563)
-        used for all coordinate conversions on this page.
-      </dd>
-      <dt>What is the difference between ellipsoidal height and sea level altitude?</dt>
-      <dd>
-        Ellipsoidal height is the distance above the WGS84 ellipsoid, which is a
-        mathematical surface. Mean sea level (orthometric height) follows the
-        geoid, an irregular equipotential surface. The two can differ by up to
-        ±100 m depending on location.
-      </dd>
-      <dt>What are azimuth and elevation?</dt>
-      <dd>
-        Azimuth is the horizontal angle from North, measured clockwise (0–360°).
-        Elevation is the vertical angle above the local horizon (0° = horizon,
-        90° = zenith). Together with slant range they form the AER coordinate
-        system, commonly used for satellite tracking and antenna pointing.
-      </dd>
-      <dt>What is the ENU coordinate system?</dt>
-      <dd>
-        ENU (East-North-Up) is a local tangent-plane coordinate system centered at
-        a reference point. East points along the local parallel, North along the
-        local meridian, and Up is normal to the ellipsoid. It is used to express
-        relative positions in an intuitive, human-readable frame.
-      </dd>
-      <dt>What is the difference between orthodromic and loxodromic distance?</dt>
-      <dd>
-        Orthodromic (great-circle) distance is the shortest path between two
-        points on the ellipsoid surface. Loxodromic (rhumb line) distance follows
-        a path of constant bearing, which is longer but simpler to navigate. For
-        short distances the difference is negligible.
-      </dd>
-      <dt>What is UTM?</dt>
-      <dd>
-        UTM (Universal Transverse Mercator) is a map projection that divides the
-        Earth into 60 zones of 6° longitude each. Within each zone, positions are
-        expressed as easting and northing in metres. UTM is widely used in
-        surveying, mapping and military applications because it provides a flat,
-        metric grid with minimal distortion.
-      </dd>
-      <dt>What is a Maidenhead grid locator?</dt>
-      <dd>
-        The Maidenhead Locator System divides the Earth into grid squares
-        identified by alternating letters and digits (e.g.&nbsp;JN58td). It is
-        primarily used by amateur radio operators to describe station locations
-        concisely. Each 6-character locator identifies an area of roughly
-        5&nbsp;&times;&nbsp;2.5&nbsp;km.
-      </dd>
-      <dt>What is a geohash?</dt>
-      <dd>
-        A geohash is a compact string that encodes a geographic location by
-        recursively subdividing the world into a grid. Longer strings mean higher
-        precision. Geohashes are used in databases and web applications for
-        efficient spatial indexing and proximity searches.
-      </dd>
-      <dt>What is the geometric horizon distance?</dt>
-      <dd>
-        The geometric horizon distance is how far an observer can see to the
-        horizon from a given height above the ellipsoid, assuming standard
-        atmospheric refraction (k&nbsp;=&nbsp;0.13). It depends only on the
-        observer's altitude and the Earth's radius.
-      </dd>
-    </dl>
-  </section>
 </BaseLayout>
