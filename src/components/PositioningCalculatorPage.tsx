@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
+import { lazy, Suspense, useState, useCallback } from 'react';
 import type { Position } from '../types/position';
 import { usePositionCalculator, useAerCalculator, useENUCalculator, useDistanceCalculator } from '../hooks/positioning';
 
@@ -22,37 +22,9 @@ function downloadBlob(content: string, filename: string, mime: string) {
 const DEFAULT_POS: Position = [4263871.9243, 722591.1075, 4672986.8878];
 const DEFAULT_REF: Position = [4837068.7779, -270548.3974, 4134608.7081];
 
-function parseHash(): { pos: Position; ref: Position } | null {
-  try {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return null;
-    const params = new URLSearchParams(hash);
-    const p = params.get('p')?.split(',').map(Number);
-    const r = params.get('r')?.split(',').map(Number);
-    if (p?.length === 3 && r?.length === 3 && p.every(isFinite) && r.every(isFinite)) {
-      return { pos: p as Position, ref: r as Position };
-    }
-  } catch { /* ignore malformed hash */ }
-  return null;
-}
-
-function writeHash(pos: Position, ref: Position) {
-  const hash = `p=${pos.map(v => v.toFixed(1)).join(',')}&r=${ref.map(v => v.toFixed(1)).join(',')}`;
-  window.history.replaceState(null, '', `#${hash}`);
-}
-
 export default function PositioningCalculatorPage() {
-  const [position, setPosition] = useState<Position>(() => {
-    return parseHash()?.pos ?? DEFAULT_POS;
-  });
-  const [refPosition, setRefPosition] = useState<Position>(() => {
-    return parseHash()?.ref ?? DEFAULT_REF;
-  });
-
-  // Sync state to URL hash
-  useEffect(() => {
-    writeHash(position, refPosition);
-  }, [position, refPosition]);
+  const [position, setPosition] = useState<Position>(DEFAULT_POS);
+  const [refPosition, setRefPosition] = useState<Position>(DEFAULT_REF);
 
   const handleSwap = useCallback(() => {
     setPosition(refPosition);
