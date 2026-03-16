@@ -31,7 +31,10 @@ self.addEventListener('fetch', (event) => {
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         return response;
-      }).catch(() => caches.match(request))
+      }).catch(() => caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return new Response('Offline', { status: 503, statusText: 'Service Unavailable', headers: { 'Content-Type': 'text/html' } });
+      }))
     );
     return;
   }
@@ -58,7 +61,10 @@ self.addEventListener('fetch', (event) => {
         const clone = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         return response;
-      }).catch(() => caches.match(request))
+      }).catch(() => caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return new Response('', { status: 503, statusText: 'Service Unavailable' });
+      }))
     );
   }
 });
