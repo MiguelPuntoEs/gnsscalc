@@ -2,10 +2,10 @@
  * Cloudflare Worker entry point.
  *
  * - Durable Object (EphemerisCollector): maintains a persistent NTRIP
- *   connection to IGS BCEP00BKG0. The fetch handler awaits the stream
- *   read loop, keeping the DO alive for the entire connection lifetime.
- *   Alarms act as a watchdog — if the stream drops, the alarm reconnects.
- * - GET /api/constellation-status: reads KV and returns JSON.
+ *   connection. The alarm handler runs the stream read loop — as long as
+ *   the alarm handler is awaiting reads, the DO stays alive. On disconnect,
+ *   it re-arms the alarm to reconnect.
+ * - GET /api/constellation-status: reads KV and returns JSON, pokes the DO.
  * - Everything else falls through to static assets.
  */
 
@@ -21,8 +21,7 @@ const CASTER_PORT = 2101;
 const MOUNTPOINT = 'BCEP00BKG0';
 const KV_KEY = 'constellation-status';
 const KV_TTL_SECONDS = 300;
-const KV_FLUSH_INTERVAL_MS = 10_000; // write to KV every 10s
-const WATCHDOG_INTERVAL_MS = 30_000; // alarm checks every 30s
+const KV_FLUSH_INTERVAL_MS = 10_000;
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -45,7 +44,6 @@ export class EphemerisCollector implements DurableObject {
   private state: DurableObjectState;
   private env: Env;
   private satellites: Record<string, EphemerisInfo> = {};
-  private streaming = false;
   private lastKvWrite = 0;
   private initialized = false;
 
@@ -55,42 +53,32 @@ export class EphemerisCollector implements DurableObject {
   }
 
   async fetch(_request: Request): Promise<Response> {
+    // Quick ping — just ensure the alarm is armed so the stream starts
     if (!this.initialized) await this.initialize();
 
-    // Arm the watchdog alarm
-    await this.armWatchdog();
-
-    if (this.streaming) {
-      // Already streaming from another fetch — just return
-      return new Response('already streaming');
+    const current = await this.state.storage.getAlarm();
+    if (!current) {
+      console.log('Ping: arming alarm to start stream');
+      await this.state.storage.setAlarm(Date.now() + 100);
     }
 
-    // Start the persistent stream. This await blocks the fetch handler,
-    // keeping the DO alive for the entire stream lifetime.
-    console.log('Starting persistent NTRIP stream');
-    await this.streamLoop();
-
-    return new Response('stream ended');
+    return new Response(JSON.stringify({
+      satellites: Object.keys(this.satellites).length,
+      lastKvWrite: this.lastKvWrite,
+    }), { headers: { 'Content-Type': 'application/json' } });
   }
 
   async alarm(): Promise<void> {
-    // Watchdog: if we're not streaming, poke ourselves to reconnect
-    if (!this.streaming) {
-      console.log('Watchdog: stream not active, reconnecting');
-      if (!this.initialized) await this.initialize();
-      await this.armWatchdog();
-      await this.streamLoop();
-    } else {
-      // Stream is alive, just re-arm
-      await this.armWatchdog();
-    }
-  }
+    // The alarm handler runs the persistent stream.
+    // As long as we're awaiting reader.read(), the DO stays alive.
+    if (!this.initialized) await this.initialize();
 
-  private async armWatchdog(): Promise<void> {
-    const current = await this.state.storage.getAlarm();
-    if (!current) {
-      await this.state.storage.setAlarm(Date.now() + WATCHDOG_INTERVAL_MS);
-    }
+    console.log('Alarm: starting NTRIP stream');
+    await this.streamLoop();
+
+    // Stream ended (disconnect/error) — reconnect in 2s
+    console.log('Alarm: stream ended, re-arming in 2s');
+    await this.state.storage.setAlarm(Date.now() + 2_000);
   }
 
   private async initialize(): Promise<void> {
@@ -106,9 +94,6 @@ export class EphemerisCollector implements DurableObject {
   }
 
   private async streamLoop(): Promise<void> {
-    if (this.streaming) return;
-    this.streaming = true;
-
     const controller = new AbortController();
 
     try {
@@ -136,7 +121,7 @@ export class EphemerisCollector implements DurableObject {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          console.log('NTRIP stream ended (server closed)');
+          console.log('Stream ended (server closed)');
           break;
         }
 
@@ -158,19 +143,13 @@ export class EphemerisCollector implements DurableObject {
         console.error('NTRIP stream error:', err.message);
       }
     } finally {
-      this.streaming = false;
       controller.abort();
-      // Final flush
       await this.flushToKv();
-      // Re-arm watchdog to reconnect
-      await this.state.storage.setAlarm(Date.now() + 2_000);
-      console.log('Stream disconnected, watchdog will reconnect in 2s');
     }
   }
 
   private async flushToKv(): Promise<void> {
     const now = Date.now();
-    // Prune stale satellites
     for (const [prn, eph] of Object.entries(this.satellites)) {
       if (now - eph.lastReceived > 30 * 60 * 1000) {
         delete this.satellites[prn];
@@ -196,11 +175,11 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/constellation-status') {
-      // Poke the DO to ensure it's alive (fire-and-forget — the DO's
-      // fetch blocks for the stream lifetime, we don't want to wait)
+      // Poke the DO to ensure the alarm is set
       const id = env.EPHEMERIS_COLLECTOR.idFromName('singleton');
       const stub = env.EPHEMERIS_COLLECTOR.get(id);
-      stub.fetch(new Request('https://dummy/ping')).catch(() => {});
+      // Await the ping — it returns immediately (doesn't block on stream)
+      await stub.fetch(new Request('https://dummy/ping'));
 
       const raw = await env.EPHEMERIS_KV.get(KV_KEY);
       return new Response(raw ?? JSON.stringify({ updatedAt: 0, satellites: {} }), {

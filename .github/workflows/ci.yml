@@ -24,7 +24,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Type check
-        run: pnpm exec tsc --noEmit --skipLibCheck
+        run: |
+          pnpm exec tsc --noEmit --skipLibCheck
+          pnpm exec tsc --noEmit --skipLibCheck --project worker/tsconfig.json
 
       - name: Fetch e2e test data
         run: bash scripts/fetch-e2e-data.sh
