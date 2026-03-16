@@ -133,7 +133,17 @@ function ephDate(eph: EphemerisInfo): Date | null {
   }
   if (eph.week !== undefined && eph.toe !== undefined) {
     const epoch = sys === 'C' ? BDS_EPOCH_MS : GPS_EPOCH_MS;
-    return new Date(epoch + eph.week * 7 * 86400_000 + eph.toe * 1000);
+    let week = eph.week;
+    // GPS (1019) and QZSS (1044) transmit a 10-bit week that rolls over at 1024.
+    // Resolve to the current rollover cycle based on the current GPS week.
+    if (sys === 'G' || sys === 'J') {
+      const currentGpsWeek = Math.floor((Date.now() - GPS_EPOCH_MS) / (7 * 86400_000));
+      const rollover = Math.floor(currentGpsWeek / 1024) * 1024;
+      week += rollover;
+      // If the resolved week is more than 512 weeks in the future, it's from the previous cycle
+      if (week > currentGpsWeek + 512) week -= 1024;
+    }
+    return new Date(epoch + week * 7 * 86400_000 + eph.toe * 1000);
   }
   return null;
 }
