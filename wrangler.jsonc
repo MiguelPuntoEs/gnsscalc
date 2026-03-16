@@ -23,7 +23,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["EphemerisCollector"]
+      "new_sqlite_classes": ["EphemerisCollector"]
     }
   ]
 }
