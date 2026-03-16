@@ -12,6 +12,12 @@
       "id": "4d75d33fc7ef4bcd87c5bc0fedc3657e"
     }
   ],
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
   "durable_objects": {
     "bindings": [
       {
