@@ -5,7 +5,7 @@
  *   connection. The alarm handler runs the stream read loop — as long as
  *   the alarm handler is awaiting reads, the DO stays alive. On disconnect,
  *   it re-arms the alarm to reconnect.
- * - GET /api/constellation-status: reads KV and returns JSON, pokes the DO.
+ * - GET /api/constellation-status: served directly from the DO's in-memory state.
  * - Everything else falls through to static assets.
  */
 
@@ -19,15 +19,10 @@ const NTRIP_PROXY = 'https://ntrip-proxy.gnsscalc.com';
 const CASTER_HOST = 'products.igs-ip.net';
 const CASTER_PORT = 2101;
 const MOUNTPOINT = 'BCEP00BKG0';
-const KV_KEY = 'constellation-status';
-const KV_TTL_SECONDS = 300;
-const KV_FLUSH_INTERVAL_MS = 10_000;
-
 /* ── Types ────────────────────────────────────────────────────── */
 
 interface Env {
   ASSETS: Fetcher;
-  EPHEMERIS_KV: KVNamespace;
   EPHEMERIS_COLLECTOR: DurableObjectNamespace;
   NTRIP_USERNAME: string;
   NTRIP_PASSWORD: string;
@@ -44,8 +39,8 @@ export class EphemerisCollector implements DurableObject {
   private state: DurableObjectState;
   private env: Env;
   private satellites: Record<string, EphemerisInfo> = {};
-  private lastKvWrite = 0;
-  private initialized = false;
+  private lastEphReceived = 0;
+  private consecutiveFailures = 0;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
@@ -53,56 +48,47 @@ export class EphemerisCollector implements DurableObject {
   }
 
   async fetch(_request: Request): Promise<Response> {
-    // Quick ping — just ensure the alarm is armed so the stream starts
-    if (!this.initialized) await this.initialize();
-
+    // Ensure the alarm is armed so the stream starts
     const current = await this.state.storage.getAlarm();
     if (!current) {
       console.log('Ping: arming alarm to start stream');
       await this.state.storage.setAlarm(Date.now() + 100);
     }
 
-    return new Response(JSON.stringify({
-      satellites: Object.keys(this.satellites).length,
-      lastKvWrite: this.lastKvWrite,
-    }), { headers: { 'Content-Type': 'application/json' } });
+    const data: ConstellationStatusData = {
+      updatedAt: this.lastEphReceived,
+      satellites: this.satellites,
+    };
+
+    return new Response(JSON.stringify(data), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=10',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
   }
 
   async alarm(): Promise<void> {
-    // The alarm handler runs the persistent stream.
-    // As long as we're awaiting reader.read(), the DO stays alive.
-    if (!this.initialized) await this.initialize();
-
     console.log('Alarm: starting NTRIP stream');
-    await this.streamLoop();
+    const connected = await this.streamLoop();
 
-    // Stream ended (disconnect/error) — reconnect in 2s
-    console.log('Alarm: stream ended, re-arming in 2s');
-    await this.state.storage.setAlarm(Date.now() + 2_000);
+    if (connected) {
+      this.consecutiveFailures = 0;
+    } else {
+      this.consecutiveFailures++;
+    }
+
+    // Exponential backoff: 2s, 4s, 8s, 16s, 32s, 60s max
+    const delay = Math.min(2_000 * 2 ** this.consecutiveFailures, 60_000);
+    console.log(`Alarm: stream ended, re-arming in ${delay / 1000}s (failures: ${this.consecutiveFailures})`);
+    await this.state.storage.setAlarm(Date.now() + delay);
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      const raw = await this.env.EPHEMERIS_KV.get(KV_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as ConstellationStatusData;
-        // Filter out invalid PRNs from older decoder bugs
-        for (const [prn] of Object.entries(parsed.satellites)) {
-          const sys = prn.charAt(0);
-          const num = parseInt(prn.slice(1), 10);
-          if (sys === 'J' && num > 10) continue; // QZSS max PRN is 10
-          if (sys === 'G' && num > 32) continue;
-          if (sys === 'R' && num > 27) continue;
-          this.satellites[prn] = parsed.satellites[prn];
-        }
-        console.log(`Loaded ${Object.keys(this.satellites).length} satellites from KV`);
-      }
-    } catch { /* start fresh */ }
-    this.initialized = true;
-  }
-
-  private async streamLoop(): Promise<void> {
+  /** Returns true if the stream connected successfully (even if it later disconnected). */
+  private async streamLoop(): Promise<boolean> {
     const controller = new AbortController();
+    let connected = false;
 
     try {
       const headers: Record<string, string> = {
@@ -123,6 +109,7 @@ export class EphemerisCollector implements DurableObject {
       }
 
       console.log('Connected to NTRIP stream');
+      connected = true;
       const reader = res.body.getReader();
       const decoder = new Rtcm3Decoder();
 
@@ -138,12 +125,8 @@ export class EphemerisCollector implements DurableObject {
           const eph = decodeEphemeris(frame);
           if (eph) {
             this.satellites[eph.prn] = eph;
+            this.lastEphReceived = Date.now();
           }
-        }
-
-        // Periodic flush to KV
-        if (Date.now() - this.lastKvWrite > KV_FLUSH_INTERVAL_MS) {
-          await this.flushToKv();
         }
       }
     } catch (err: any) {
@@ -152,27 +135,9 @@ export class EphemerisCollector implements DurableObject {
       }
     } finally {
       controller.abort();
-      await this.flushToKv();
-    }
-  }
-
-  private async flushToKv(): Promise<void> {
-    const now = Date.now();
-    for (const [prn, eph] of Object.entries(this.satellites)) {
-      if (now - eph.lastReceived > 30 * 60 * 1000) {
-        delete this.satellites[prn];
-      }
     }
 
-    const data: ConstellationStatusData = {
-      updatedAt: now,
-      satellites: this.satellites,
-    };
-    await this.env.EPHEMERIS_KV.put(KV_KEY, JSON.stringify(data), {
-      expirationTtl: KV_TTL_SECONDS,
-    });
-    this.lastKvWrite = now;
-    console.log(`Flushed ${Object.keys(this.satellites).length} satellites to KV`);
+    return connected;
   }
 }
 
@@ -183,20 +148,9 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/constellation-status') {
-      // Poke the DO to ensure the alarm is set
       const id = env.EPHEMERIS_COLLECTOR.idFromName('singleton');
       const stub = env.EPHEMERIS_COLLECTOR.get(id);
-      // Await the ping — it returns immediately (doesn't block on stream)
-      await stub.fetch(new Request('https://dummy/ping'));
-
-      const raw = await env.EPHEMERIS_KV.get(KV_KEY);
-      return new Response(raw ?? JSON.stringify({ updatedAt: 0, satellites: {} }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=10',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
+      return stub.fetch(request);
     }
 
     return env.ASSETS.fetch(request);

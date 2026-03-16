@@ -6,7 +6,6 @@ import { CONSTELLATION_COLORS } from '../util/gnss-constants';
 
 const API_URL = '/api/constellation-status';
 const POLL_INTERVAL = 30_000;
-const USE_MOCK = false; // flip to false for live data
 
 const GPS_EPOCH_MS = Date.UTC(1980, 0, 6);
 const BDS_EPOCH_MS = Date.UTC(2006, 0, 1);
@@ -27,98 +26,87 @@ interface StatusData {
   satellites: Record<string, EphemerisInfo>;
 }
 
-/* ── Mock data ────────────────────────────────────────────────── */
+/** GPS PRN → Block type mapping (source: NAVCEN, March 2026) */
+const GPS_BLOCK: Record<number, string> = {
+  1: 'III', 2: 'IIR', 3: 'IIF', 4: 'III', 5: 'IIR-M', 6: 'IIF',
+  7: 'IIR-M', 8: 'IIF', 9: 'IIF', 10: 'IIF', 11: 'III', 12: 'IIR-M',
+  13: 'IIR', 14: 'III', 15: 'IIR-M', 16: 'IIR', 17: 'IIR-M', 18: 'III',
+  19: 'IIR', 20: 'IIR', 21: 'III', 22: 'IIR', 23: 'III', 24: 'IIF',
+  25: 'IIF', 26: 'IIF', 27: 'IIF', 28: 'III', 29: 'IIR-M', 30: 'IIF',
+  31: 'IIR-M', 32: 'IIF',
+};
 
-function generateMockData(): StatusData {
-  const satellites: Record<string, EphemerisInfo> = {};
-  const now = Date.now();
+/** BeiDou PRN → generation/orbit mapping */
+function bdsGeneration(prn: number): string {
+  if (prn >= 1 && prn <= 5) return 'BDS-2 GEO';
+  if (prn >= 6 && prn <= 10) return 'BDS-2 IGSO';
+  if (prn >= 11 && prn <= 14) return 'BDS-2 MEO';
+  if (prn === 16) return 'BDS-2 IGSO';
+  if (prn >= 19 && prn <= 37) return 'BDS-3 MEO';
+  if (prn >= 38 && prn <= 40) return 'BDS-3 IGSO';
+  if (prn >= 41 && prn <= 46) return 'BDS-3 MEO';
+  if (prn >= 56 && prn <= 63) return 'BDS-3';
+  return '—';
+}
 
-  // GPS: all 32 healthy
-  for (let i = 1; i <= 32; i++) {
-    const prn = `G${String(i).padStart(2, '0')}`;
-    satellites[prn] = {
-      prn, constellation: 'GPS', health: 0, lastReceived: now, messageType: 1019,
-      week: 2356, toe: 7200 * Math.floor(Math.random() * 12), toc: 7200 * Math.floor(Math.random() * 12),
-      sqrtA: 5153.6 + Math.random() * 0.5, eccentricity: 0.005 + Math.random() * 0.015,
-      inclination: 0.96 + Math.random() * 0.02, omega0: Math.random() * Math.PI * 2 - Math.PI,
-      omegaDot: -8.0e-9, argPerigee: Math.random() * Math.PI * 2 - Math.PI,
-      meanAnomaly: Math.random() * Math.PI * 2 - Math.PI, deltaN: 4.5e-9,
-      idot: -2e-10, crs: Math.random() * 40 - 20, crc: Math.random() * 300,
-      cuc: Math.random() * 1e-6, cus: Math.random() * 1e-5,
-      cic: Math.random() * 1e-7, cis: Math.random() * 1e-7,
-      af0: Math.random() * 1e-4 - 5e-5, af1: Math.random() * 1e-11, af2: 0,
-      ura: 2, iode: Math.floor(Math.random() * 255),
-    };
-  }
+/** Galileo PRN → generation mapping */
+function galGeneration(prn: number): string {
+  if ([11, 12, 19, 20].includes(prn)) return 'IOV';
+  if ([14, 18].includes(prn)) return 'FOC (eccentric)';
+  return 'FOC';
+}
 
-  // Galileo: 28 healthy, 4 unhealthy
-  const galUnhealthy = new Set([14, 18, 28, 32]);
-  for (const id of [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,18,19,21,23,25,26,27,28,29,30,31,32,33,34,36]) {
-    const prn = `E${String(id).padStart(2, '0')}`;
-    satellites[prn] = {
-      prn, constellation: 'Galileo', health: galUnhealthy.has(id) ? (id === 28 || id === 32 ? 3 : 1) : 0,
-      lastReceived: now, messageType: 1046, week: 1356,
-      toe: 600 * Math.floor(Math.random() * 144), toc: 600 * Math.floor(Math.random() * 144),
-      sqrtA: 5440.5 + Math.random() * 0.3, eccentricity: 0.0002 + Math.random() * 0.001,
-      inclination: 0.977 + Math.random() * 0.01, omega0: Math.random() * Math.PI * 2 - Math.PI,
-      omegaDot: -5.4e-9, argPerigee: Math.random() * Math.PI * 2 - Math.PI,
-      meanAnomaly: Math.random() * Math.PI * 2 - Math.PI, deltaN: 3.1e-9,
-      idot: -1.5e-10, crs: Math.random() * 20 - 10, crc: Math.random() * 200,
-      cuc: Math.random() * 5e-7, cus: Math.random() * 5e-6,
-      cic: Math.random() * 5e-8, cis: Math.random() * 5e-8,
-      af0: Math.random() * 1e-5, af1: Math.random() * 1e-12, af2: 0,
-      ura: 3, iode: Math.floor(Math.random() * 1023),
-    };
-  }
+/** QZSS PRN → satellite mapping */
+const QZSS_SAT: Record<number, string> = {
+  1: 'QZS-1 (Block I)',
+  2: 'QZS-2R (Block II)',
+  3: 'QZS-3 (GEO)',
+  4: 'QZS-4 (Block II)',
+  7: 'QZS-1R (Block II)',
+};
 
-  // GLONASS: 24 healthy, 3 unhealthy
-  const gloUnhealthy = new Set([20, 26, 27]);
-  for (let i = 1; i <= 27; i++) {
-    const prn = `R${String(i).padStart(2, '0')}`;
-    satellites[prn] = {
-      prn, constellation: 'GLONASS', health: gloUnhealthy.has(i) ? 1 : 0,
-      lastReceived: now, messageType: 1020,
-      freqChannel: (i % 14) - 7, tb: Math.floor(Math.random() * 96),
-      x: 10000 + Math.random() * 15000, y: -10000 + Math.random() * 20000, z: Math.random() * 20000 - 10000,
-      vx: Math.random() * 4 - 2, vy: Math.random() * 4 - 2, vz: Math.random() * 4 - 2,
-      ax: 0, ay: 0, az: 0,
-      af0: Math.random() * 1e-4, gammaN: Math.random() * 1e-10,
-    };
-  }
+/** SBAS PRN → satellite/system mapping */
+const SBAS_SAT: Record<number, string> = {
+  120: 'EGNOS (PRN120)',
+  121: 'EGNOS (Eutelsat 5WB)',
+  122: 'SPAN (Inmarsat 4F2)',
+  123: 'EGNOS (ASTRA 5B)',
+  124: 'EGNOS',
+  125: 'SDCM (Luch-5A)',
+  126: 'EGNOS',
+  127: 'GAGAN (GSAT-8)',
+  128: 'GAGAN (GSAT-10)',
+  129: 'MSAS (MTSAT-2)',
+  130: 'BDSBAS',
+  131: 'WAAS (Eutelsat 117WB)',
+  133: 'WAAS (SES-15)',
+  135: 'WAAS (Inmarsat 4F3)',
+  136: 'EGNOS',
+  137: 'MSAS (QZS-3)',
+  138: 'WAAS (Anik F1R)',
+  140: 'GAGAN (GSAT-15)',
+  141: 'SDCM (Luch-5B)',
+  143: 'BDSBAS',
+  144: 'BDSBAS',
+  147: 'KASS',
+  148: 'KASS',
+};
 
-  // BeiDou: 48 healthy
-  for (const id of [1,2,3,4,5,6,7,8,9,10,11,12,13,14,16,19,20,21,22,23,24,25,26,27,28,29,30,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,56,59]) {
-    const prn = `C${String(id).padStart(2, '0')}`;
-    satellites[prn] = {
-      prn, constellation: 'BeiDou', health: 0, lastReceived: now, messageType: 1042,
-      week: 956, toe: 3600 * Math.floor(Math.random() * 24), toc: 3600 * Math.floor(Math.random() * 24),
-      sqrtA: id <= 5 ? 6493.5 : 5282.6 + Math.random() * 0.3,
-      eccentricity: 0.001 + Math.random() * 0.01,
-      inclination: id <= 5 ? 0.0087 : 0.96 + Math.random() * 0.02,
-      omega0: Math.random() * Math.PI * 2 - Math.PI, omegaDot: -6e-9,
-      argPerigee: Math.random() * Math.PI * 2 - Math.PI,
-      meanAnomaly: Math.random() * Math.PI * 2 - Math.PI, deltaN: 4e-9,
-      idot: -1e-10, crs: Math.random() * 30, crc: Math.random() * 250,
-      cuc: 0, cus: 0, cic: 0, cis: 0,
-      af0: Math.random() * 1e-5, af1: Math.random() * 1e-12, af2: 0,
-      ura: 2, iode: Math.floor(Math.random() * 255),
-    };
-  }
+/** Ephemeris validity periods per constellation (from ICDs) */
+const VALIDITY_MS: Record<string, number> = {
+  G: 2 * 3600_000,    // GPS: 2 hours (IS-GPS-200N)
+  E: 4 * 3600_000,    // Galileo: 4 hours (OS SIS ICD)
+  R: 30 * 60_000,     // GLONASS: 30 minutes (ICD-GLONASS)
+  C: 1 * 3600_000,    // BeiDou: 1 hour (BDS-SIS-ICD)
+  J: 2 * 3600_000,    // QZSS: 2 hours (IS-QZSS-PNT-006)
+  S: 10 * 60_000,     // SBAS: ~10 minutes
+};
 
-  // SBAS: 20 satellites
-  for (const id of [121,122,123,125,127,128,129,130,131,132,133,134,135,136,137,139,140,141,142,143]) {
-    const prn = `S${String(id).padStart(3, '0')}`;
-    satellites[prn] = {
-      prn, constellation: 'SBAS', health: 0, lastReceived: now, messageType: 1043,
-      toc: Math.floor(Math.random() * 86400), ura: 3, iode: Math.floor(Math.random() * 255),
-      x: 36000 + Math.random() * 6000, y: Math.random() * 40000 - 20000, z: Math.random() * 4000 - 2000,
-      vx: 0.001 * Math.random(), vy: 0.001 * Math.random(), vz: 0.001 * Math.random(),
-      ax: 0, ay: 0, az: 0,
-      af0: Math.random() * 1e-7, af1: Math.random() * 1e-11,
-    };
-  }
-
-  return { updatedAt: now, satellites };
+/** Check if ephemeris has expired based on constellation-specific validity period. */
+function isEphExpired(eph: EphemerisInfo): boolean {
+  const sys = eph.prn.charAt(0);
+  const validity = VALIDITY_MS[sys] ?? 2 * 3600_000;
+  return Date.now() - eph.lastReceived > validity;
 }
 
 /* ── Helpers ──────────────────────────────────────────────────── */
@@ -133,9 +121,10 @@ function formatAge(ms: number): string {
 function ephDate(eph: EphemerisInfo): Date | null {
   const sys = eph.prn.charAt(0);
   if (sys === 'R' && eph.tb !== undefined) {
+    // tb is already in minutes (decoder multiplies by 15), Moscow time
     const now = new Date(eph.lastReceived);
     const utcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    return new Date(utcMidnight + (eph.tb * 900 - 3 * 3600) * 1000);
+    return new Date(utcMidnight + (eph.tb * 60 - 3 * 3600) * 1000);
   }
   if (sys === 'S' && eph.toc !== undefined) {
     const now = new Date(eph.lastReceived);
@@ -151,14 +140,65 @@ function ephDate(eph: EphemerisInfo): Date | null {
 
 /**
  * Determine if a satellite is healthy based on constellation-specific rules.
- * QZSS: only the MSB (bit 5) indicates L1 health. Lower 5 bits indicate
- * per-signal availability (L1C/A, L2C, L5, L1C, L1C/B) — non-zero is normal.
- * See IS-QZSS-PNT-006 Table 4.1.2-5-1/5-2.
+ * GPS:  MSB=0 & 5-bit signal code=0 → healthy (IS-GPS-200N §20.3.3.3.1.4)
+ * QZSS: only the MSB (bit 5) indicates L1 health (IS-QZSS-PNT-006 Table 4.1.2-5-1)
+ * Galileo: SHS 2-bit field, 0 = OK (Galileo OS SIS ICD Table 84)
+ * Others: 0 = healthy
  */
 function isSatHealthy(eph: EphemerisInfo): boolean {
   const sys = eph.prn.charAt(0);
   if (sys === 'J') return (eph.health & 0b100000) === 0; // MSB only
-  return isSatHealthy(eph);
+  return eph.health === 0;
+}
+
+/** GPS 5-bit signal health codes (IS-GPS-200N Table 20-VIII) */
+const GPS_SIGNAL_HEALTH: Record<number, string> = {
+  0: 'All Signals OK',
+  1: 'All Signals Weak',
+  2: 'All Signals Dead',
+  3: 'All Signals — No Data Modulation',
+  4: 'L1 P Signal Weak',
+  5: 'L1 P Signal Dead',
+  6: 'L1 P Signal — No Data Modulation',
+  7: 'L2 P Signal Weak',
+  8: 'L2 P Signal Dead',
+  9: 'L2 P Signal — No Data Modulation',
+  10: 'L1C Signal Weak',
+  11: 'L1C Signal Dead',
+  12: 'L1C Signal — No Data Modulation',
+  13: 'L2C Signal Weak',
+  14: 'L2C Signal Dead',
+  15: 'L2C Signal — No Data Modulation',
+  16: 'L1 & L2 P Signal Weak',
+  17: 'L1 & L2 P Signal Dead',
+  18: 'L1 & L2 P Signal — No Data Modulation',
+  19: 'L1 & L2C Signal Weak',
+  20: 'L1 & L2C Signal Dead',
+  21: 'L1 & L2C Signal — No Data Modulation',
+  22: 'L1 Signal Weak',
+  23: 'L1 Signal Dead',
+  24: 'L1 Signal — No Data Modulation',
+  25: 'L2 Signal Weak',
+  26: 'L2 Signal Dead',
+  27: 'L2 Signal — No Data Modulation',
+  28: 'SV Temporarily Out',
+  29: 'SV Will Be Temporarily Out',
+  30: 'Signals Deformed (URA valid)',
+  31: 'Multiple Anomalies',
+};
+
+/** Galileo Signal Health Status (Galileo OS SIS ICD Table 84) */
+const GAL_SHS: Record<number, string> = {
+  0: 'Signal OK',
+  1: 'Signal Out of Service',
+  2: 'Extended Operations Mode',
+  3: 'Signal in Test',
+};
+
+/** Galileo Data Validity Status (Galileo OS SIS ICD Table 81) */
+function galDvs(v: number | undefined): string {
+  if (v === undefined) return '—';
+  return v === 0 ? 'Valid' : 'No guarantee';
 }
 
 function formatEphTime(d: Date | null): string {
@@ -210,6 +250,11 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
           <span className={`text-xs px-1.5 py-0.5 rounded ${isSatHealthy(eph) ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'}`}>
             {isSatHealthy(eph) ? 'Healthy' : `Unhealthy (${eph.health})`}
           </span>
+          {isEphExpired(eph) && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+              Expired
+            </span>
+          )}
           <span className="text-xs text-fg/30">msg {eph.messageType}</span>
         </div>
         <button
@@ -259,23 +304,45 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
             <Field name="af₁" value={eph.af1 !== undefined ? `${fmtSci(eph.af1)} s/s` : '—'} />
             <Field name="af₂" value={eph.af2 !== undefined ? `${fmtSci(eph.af2)} s/s²` : '—'} />
             <Field name="URA/SISA" value={eph.ura !== undefined ? String(eph.ura) : '—'} />
-            <Field name="Health" value={`${eph.health} (0x${eph.health.toString(16).toUpperCase()})`} />
+            {/* GPS/QZSS: MSB = LNAV health, 5 LSBs = signal component code */}
+            {(sys === 'G' || sys === 'J') && (
+              <>
+                <Field name="LNAV health" value={(eph.health >> 5) === 0 ? 'OK' : 'Bad'} />
+                <Field name="Signal health" value={GPS_SIGNAL_HEALTH[eph.health & 0x1F] ?? `Unknown (${eph.health & 0x1F})`} />
+                {sys === 'G' && <Field name="Block" value={GPS_BLOCK[parseInt(eph.prn.slice(1), 10)] ?? '—'} />}
+                {sys === 'J' && <Field name="Satellite" value={QZSS_SAT[parseInt(eph.prn.slice(1), 10)] ?? '—'} />}
+              </>
+            )}
+            {/* Galileo: 2-bit SHS */}
+            {sys === 'E' && (
+              <>
+                <Field name="SHS" value={GAL_SHS[eph.health] ?? `Unknown (${eph.health})`} />
+                <Field name="Generation" value={galGeneration(parseInt(eph.prn.slice(1), 10))} />
+              </>
+            )}
+            {/* BeiDou: 1-bit */}
+            {sys === 'C' && (
+              <>
+                <Field name="Health" value={eph.health === 0 ? 'OK' : 'Unhealthy'} />
+                <Field name="Generation" value={bdsGeneration(parseInt(eph.prn.slice(1), 10))} />
+              </>
+            )}
             {eph.iodc !== undefined && <Field name="IODC" value={String(eph.iodc)} />}
             {eph.tgd !== undefined && <Field name="TGD" value={`${fmtSci(eph.tgd)} s`} />}
-            {eph.l2Codes !== undefined && <Field name="L2 codes" value={String(eph.l2Codes)} />}
-            {eph.l2PFlag !== undefined && <Field name="L2P flag" value={String(eph.l2PFlag)} />}
+            {(sys === 'G') && eph.l2Codes !== undefined && <Field name="L2 codes" value={String(eph.l2Codes)} />}
+            {(sys === 'G') && eph.l2PFlag !== undefined && <Field name="L2P flag" value={String(eph.l2PFlag)} />}
             {eph.fitInterval !== undefined && <Field name="Fit int." value={String(eph.fitInterval)} />}
           </FieldGroup>
 
-          {/* Galileo-specific group delay */}
+          {/* Galileo-specific group delay & validity */}
           {sys === 'E' && (
-            <FieldGroup label="Group delay">
+            <FieldGroup label="Group delay & validity">
               {eph.bgdE5aE1 !== undefined && <Field name="BGD E5a/E1" value={`${fmtSci(eph.bgdE5aE1)} s`} />}
               {eph.bgdE5bE1 !== undefined && <Field name="BGD E5b/E1" value={`${fmtSci(eph.bgdE5bE1)} s`} />}
-              {eph.e5aDataInvalid !== undefined && <Field name="E5a valid" value={eph.e5aDataInvalid === 0 ? 'Yes' : 'No'} />}
-              {eph.e5bDataInvalid !== undefined && <Field name="E5b valid" value={eph.e5bDataInvalid === 0 ? 'Yes' : 'No'} />}
-              {eph.e1bHealth !== undefined && <Field name="E1B health" value={String(eph.e1bHealth)} />}
-              {eph.e1bDataInvalid !== undefined && <Field name="E1B valid" value={eph.e1bDataInvalid === 0 ? 'Yes' : 'No'} />}
+              {eph.e5aDataInvalid !== undefined && <Field name="E5a DVS" value={galDvs(eph.e5aDataInvalid)} />}
+              {eph.e5bDataInvalid !== undefined && <Field name="E5b DVS" value={galDvs(eph.e5bDataInvalid)} />}
+              {eph.e1bHealth !== undefined && <Field name="E1B SHS" value={GAL_SHS[eph.e1bHealth] ?? String(eph.e1bHealth)} />}
+              {eph.e1bDataInvalid !== undefined && <Field name="E1B DVS" value={galDvs(eph.e1bDataInvalid)} />}
             </FieldGroup>
           )}
 
@@ -316,6 +383,12 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
             <Field name="Vz" value={eph.vz !== undefined ? `${eph.vz.toFixed(6)} km/s` : '—'} />
           </FieldGroup>
 
+          <FieldGroup label="Acceleration">
+            <Field name="Ax" value={eph.ax !== undefined ? `${fmtSci(eph.ax)} km/s²` : '—'} />
+            <Field name="Ay" value={eph.ay !== undefined ? `${fmtSci(eph.ay)} km/s²` : '—'} />
+            <Field name="Az" value={eph.az !== undefined ? `${fmtSci(eph.az)} km/s²` : '—'} />
+          </FieldGroup>
+
           <FieldGroup label="Clock">
             {isGlonass && (
               <>
@@ -330,8 +403,10 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
             )}
             {isSbas && (
               <>
+                <Field name="Satellite" value={SBAS_SAT[parseInt(eph.prn.slice(1), 10)] ?? '—'} />
                 <Field name="af₀" value={eph.af0 !== undefined ? `${fmtSci(eph.af0)} s` : '—'} />
                 <Field name="af₁" value={eph.af1 !== undefined ? `${fmtSci(eph.af1)} s/s` : '—'} />
+                <Field name="t₀" value={eph.toc !== undefined ? `${eph.toc} s` : '—'} />
                 <Field name="IODN" value={eph.iode !== undefined ? String(eph.iode) : '—'} />
                 <Field name="URA" value={eph.ura !== undefined ? String(eph.ura) : '—'} />
               </>
@@ -344,7 +419,7 @@ function EphemerisDetail({ eph, onClose }: { eph: EphemerisInfo; onClose: () => 
               {eph.en !== undefined && <Field name="En (age)" value={`${eph.en} d`} />}
               {eph.nt !== undefined && <Field name="NT (day)" value={String(eph.nt)} />}
               {eph.n4 !== undefined && <Field name="N4 (4-yr)" value={String(eph.n4)} />}
-              {eph.satType !== undefined && <Field name="Type (M)" value={String(eph.satType)} />}
+              {eph.satType !== undefined && <Field name="Type" value={eph.satType === 0 ? 'GLONASS' : eph.satType === 1 ? 'GLONASS-M' : `Unknown (${eph.satType})`} />}
               {eph.tauC !== undefined && <Field name="τc" value={`${fmtSci(eph.tauC)} s`} />}
               {eph.tauGPS !== undefined && <Field name="τGPS" value={`${fmtSci(eph.tauGPS)} s`} />}
             </FieldGroup>
@@ -376,14 +451,13 @@ function Field({ name, value }: { name: string; value: string }) {
 /* ── Main component ───────────────────────────────────────────── */
 
 export default function ConstellationStatusPage() {
-  const [data, setData] = useState<StatusData | null>(USE_MOCK ? generateMockData() : null);
-  const [loading, setLoading] = useState(!USE_MOCK);
+  const [data, setData] = useState<StatusData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPrn, setSelectedPrn] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (USE_MOCK) return;
     try {
       const res = await fetch(API_URL);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -399,7 +473,6 @@ export default function ConstellationStatusPage() {
 
   useEffect(() => {
     fetchData();
-    if (USE_MOCK) return;
     timerRef.current = setInterval(fetchData, POLL_INTERVAL);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [fetchData]);
@@ -412,7 +485,14 @@ export default function ConstellationStatusPage() {
   const totalSats = satellites.size;
   const healthySats = [...satellites.values()].filter(e => isSatHealthy(e)).length;
   const unhealthySats = totalSats - healthySats;
-  const updatedAge = data?.updatedAt ? Date.now() - data.updatedAt : null;
+
+  // Tick the "Updated Xs ago" display every 5 seconds
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(id);
+  }, []);
+  const updatedAge = data?.updatedAt ? now - data.updatedAt : null;
 
   // Which constellation owns the selected PRN?
   const selectedSys = selectedPrn?.charAt(0) ?? null;
@@ -458,7 +538,7 @@ export default function ConstellationStatusPage() {
         const slots = CONSTELLATION_SLOTS[sys]!;
         const color = CONSTELLATION_COLORS[sys] ?? '#7c8aff';
         const sysEphs = [...satellites.values()].filter(e => e.prn.startsWith(sys));
-        const unhealthy = sysEphs.filter(e => e.health !== 0).length;
+        const unhealthy = sysEphs.filter(e => !isSatHealthy(e)).length;
 
         return (
           <section key={sys} className="space-y-3">
@@ -483,9 +563,30 @@ export default function ConstellationStatusPage() {
                 const prn = `${slots.prefix}${String(slots.min + i).padStart(slots.padWidth, '0')}`;
                 const eph = satellites.get(prn);
                 const hasEph = !!eph;
+                const expired = eph ? isEphExpired(eph) : false;
                 const isHealthy = eph ? isSatHealthy(eph) : false;
                 const isSelected = prn === selectedPrn;
                 const date = eph ? ephDate(eph) : null;
+
+                // Three visual states: healthy (green), unhealthy (red), expired (amber/dimmed)
+                const cellStyle = isSelected
+                  ? 'ring-2 ring-accent bg-accent/10 border border-accent/30 scale-105'
+                  : !hasEph
+                    ? 'bg-fg/[0.03] border border-fg/[0.06] cursor-default'
+                    : expired
+                      ? 'bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 hover:scale-105 hover:shadow-md hover:shadow-amber-500/5'
+                      : isHealthy
+                        ? 'bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 hover:scale-105 hover:shadow-md hover:shadow-green-500/5'
+                        : 'bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 hover:scale-105 hover:shadow-md hover:shadow-red-500/5';
+
+                const prnColor = isSelected ? 'text-accent'
+                  : !hasEph ? 'text-fg/20'
+                    : expired ? 'text-amber-300/60'
+                      : isHealthy ? 'text-green-300' : 'text-red-300';
+
+                const timeColor = isSelected ? 'text-accent/60'
+                  : expired ? 'text-amber-400/40'
+                    : isHealthy ? 'text-green-400/60' : 'text-red-400/60';
 
                 return (
                   <button
@@ -493,29 +594,13 @@ export default function ConstellationStatusPage() {
                     type="button"
                     disabled={!hasEph}
                     onClick={() => setSelectedPrn(isSelected ? null : prn)}
-                    className={`rounded-md px-2 py-1.5 text-center transition-all duration-100 ${
-                      isSelected
-                        ? 'ring-2 ring-accent bg-accent/10 border border-accent/30 scale-105'
-                        : hasEph
-                          ? isHealthy
-                            ? 'bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 hover:scale-105 hover:shadow-md hover:shadow-green-500/5'
-                            : 'bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 hover:scale-105 hover:shadow-md hover:shadow-red-500/5'
-                          : 'bg-fg/[0.03] border border-fg/[0.06] cursor-default'
-                    } ${hasEph ? 'cursor-pointer' : ''}`}
+                    className={`rounded-md px-2 py-1.5 text-center transition-all duration-100 ${cellStyle} ${hasEph ? 'cursor-pointer' : ''}`}
                   >
-                    <div className={`text-xs font-mono font-semibold ${
-                      isSelected ? 'text-accent'
-                        : hasEph
-                          ? isHealthy ? 'text-green-300' : 'text-red-300'
-                          : 'text-fg/20'
-                    }`}>
+                    <div className={`text-xs font-mono font-semibold ${prnColor}`}>
                       {prn}
                     </div>
                     {hasEph && (
-                      <div className={`text-[10px] ${
-                        isSelected ? 'text-accent/60'
-                          : isHealthy ? 'text-green-400/60' : 'text-red-400/60'
-                      }`}>
+                      <div className={`text-[10px] ${timeColor}`}>
                         {formatEphTime(date)}
                       </div>
                     )}
@@ -542,6 +627,10 @@ export default function ConstellationStatusPage() {
           <span className="flex items-center gap-1.5">
             <span className="inline-block size-3 rounded bg-red-500/10 border border-red-500/20" />
             Unhealthy
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-3 rounded bg-amber-500/10 border border-amber-500/20" />
+            Expired
           </span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block size-3 rounded bg-fg/[0.03] border border-fg/[0.06]" />

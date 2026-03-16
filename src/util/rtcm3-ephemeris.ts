@@ -90,13 +90,11 @@ export function readString(r: BitReader, nChars: number): string {
 }
 
 /* ================================================================== */
-/*  GPS / QZSS ephemeris (1019, 1044)                                  */
+/*  GPS ephemeris (1019)                                               */
 /* ================================================================== */
 
-/**
- * Decode GPS ephemeris (message 1019) or QZSS ephemeris (1044, same structure).
- */
-function decodeGpsLikeEphemeris(payload: Uint8Array, constellation: string, prefix: string, msgType: number): EphemerisInfo | null {
+/** Decode GPS ephemeris (message 1019). */
+function decodeGpsEphemeris(payload: Uint8Array): EphemerisInfo | null {
   if (payload.length < 60) return null;
   const r = new BitReader(payload);
   r.skip(12);                          // message type
@@ -132,8 +130,8 @@ function decodeGpsLikeEphemeris(payload: Uint8Array, constellation: string, pref
   const fitInterval = r.readU(1);
 
   return {
-    prn: `${prefix}${String(svId).padStart(2, '0')}`,
-    constellation, health, lastReceived: Date.now(), messageType: msgType,
+    prn: `G${String(svId).padStart(2, '0')}`,
+    constellation: 'GPS', health, lastReceived: Date.now(), messageType: 1019,
     week, ura, toc, toe, sqrtA, eccentricity: e,
     inclination: i0, omega0, omegaDot, argPerigee, meanAnomaly: m0,
     deltaN, idot, crs, crc, cuc, cus, cic, cis, af0, af1, af2,
@@ -157,7 +155,8 @@ function decodeGlonassEphemeris(payload: Uint8Array): EphemerisInfo | null {
   const tkHours = r.readU(5);
   const tkMins = r.readU(6);
   const tk30s = r.readU(1);
-  const tk = (tkHours * 3600 + tkMins * 60 + tk30s * 30) - 3 * 3600; // Moscow→UTC
+  const tkMoscow = tkHours * 3600 + tkMins * 60 + tk30s * 30;
+  const tk = ((tkMoscow - 3 * 3600) % 86400 + 86400) % 86400; // Moscow→UTC, wrap at day boundary
   const healthBn = r.readU(1);
   r.skip(1);                           // P2
   const tb = r.readU(7) * 15;           // time interval index → minutes
@@ -309,10 +308,6 @@ function decodeBdsEphemeris(payload: Uint8Array): EphemerisInfo | null {
 }
 
 /* ================================================================== */
-/*  Public entry point                                                 */
-/* ================================================================== */
-
-/* ================================================================== */
 /*  SBAS ephemeris (1043)                                              */
 /* ================================================================== */
 
@@ -411,7 +406,7 @@ function decodeQzssEphemeris(payload: Uint8Array): EphemerisInfo | null {
 export function decodeEphemeris(frame: Rtcm3Frame): EphemerisInfo | null {
   try {
     switch (frame.messageType) {
-      case 1019: return decodeGpsLikeEphemeris(frame.payload, 'GPS', 'G', 1019);
+      case 1019: return decodeGpsEphemeris(frame.payload);
       case 1020: return decodeGlonassEphemeris(frame.payload);
       case 1042: return decodeBdsEphemeris(frame.payload);
       case 1043: return decodeSbasEphemeris(frame.payload);
