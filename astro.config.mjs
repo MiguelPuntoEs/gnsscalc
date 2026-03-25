@@ -26,11 +26,7 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
-    resolve: {
-      alias: {
-        'gnss-js': 'gnss-js/dist/index.js',
-      },
-    },
+    resolve: {},
     optimizeDeps: {
       include: ['react-imask', 'imask'],
     },
