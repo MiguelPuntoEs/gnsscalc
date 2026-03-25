@@ -111,6 +111,7 @@ export default function AddressSearch({
         </div>
         <input
           type="text"
+          autoComplete="off"
           className="w-full rounded-lg bg-input/70 border border-border/50 text-left text-sm pl-8 pr-7 py-1.5 placeholder:text-fg/30 focus:border-accent/50 focus:outline-none transition-colors"
           placeholder="Search address..."
           value={query}
