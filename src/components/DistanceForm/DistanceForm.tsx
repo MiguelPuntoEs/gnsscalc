@@ -10,7 +10,7 @@ function formatDistance(meters: number): string {
 }
 
 function normalizeBearing(deg: number): string {
-  return ((deg % 360 + 360) % 360).toFixed(4);
+  return (((deg % 360) + 360) % 360).toFixed(4);
 }
 
 export default function DistanceForm({
@@ -42,39 +42,59 @@ export default function DistanceForm({
         <div className="card-fields">
           <span className="section-label">Distances</span>
 
-          <label title="Orthodromic (great-circle) distance on the WGS84 ellipsoid">Orthodromic</label>
+          <span title="Orthodromic (great-circle) distance on the WGS84 ellipsoid">
+            Orthodromic
+          </span>
           <CopyableInput value={formatDistance(orthodromic)} />
 
-          <label title="Loxodromic (rhumb line) distance — constant bearing path">Loxodromic</label>
+          <span title="Loxodromic (rhumb line) distance — constant bearing path">
+            Loxodromic
+          </span>
           <CopyableInput value={formatDistance(loxodromic)} />
 
-          <label title="3D Euclidean straight-line distance through the Earth">Euclidean</label>
+          <span title="3D Euclidean straight-line distance through the Earth">
+            Euclidean
+          </span>
           <CopyableInput value={formatDistance(euclidean)} />
         </div>
 
         <div className="card-fields">
           <span className="section-label">Bearings</span>
 
-          <label title="Initial bearing of the great-circle path (degrees)">Initial</label>
+          <span title="Initial bearing of the great-circle path (degrees)">
+            Initial
+          </span>
           <CopyableInput value={`${normalizeBearing(initialBearing)}°`} />
 
-          <label title="Final bearing of the great-circle path (degrees)">Final</label>
+          <span title="Final bearing of the great-circle path (degrees)">
+            Final
+          </span>
           <CopyableInput value={`${normalizeBearing(finalBearing)}°`} />
 
-          <label title="Constant bearing along the rhumb line (degrees)">Rhumb</label>
+          <span title="Constant bearing along the rhumb line (degrees)">
+            Rhumb
+          </span>
           <CopyableInput value={`${normalizeBearing(rhumbBearing)}°`} />
         </div>
 
         <div className="card-fields">
           <span className="section-label">Misc</span>
 
-          <label title="Geographic midpoint along the great-circle arc">Midpoint</label>
-          <CopyableInput value={`${midpoint[0].toFixed(6)}°, ${midpoint[1].toFixed(6)}°`} />
+          <span title="Geographic midpoint along the great-circle arc">
+            Midpoint
+          </span>
+          <CopyableInput
+            value={`${midpoint[0].toFixed(6)}°, ${midpoint[1].toFixed(6)}°`}
+          />
 
-          <label title="Geometric horizon distance from reference position height">Horizon (ref)</label>
+          <span title="Geometric horizon distance from reference position height">
+            Horizon (ref)
+          </span>
           <CopyableInput value={formatDistance(horizonA)} />
 
-          <label title="Geometric horizon distance from target position height">Horizon (pos)</label>
+          <span title="Geometric horizon distance from target position height">
+            Horizon (pos)
+          </span>
           <CopyableInput value={formatDistance(horizonB)} />
         </div>
       </div>

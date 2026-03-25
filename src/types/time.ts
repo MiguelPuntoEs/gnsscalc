@@ -1,4 +1,4 @@
-import type { HourCode } from 'gnss-js';
+import type { HourCode } from 'gnss-js/time';
 
 export type TimeResult = {
   weekNumber: number;

@@ -5,41 +5,46 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 type FetchListener = (event: MockFetchEvent) => void;
 
 let fetchListener: FetchListener;
-let installListener: (event: { waitUntil: (p: Promise<unknown>) => void }) => void;
-let activateListener: (event: { waitUntil: (p: Promise<unknown>) => void }) => void;
+let _installListener: (event: {
+  waitUntil: (p: Promise<unknown>) => void;
+}) => void;
+let _activateListener: (event: {
+  waitUntil: (p: Promise<unknown>) => void;
+}) => void;
 
 const cacheStore = new Map<string, Map<string, Response>>();
 
 const mockCache = {
-  put: vi.fn(async (req: Request | string, res: Response) => {
+  put: vi.fn((req: Request | string, res: Response) => {
     const key = typeof req === 'string' ? req : req.url;
     const cacheName = 'gnsscalc-v1';
     if (!cacheStore.has(cacheName)) cacheStore.set(cacheName, new Map());
     cacheStore.get(cacheName)!.set(key, res);
+    return Promise.resolve();
   }),
-  addAll: vi.fn(async () => {}),
-  match: vi.fn(async (req: Request | string) => {
+  addAll: vi.fn(() => Promise.resolve()),
+  match: vi.fn((req: Request | string): Promise<Response | undefined> => {
     const key = typeof req === 'string' ? req : req.url;
     for (const cache of cacheStore.values()) {
-      if (cache.has(key)) return cache.get(key)!;
+      if (cache.has(key)) return Promise.resolve(cache.get(key)!);
     }
-    return undefined;
+    return Promise.resolve(undefined);
   }),
 };
 
 const mockCaches = {
-  open: vi.fn(async () => mockCache),
-  match: vi.fn(async (req: Request | string) => {
+  open: vi.fn(() => Promise.resolve(mockCache)),
+  match: vi.fn((req: Request | string): Promise<Response | undefined> => {
     const key = typeof req === 'string' ? req : req.url;
     for (const cache of cacheStore.values()) {
-      if (cache.has(key)) return cache.get(key)!;
+      if (cache.has(key)) return Promise.resolve(cache.get(key)!);
     }
-    return undefined;
+    return Promise.resolve(undefined);
   }),
-  keys: vi.fn(async () => [...cacheStore.keys()]),
-  delete: vi.fn(async (name: string) => {
+  keys: vi.fn(() => Promise.resolve([...cacheStore.keys()])),
+  delete: vi.fn((name: string) => {
     cacheStore.delete(name);
-    return true;
+    return Promise.resolve(true);
   }),
 };
 
@@ -54,7 +59,8 @@ class MockFetchEvent {
 
   respondWith(response: Promise<Response> | Response) {
     this._responded = true;
-    this._response = response instanceof Response ? Promise.resolve(response) : response;
+    this._response =
+      response instanceof Response ? Promise.resolve(response) : response;
   }
 
   get responded() {
@@ -67,7 +73,10 @@ class MockFetchEvent {
   }
 }
 
-function makeRequest(url: string, opts: { mode?: string; method?: string; destination?: string } = {}): Request {
+function makeRequest(
+  url: string,
+  opts: { mode?: string; method?: string; destination?: string } = {},
+): Request {
   const req = new Request(url, { method: opts.method ?? 'GET' });
   Object.defineProperty(req, 'mode', { value: opts.mode ?? 'cors' });
   Object.defineProperty(req, 'destination', { value: opts.destination ?? '' });
@@ -79,8 +88,10 @@ Object.assign(globalThis, {
   self: {
     addEventListener: (type: string, handler: (...args: unknown[]) => void) => {
       if (type === 'fetch') fetchListener = handler as FetchListener;
-      if (type === 'install') installListener = handler as typeof installListener;
-      if (type === 'activate') activateListener = handler as typeof activateListener;
+      if (type === 'install')
+        _installListener = handler as typeof _installListener;
+      if (type === 'activate')
+        _activateListener = handler as typeof _activateListener;
     },
     skipWaiting: vi.fn(),
     clients: { claim: vi.fn() },
@@ -97,26 +108,31 @@ await import('../../../public/sw.js');
 
 describe('Service Worker', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
     cacheStore.clear();
-    // Re-assign mocks that vi.restoreAllMocks may have cleared
-    mockCache.put = vi.fn(async (req: Request | string, res: Response) => {
+    // Re-assign mock implementations
+    mockCache.put = vi.fn((req: Request | string, res: Response) => {
       const key = typeof req === 'string' ? req : req.url;
-      if (!cacheStore.has('gnsscalc-v1')) cacheStore.set('gnsscalc-v1', new Map());
+      if (!cacheStore.has('gnsscalc-v1'))
+        cacheStore.set('gnsscalc-v1', new Map());
       cacheStore.get('gnsscalc-v1')!.set(key, res);
+      return Promise.resolve();
     });
-    mockCache.addAll = vi.fn(async () => {});
-    mockCache.match = vi.fn(async (req: Request | string) => {
+    mockCache.addAll = vi.fn(() => Promise.resolve());
+    mockCache.match = vi.fn((req: Request | string) => {
       const key = typeof req === 'string' ? req : req.url;
       for (const cache of cacheStore.values()) {
-        if (cache.has(key)) return cache.get(key)!;
+        if (cache.has(key)) return Promise.resolve(cache.get(key)!);
       }
-      return undefined;
+      return Promise.resolve(undefined);
     });
-    mockCaches.open = vi.fn(async () => mockCache);
+    mockCaches.open = vi.fn(() => Promise.resolve(mockCache));
     mockCaches.match = mockCache.match;
-    mockCaches.keys = vi.fn(async () => [...cacheStore.keys()]);
-    mockCaches.delete = vi.fn(async (name: string) => { cacheStore.delete(name); return true; });
+    mockCaches.keys = vi.fn(() => Promise.resolve([...cacheStore.keys()]));
+    mockCaches.delete = vi.fn((name: string) => {
+      cacheStore.delete(name);
+      return Promise.resolve(true);
+    });
   });
 
   describe('fetch handler — never returns null', () => {
@@ -136,7 +152,7 @@ describe('Service Worker', () => {
 
     it('navigation: returns network response on success', async () => {
       const networkResponse = new Response('<html></html>', { status: 200 });
-      globalThis.fetch = vi.fn(async () => networkResponse);
+      globalThis.fetch = vi.fn(() => Promise.resolve(networkResponse));
 
       const req = makeRequest('https://gnsscalc.com/', { mode: 'navigate' });
       const event = new MockFetchEvent(req);
@@ -151,10 +167,15 @@ describe('Service Worker', () => {
 
     it('navigation: returns cached response when network fails', async () => {
       // Pre-populate cache
-      const cachedResponse = new Response('<html>cached</html>', { status: 200 });
-      cacheStore.set('gnsscalc-v1', new Map([['https://gnsscalc.com/', cachedResponse]]));
+      const cachedResponse = new Response('<html>cached</html>', {
+        status: 200,
+      });
+      cacheStore.set(
+        'gnsscalc-v1',
+        new Map([['https://gnsscalc.com/', cachedResponse]]),
+      );
 
-      globalThis.fetch = vi.fn(async () => { throw new Error('offline'); });
+      globalThis.fetch = vi.fn(() => Promise.reject(new Error('offline')));
 
       const req = makeRequest('https://gnsscalc.com/', { mode: 'navigate' });
       const event = new MockFetchEvent(req);
@@ -168,7 +189,7 @@ describe('Service Worker', () => {
     });
 
     it('navigation: returns 503 when network fails and no cache (not null)', async () => {
-      globalThis.fetch = vi.fn(async () => { throw new Error('offline'); });
+      globalThis.fetch = vi.fn(() => Promise.reject(new Error('offline')));
 
       const req = makeRequest('https://gnsscalc.com/', { mode: 'navigate' });
       const event = new MockFetchEvent(req);
@@ -183,9 +204,12 @@ describe('Service Worker', () => {
     });
 
     it('assets (style/font/image): returns 503 when network fails and no cache (not null)', async () => {
-      globalThis.fetch = vi.fn(async () => { throw new Error('offline'); });
+      globalThis.fetch = vi.fn(() => Promise.reject(new Error('offline')));
 
-      const req = makeRequest('https://fonts.googleapis.com/css2?family=Inter', { destination: 'style' });
+      const req = makeRequest(
+        'https://fonts.googleapis.com/css2?family=Inter',
+        { destination: 'style' },
+      );
       const event = new MockFetchEvent(req);
       fetchListener(event);
 
@@ -199,11 +223,19 @@ describe('Service Worker', () => {
 
     it('assets (font): returns cached response when network fails', async () => {
       const cachedFont = new Response('font-data', { status: 200 });
-      cacheStore.set('gnsscalc-v1', new Map([['https://fonts.gstatic.com/s/inter/v1/font.woff2', cachedFont]]));
+      cacheStore.set(
+        'gnsscalc-v1',
+        new Map([
+          ['https://fonts.gstatic.com/s/inter/v1/font.woff2', cachedFont],
+        ]),
+      );
 
-      globalThis.fetch = vi.fn(async () => { throw new Error('offline'); });
+      globalThis.fetch = vi.fn(() => Promise.reject(new Error('offline')));
 
-      const req = makeRequest('https://fonts.gstatic.com/s/inter/v1/font.woff2', { destination: 'font' });
+      const req = makeRequest(
+        'https://fonts.gstatic.com/s/inter/v1/font.woff2',
+        { destination: 'font' },
+      );
       const event = new MockFetchEvent(req);
       fetchListener(event);
 
@@ -216,9 +248,14 @@ describe('Service Worker', () => {
 
     it('_astro assets: serves from cache first', async () => {
       const cachedAsset = new Response('cached-js', { status: 200 });
-      cacheStore.set('gnsscalc-v1', new Map([['https://gnsscalc.com/_astro/chunk.abc123.js', cachedAsset]]));
+      cacheStore.set(
+        'gnsscalc-v1',
+        new Map([['https://gnsscalc.com/_astro/chunk.abc123.js', cachedAsset]]),
+      );
 
-      globalThis.fetch = vi.fn(async () => new Response('network-js'));
+      globalThis.fetch = vi.fn(() =>
+        Promise.resolve(new Response('network-js')),
+      );
 
       const req = makeRequest('https://gnsscalc.com/_astro/chunk.abc123.js');
       const event = new MockFetchEvent(req);

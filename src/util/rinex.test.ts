@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRinexStream } from './rinex';
+import { parseRinexStream } from 'gnss-js/rinex';
 
 /** Helper: create a File from a string. */
 function fileFrom(content: string, name = 'test.obs'): File {
@@ -40,7 +40,9 @@ describe('RINEX 3.x parser', () => {
     expect(result.header.type).toBe('O');
     expect(result.header.markerName).toBe('TEST');
     expect(result.header.interval).toBe(1);
-    expect(result.header.approxPosition).toEqual([4027893.7145, 307045.6054, 4919474.545]);
+    expect(result.header.approxPosition).toEqual([
+      4027893.7145, 307045.6054, 4919474.545,
+    ]);
     expect(result.header.obsTypes['G']).toEqual(['C1C', 'L1C', 'S1C', 'C2W']);
     expect(result.header.obsTypes['R']).toEqual(['C1C', 'S1C']);
   });
@@ -60,7 +62,10 @@ describe('RINEX 3.x parser', () => {
 
     // G has S1C at index 2 → values 42.3 and 38.1; R has S1C at index 1 → value 35.5
     expect(result.epochs[0]!.meanSnr).toBeCloseTo((42.3 + 38.1 + 35.5) / 3, 1);
-    expect(result.epochs[0]!.snrPerSystem['G']).toBeCloseTo((42.3 + 38.1) / 2, 1);
+    expect(result.epochs[0]!.snrPerSystem['G']).toBeCloseTo(
+      (42.3 + 38.1) / 2,
+      1,
+    );
     expect(result.epochs[0]!.snrPerSystem['R']).toBeCloseTo(35.5, 1);
   });
 
@@ -101,14 +106,18 @@ describe('RINEX 3.x parser', () => {
 SOME HEADER RECORD                                          COMMENT
 ANOTHER RECORD                                              COMMENT
 `;
-    const file = fileFrom(RINEX3_HEADER + RINEX3_EPOCH1 + event + RINEX3_EPOCH2);
+    const file = fileFrom(
+      RINEX3_HEADER + RINEX3_EPOCH1 + event + RINEX3_EPOCH2,
+    );
     const result = await parseRinexStream(file);
     expect(result.epochs).toHaveLength(2);
   });
 
   it('throws on missing header', async () => {
     const file = fileFrom('not a rinex file\n');
-    await expect(parseRinexStream(file)).rejects.toThrow('No valid RINEX header');
+    await expect(parseRinexStream(file)).rejects.toThrow(
+      'No valid RINEX header',
+    );
   });
 });
 
@@ -154,9 +163,21 @@ MARK                                                        MARKER NAME
 `;
 
 // Each observation is exactly 16 chars: F14.3 (right-justified) + LLI(1) + SS(1)
-function obs(val: string): string { return val.padStart(14) + '  '; }
-const v2Line1 = obs('23456789.123') + obs('123456789.123') + obs('41.200') + obs('99999.999') + obs('39.800');
-const v2Line2 = obs('23456790.456') + obs('123456790.456') + obs('37.600') + obs('99999.998') + obs('35.200');
+function obs(val: string): string {
+  return val.padStart(14) + '  ';
+}
+const v2Line1 =
+  obs('23456789.123') +
+  obs('123456789.123') +
+  obs('41.200') +
+  obs('99999.999') +
+  obs('39.800');
+const v2Line2 =
+  obs('23456790.456') +
+  obs('123456790.456') +
+  obs('37.600') +
+  obs('99999.998') +
+  obs('35.200');
 const RINEX2_EPOCH = ` 16  3 10 16 55 31.0000000  0  2G01G03\n${v2Line1}\n${v2Line2}\n`;
 
 describe('RINEX 2.x parser', () => {
@@ -165,7 +186,13 @@ describe('RINEX 2.x parser', () => {
     const result = await parseRinexStream(file);
 
     expect(result.header.version).toBe(2.11);
-    expect(result.header.obsTypes['_v2']).toEqual(['C1', 'L1', 'S1', 'C2', 'S2']);
+    expect(result.header.obsTypes['_v2']).toEqual([
+      'C1',
+      'L1',
+      'S1',
+      'C2',
+      'S2',
+    ]);
     expect(result.epochs).toHaveLength(1);
     expect(result.epochs[0]!.totalSats).toBe(2);
     expect(result.epochs[0]!.satsPerSystem).toEqual({ G: 2 });
@@ -241,7 +268,10 @@ describe('CRX 3.0 parser', () => {
     const result = await parseRinexStream(file);
     // G01 S1C = 42300/1000 = 42.3, G03 S1C = 38100/1000 = 38.1, R01 S1C = 35500/1000 = 35.5
     expect(result.epochs[0]!.meanSnr).toBeCloseTo((42.3 + 38.1 + 35.5) / 3, 1);
-    expect(result.epochs[0]!.snrPerSystem['G']).toBeCloseTo((42.3 + 38.1) / 2, 1);
+    expect(result.epochs[0]!.snrPerSystem['G']).toBeCloseTo(
+      (42.3 + 38.1) / 2,
+      1,
+    );
     expect(result.epochs[0]!.snrPerSystem['R']).toBeCloseTo(35.5, 1);
   });
 
@@ -339,7 +369,6 @@ ANOTHER HEADER RECORD                                       COMMENT
     const result = await parseRinexStream(file);
     // Should have 2 data epochs, event is skipped
     expect(result.epochs).toHaveLength(2);
-    expect(result.epochs[1]!!.totalSats).toBe(2);
+    expect(result.epochs[1]!.totalSats).toBe(2);
   });
 });
-

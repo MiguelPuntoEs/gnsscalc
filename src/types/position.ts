@@ -39,7 +39,12 @@ export type DistanceResult = {
 };
 
 export type CoordinateFormats = {
-  utm: { easting: number; northing: number; zone: number; hemisphere: 'N' | 'S' };
+  utm: {
+    easting: number;
+    northing: number;
+    zone: number;
+    hemisphere: 'N' | 'S';
+  };
   maidenhead: string;
   geohash: string;
 };

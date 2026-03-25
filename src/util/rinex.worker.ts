@@ -16,25 +16,35 @@
  *   clear     — reset all state
  */
 
-import { parseRinexStream } from './rinex';
-import type { RinexHeader, RinexStats } from './rinex';
-import { parseNavFile } from './nav';
-import type { NavResult, Ephemeris } from './nav';
-import { computeAllPositions, navTimesFromEph } from './orbit';
-import type { AllPositionsData } from './orbit';
-import { CycleSlipAccumulator } from './cycle-slip';
-import { CompletenessAccumulator } from './completeness';
-import { MultipathAccumulator } from './multipath';
-import type { QualityResult } from './quality-analysis';
-import { WarningAccumulator, EMPTY_WARNINGS } from './rinex-warnings';
-import type { RinexWarnings } from './rinex-warnings';
+import {
+  parseRinexStream,
+  type RinexHeader,
+  type RinexStats,
+  parseNavFile,
+  type NavResult,
+  type Ephemeris,
+  WarningAccumulator,
+  EMPTY_WARNINGS,
+  type RinexWarnings,
+} from 'gnss-js/rinex';
+import {
+  computeAllPositions,
+  navTimesFromEph,
+  type AllPositionsData,
+} from 'gnss-js/orbit';
+import {
+  CycleSlipAccumulator,
+  CompletenessAccumulator,
+  MultipathAccumulator,
+  type QualityResult,
+} from 'gnss-js/analysis';
 import { writeRinexObsBlob } from './obs-writer';
 import type { CompactEpoch } from './obs-writer';
 import { writeRinex2ObsBlob } from './obs-writer-v2';
 import { writeRinex4ObsBlob } from './obs-writer-v4';
 import { writeObsCsv } from './csv-writer';
 import { writeMetadataJson } from './metadata-writer';
-import { writeRinexNav } from './nav-writer';
+import { writeRinexNav } from 'gnss-js/rinex';
 import { readFileText } from './read-file-text';
 import { compactToGrid, compactToStats, gridTransferables } from './epoch-grid';
 import type { EpochGrid } from './epoch-grid';
@@ -50,12 +60,12 @@ export { DEFAULT_FILTER } from './filter-state';
 
 export interface AddObsRequest {
   type: 'add-obs';
-  files: File[];   // only NEW files (not previously loaded)
+  files: File[]; // only NEW files (not previously loaded)
 }
 
 export interface AddNavRequest {
   type: 'add-nav';
-  files: File[];   // only NEW files
+  files: File[]; // only NEW files
 }
 
 export interface ApplyFiltersRequest {
@@ -89,15 +99,23 @@ export interface ExportObsRequest {
   splitInterval?: number | null; // seconds, null = no split
   headerOverrides?: HeaderOverrides;
 }
-export interface ExportNavRequest { type: 'export-nav'; markerName: string }
-export interface ClearRequest { type: 'clear' }
+export interface ExportNavRequest {
+  type: 'export-nav';
+  markerName: string;
+}
+export interface ClearRequest {
+  type: 'clear';
+}
 
-export type WorkerRequest =
-  (AddObsRequest | AddNavRequest
+export type WorkerRequest = (
+  | AddObsRequest
+  | AddNavRequest
   | ApplyFiltersRequest
   | RecomputePositionsRequest
-  | ExportObsRequest | ExportNavRequest
-  | ClearRequest) & { requestId?: number };
+  | ExportObsRequest
+  | ExportNavRequest
+  | ClearRequest
+) & { requestId?: number };
 
 // ── Responses ──
 
@@ -134,13 +152,22 @@ export interface AddNavResult {
 export interface ObsExportResult {
   type: 'obs-export-result';
   blob: Blob;
-  filename: { markerName: string; startTime: string | null; durationSec: number | null; intervalSec: number | null };
+  filename: {
+    markerName: string;
+    startTime: string | null;
+    durationSec: number | null;
+    intervalSec: number | null;
+  };
 }
 
 export interface NavExportResult {
   type: 'nav-export-result';
   blob: Blob;
-  filename: { markerName: string; startTime: string | null; durationSec: number | null };
+  filename: {
+    markerName: string;
+    startTime: string | null;
+    durationSec: number | null;
+  };
 }
 
 export interface ApplyFiltersResult {
@@ -170,10 +197,12 @@ export interface ErrorMessage {
 
 export type WorkerResponse =
   | ProgressMessage
-  | AddObsResult | AddNavResult
+  | AddObsResult
+  | AddNavResult
   | ApplyFiltersResult
   | RecomputePositionsResult
-  | ObsExportResult | NavExportResult
+  | ObsExportResult
+  | NavExportResult
   | ErrorMessage;
 
 /* ================================================================== */
@@ -184,7 +213,7 @@ export type WorkerResponse =
 let obsHeader: RinexHeader | null = null;
 let compactEpochs: CompactEpoch[] = [];
 let compactEpochMap = new Map<number, CompactEpoch>();
-let sysCodeList = new Map<string, string[]>();       // sys → codes (defines Float64Array index order)
+let sysCodeList = new Map<string, string[]>(); // sys → codes (defines Float64Array index order)
 let sysCodeIdx = new Map<string, Map<string, number>>(); // sys → code → index
 // Warnings
 let cachedWarnings: RinexWarnings = EMPTY_WARNINGS;
@@ -199,10 +228,14 @@ let navEphemerides: Ephemeris[] = [];
 let currentRequestId: number | undefined;
 
 function post(msg: WorkerResponse, transferables?: Transferable[]) {
-  const out = currentRequestId != null ? { ...msg, requestId: currentRequestId } : msg;
+  const out =
+    currentRequestId != null ? { ...msg, requestId: currentRequestId } : msg;
   if (transferables && transferables.length > 0) {
     // Worker postMessage with transferables
-    (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(out, transferables);
+    (self.postMessage as (message: unknown, transfer: Transferable[]) => void)(
+      out,
+      transferables,
+    );
   } else {
     self.postMessage(out);
   }
@@ -261,8 +294,14 @@ function filterEpochs(filters: FilterState): {
   filteredSysCodeList: Map<string, string[]>;
 } {
   const {
-    excludedSystems, excludedPrns, excludedSignalTypes, excludedBands,
-    timeStart, timeEnd, samplingInterval, sparseThreshold,
+    excludedSystems,
+    excludedPrns,
+    excludedSignalTypes,
+    excludedBands,
+    timeStart,
+    timeEnd,
+    samplingInterval,
+    sparseThreshold,
     excludedSignalsPerSystem,
   } = filters;
 
@@ -289,7 +328,7 @@ function filterEpochs(filters: FilterState): {
     const idxMap = new Map<string, number>();
     for (const code of codes) {
       const sigType = code[0]!; // C, L, D, S
-      const band = code[1]!;   // 1, 2, 5, etc.
+      const band = code[1]!; // 1, 2, 5, etc.
       if (exSigSet.has(sigType)) continue;
       if (exBandSet.has(band)) continue;
       // Per-system signal: match 2-char suffix (band+attribute), e.g. '1C' from 'C1C'
@@ -306,7 +345,7 @@ function filterEpochs(filters: FilterState): {
   // Time windowing
   let source = compactEpochs;
   if (timeStart != null || timeEnd != null) {
-    source = source.filter(e => {
+    source = source.filter((e) => {
       if (timeStart != null && e.time < timeStart) return false;
       if (timeEnd != null && e.time > timeEnd) return false;
       return true;
@@ -319,7 +358,8 @@ function filterEpochs(filters: FilterState): {
     const decimated: CompactEpoch[] = [source[0]!];
     let lastTime = source[0]!.time;
     for (let i = 1; i < source.length; i++) {
-      if (source[i]!.time - lastTime >= intervalMs - 1) { // -1ms tolerance
+      if (source[i]!.time - lastTime >= intervalMs - 1) {
+        // -1ms tolerance
         decimated.push(source[i]!);
         lastTime = source[i]!.time;
       }
@@ -328,7 +368,8 @@ function filterEpochs(filters: FilterState): {
   }
 
   // PRN and signal filtering
-  const hasCodeFilters = exSigSet.size > 0 || exBandSet.size > 0 || exSigPerSys.size > 0;
+  const hasCodeFilters =
+    exSigSet.size > 0 || exBandSet.size > 0 || exSigPerSys.size > 0;
   const hasPrnFilters = exSysSet.size > 0 || exPrnSet.size > 0;
 
   let filtered: CompactEpoch[];
@@ -364,7 +405,7 @@ function filterEpochs(filters: FilterState): {
 
   // Sparse obs removal: remove codes that appear in < sparseThreshold % of epochs
   if (sparseThreshold > 0 && filtered.length > 0) {
-    const minCount = Math.ceil(filtered.length * sparseThreshold / 100);
+    const minCount = Math.ceil((filtered.length * sparseThreshold) / 100);
     // Count occurrences per system per code
     for (const [sys, codes] of filteredSysCodeList) {
       const counts = new Uint32Array(codes.length);
@@ -393,7 +434,8 @@ function filterEpochs(filters: FilterState): {
             const newArr = new Float64Array(newCodes.length);
             newArr.fill(NaN);
             for (let j = 0; j < keepIndices.length; j++) {
-              if (keepIndices[j]! < valArr.length) newArr[j] = valArr[keepIndices[j]!]!;
+              if (keepIndices[j]! < valArr.length)
+                newArr[j] = valArr[keepIndices[j]!]!;
             }
             epoch.sats.set(prn, newArr);
           }
@@ -406,7 +448,11 @@ function filterEpochs(filters: FilterState): {
 }
 
 /** Run QA over given epochs with a given code list. */
-function runQA(header: RinexHeader, epochs: CompactEpoch[], codeList: Map<string, string[]>): QualityResult {
+function runQA(
+  header: RinexHeader,
+  epochs: CompactEpoch[],
+  codeList: Map<string, string[]>,
+): QualityResult {
   const mpAccum = new MultipathAccumulator(header);
   const csAccum = new CycleSlipAccumulator(header, (time, prn, bands) => {
     mpAccum.notifySlip(time, prn, bands);
@@ -474,8 +520,11 @@ function replayQA(header: RinexHeader): QualityResult {
  * Compute positions if both obs and nav are cached.
  * Returns null if either side is missing.
  */
-function tryComputePositions(rxPosOverride?: [number, number, number]): { positions: AllPositionsData; observedPrns: string[][] } | null {
-  if (compactEpochs.length === 0 || navEphemerides.length === 0 || !obsHeader) return null;
+function tryComputePositions(
+  rxPosOverride?: [number, number, number],
+): { positions: AllPositionsData; observedPrns: string[][] } | null {
+  if (compactEpochs.length === 0 || navEphemerides.length === 0 || !obsHeader)
+    return null;
 
   const maxEpochs = 500;
   const step = Math.max(1, Math.ceil(compactEpochs.length / maxEpochs));
@@ -488,7 +537,10 @@ function tryComputePositions(rxPosOverride?: [number, number, number]): { positi
   }
 
   const rxPos = rxPosOverride ?? obsHeader.approxPosition;
-  const validRx = rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0) ? rxPos : undefined;
+  const validRx =
+    rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0)
+      ? rxPos
+      : undefined;
   const positions = computeAllPositions(navEphemerides, times, validRx);
   return { positions, observedPrns: prnsPerEpoch };
 }
@@ -512,42 +564,48 @@ async function handleAddObs(msg: AddObsRequest) {
   let hasData = false;
   for (let i = 0; i < msg.files.length; i++) {
     const file = msg.files[i]!;
-    const r = await parseRinexStream(file, (p) => {
-      const overall = (i + p / 100) / msg.files.length * 100;
-      progress('add-obs', Math.round(overall));
-    }, undefined, (time, prn, codes, values) => {
-      const sys = prn[0]!;
+    const r = await parseRinexStream(
+      file,
+      (p) => {
+        const overall = ((i + p / 100) / msg.files.length) * 100;
+        progress('add-obs', Math.round(overall));
+      },
+      undefined,
+      (time, prn, codes, values) => {
+        const sys = prn[0]!;
 
-      // Register obs codes, detect growth
-      const prevLen = sysCodeList.get(sys)?.length ?? 0;
-      for (const code of codes) registerCode(sys, code);
-      const stride = sysCodeList.get(sys)!.length;
-      if (stride > prevLen) grownSystems.add(sys);
+        // Register obs codes, detect growth
+        const prevLen = sysCodeList.get(sys)?.length ?? 0;
+        for (const code of codes) registerCode(sys, code);
+        const stride = sysCodeList.get(sys)!.length;
+        if (stride > prevLen) grownSystems.add(sys);
 
-      // Get or create epoch
-      let epoch = compactEpochMap.get(time);
-      if (!epoch) {
-        epoch = { time, sats: new Map() };
-        compactEpochMap.set(time, epoch);
-      }
+        // Get or create epoch
+        let epoch = compactEpochMap.get(time);
+        if (!epoch) {
+          epoch = { time, sats: new Map() };
+          compactEpochMap.set(time, epoch);
+        }
 
-      // Get or create satellite values array
-      let valArr = epoch.sats.get(prn);
-      if (!valArr || valArr.length < stride) {
-        const newArr = new Float64Array(stride);
-        newArr.fill(NaN);
-        if (valArr) newArr.set(valArr);
-        valArr = newArr;
-        epoch.sats.set(prn, valArr);
-      }
+        // Get or create satellite values array
+        let valArr = epoch.sats.get(prn);
+        if (!valArr || valArr.length < stride) {
+          const newArr = new Float64Array(stride);
+          newArr.fill(NaN);
+          if (valArr) newArr.set(valArr);
+          valArr = newArr;
+          epoch.sats.set(prn, valArr);
+        }
 
-      // Store observation values
-      const codeMap = sysCodeIdx.get(sys)!;
-      for (let j = 0; j < codes.length; j++) {
-        const val = values[j];
-        if (val != null) valArr[codeMap.get(codes[j]!)!] = val;
-      }
-    }, true /* workerMode */);
+        // Store observation values
+        const codeMap = sysCodeIdx.get(sys)!;
+        for (let j = 0; j < codes.length; j++) {
+          const val = values[j];
+          if (val != null) valArr[codeMap.get(codes[j]!)!] = val;
+        }
+      },
+      true /* workerMode */,
+    );
 
     // Keep header from first file (or merge obsTypes across files)
     if (!obsHeader) {
@@ -567,7 +625,11 @@ async function handleAddObs(msg: AddObsRequest) {
   }
 
   if (!hasData || compactEpochMap.size === 0) {
-    post({ type: 'error', task: 'add-obs', message: 'No valid observation epochs found in the file(s).' });
+    post({
+      type: 'error',
+      task: 'add-obs',
+      message: 'No valid observation epochs found in the file(s).',
+    });
     return;
   }
 
@@ -600,7 +662,8 @@ async function handleAddObs(msg: AddObsRequest) {
   // Validation warnings — scan sorted epochs + header
   const warnAccum = new WarningAccumulator();
   warnAccum.checkHeader(obsHeader!);
-  if (obsHeader!.interval != null) warnAccum.setInterval(obsHeader!.interval * 1000);
+  if (obsHeader!.interval != null)
+    warnAccum.setInterval(obsHeader!.interval * 1000);
   for (const epoch of compactEpochs) {
     warnAccum.onEpoch(epoch.time, 0); // compact epochs only store flag-0 measurement epochs
     for (const prn of epoch.sats.keys()) warnAccum.onPrn(prn);
@@ -615,18 +678,21 @@ async function handleAddObs(msg: AddObsRequest) {
   const availablePrns = collectAvailablePrns();
   const availableCodes = collectAvailableCodes();
 
-  post({
-    type: 'add-obs-result',
-    header: obsHeader!,
-    stats,
-    grid,
-    qaResult,
-    warnings,
-    positions: posData?.positions ?? null,
-    observedPrns: posData?.observedPrns ?? null,
-    availablePrns,
-    availableCodes,
-  }, transfers);
+  post(
+    {
+      type: 'add-obs-result',
+      header: obsHeader!,
+      stats,
+      grid,
+      qaResult,
+      warnings,
+      positions: posData?.positions ?? null,
+      observedPrns: posData?.observedPrns ?? null,
+      availablePrns,
+      availableCodes,
+    },
+    transfers,
+  );
 }
 
 async function handleAddNav(msg: AddNavRequest) {
@@ -649,11 +715,18 @@ async function handleAddNav(msg: AddNavRequest) {
   }
 
   if (navEphemerides.length === 0 || !navHeader) {
-    post({ type: 'error', task: 'add-nav', message: 'No valid navigation data found.' });
+    post({
+      type: 'error',
+      task: 'add-nav',
+      message: 'No valid navigation data found.',
+    });
     return;
   }
 
-  const navResult: NavResult = { header: navHeader, ephemerides: navEphemerides };
+  const navResult: NavResult = {
+    header: navHeader,
+    ephemerides: navEphemerides,
+  };
 
   // Compute positions: use obs epochs if available, otherwise nav-only
   const posData = tryComputePositions();
@@ -669,24 +742,35 @@ async function handleAddNav(msg: AddNavRequest) {
 
 function handleApplyFilters(msg: ApplyFiltersRequest) {
   if (!obsHeader || compactEpochs.length === 0) {
-    post({ type: 'error', task: 'apply-filters', message: 'No observation data to filter.' });
+    post({
+      type: 'error',
+      task: 'apply-filters',
+      message: 'No observation data to filter.',
+    });
     return;
   }
 
   const { epochs: filtered, filteredSysCodeList } = filterEpochs(msg.filters);
 
   if (filtered.length === 0) {
-    post({ type: 'error', task: 'apply-filters', message: 'All data was excluded by the current filters.' });
+    post({
+      type: 'error',
+      task: 'apply-filters',
+      message: 'All data was excluded by the current filters.',
+    });
     return;
   }
 
   const grid = compactToGrid(filtered, filteredSysCodeList);
-  const stats = compactToStats(filtered, filteredSysCodeList, obsHeader!);
+  const stats = compactToStats(filtered, filteredSysCodeList, obsHeader);
   const transfers = gridTransferables(grid);
-  const qaResult = runQA(obsHeader!, filtered, filteredSysCodeList);
+  const qaResult = runQA(obsHeader, filtered, filteredSysCodeList);
 
   // Positions from filtered data
-  let posData: { positions: AllPositionsData; observedPrns: string[][] } | null = null;
+  let posData: {
+    positions: AllPositionsData;
+    observedPrns: string[][];
+  } | null = null;
   if (navEphemerides.length > 0) {
     const maxEpochs = 500;
     const step = Math.max(1, Math.ceil(filtered.length / maxEpochs));
@@ -696,33 +780,49 @@ function handleApplyFilters(msg: ApplyFiltersRequest) {
       times.push(filtered[i]!.time);
       prnsPerEpoch.push([...filtered[i]!.sats.keys()]);
     }
-    const rxPos = obsHeader!.approxPosition;
-    const validRx = rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0) ? rxPos : undefined;
-    posData = { positions: computeAllPositions(navEphemerides, times, validRx), observedPrns: prnsPerEpoch };
+    const rxPos = obsHeader.approxPosition;
+    const validRx =
+      rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0)
+        ? rxPos
+        : undefined;
+    posData = {
+      positions: computeAllPositions(navEphemerides, times, validRx),
+      observedPrns: prnsPerEpoch,
+    };
   }
 
-  post({
-    type: 'apply-filters-result',
-    stats,
-    grid,
-    qaResult,
-    availablePrns: collectAvailablePrns(),
-    availableCodes: collectAvailableCodes(),
-    positions: posData?.positions ?? null,
-    observedPrns: posData?.observedPrns ?? null,
-  }, transfers);
+  post(
+    {
+      type: 'apply-filters-result',
+      stats,
+      grid,
+      qaResult,
+      availablePrns: collectAvailablePrns(),
+      availableCodes: collectAvailableCodes(),
+      positions: posData?.positions ?? null,
+      observedPrns: posData?.observedPrns ?? null,
+    },
+    transfers,
+  );
 }
 
-function applyHeaderOverrides(header: RinexHeader, overrides: HeaderOverrides): RinexHeader {
+function applyHeaderOverrides(
+  header: RinexHeader,
+  overrides: HeaderOverrides,
+): RinexHeader {
   const h = { ...header };
   if (overrides.markerName !== undefined) h.markerName = overrides.markerName;
   if (overrides.markerType !== undefined) h.markerType = overrides.markerType;
-  if (overrides.receiverNumber !== undefined) h.receiverNumber = overrides.receiverNumber;
-  if (overrides.receiverType !== undefined) h.receiverType = overrides.receiverType;
-  if (overrides.receiverVersion !== undefined) h.receiverVersion = overrides.receiverVersion;
+  if (overrides.receiverNumber !== undefined)
+    h.receiverNumber = overrides.receiverNumber;
+  if (overrides.receiverType !== undefined)
+    h.receiverType = overrides.receiverType;
+  if (overrides.receiverVersion !== undefined)
+    h.receiverVersion = overrides.receiverVersion;
   if (overrides.antNumber !== undefined) h.antNumber = overrides.antNumber;
   if (overrides.antType !== undefined) h.antType = overrides.antType;
-  if (overrides.approxPosition !== undefined) h.approxPosition = overrides.approxPosition;
+  if (overrides.approxPosition !== undefined)
+    h.approxPosition = overrides.approxPosition;
   if (overrides.antDelta !== undefined) h.antDelta = overrides.antDelta;
   if (overrides.observer !== undefined) h.observer = overrides.observer;
   if (overrides.agency !== undefined) h.agency = overrides.agency;
@@ -731,7 +831,11 @@ function applyHeaderOverrides(header: RinexHeader, overrides: HeaderOverrides): 
 
 async function handleExportObs(msg: ExportObsRequest) {
   if (!obsHeader || compactEpochs.length === 0) {
-    post({ type: 'error', task: 'export-obs', message: 'No observation data to export.' });
+    post({
+      type: 'error',
+      task: 'export-obs',
+      message: 'No observation data to export.',
+    });
     return;
   }
 
@@ -754,7 +858,11 @@ async function handleExportObs(msg: ExportObsRequest) {
   }
 
   if (epochs.length === 0) {
-    post({ type: 'error', task: 'export-obs', message: 'No data remaining after filters.' });
+    post({
+      type: 'error',
+      task: 'export-obs',
+      message: 'No data remaining after filters.',
+    });
     return;
   }
 
@@ -804,13 +912,14 @@ async function handleExportObs(msg: ExportObsRequest) {
     }
 
     post({
-      type: 'obs-export-result', blob,
+      type: 'obs-export-result',
+      blob,
       filename: {
         markerName: header.markerName || '',
         startTime: new Date(chunk[0]!.time).toISOString(),
         durationSec: (chunk[chunk.length - 1]!.time - chunk[0]!.time) / 1000,
-        intervalSec: chunk.length >= 2
-          ? (chunk[1]!.time - chunk[0]!.time) / 1000 : null,
+        intervalSec:
+          chunk.length >= 2 ? (chunk[1]!.time - chunk[0]!.time) / 1000 : null,
       },
     });
   }
@@ -818,25 +927,35 @@ async function handleExportObs(msg: ExportObsRequest) {
 
 function handleExportNav(msg: ExportNavRequest) {
   if (!navHeader || navEphemerides.length === 0) {
-    post({ type: 'error', task: 'export-nav', message: 'No navigation data to export.' });
+    post({
+      type: 'error',
+      task: 'export-nav',
+      message: 'No navigation data to export.',
+    });
     return;
   }
-  const navResult: NavResult = { header: navHeader, ephemerides: navEphemerides };
+  const navResult: NavResult = {
+    header: navHeader,
+    ephemerides: navEphemerides,
+  };
   const content = writeRinexNav(navResult);
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
 
-  let minT: Date | null = null, maxT: Date | null = null;
+  let minT: Date | null = null,
+    maxT: Date | null = null;
   for (const eph of navEphemerides) {
     if (!minT || eph.tocDate < minT) minT = eph.tocDate;
     if (!maxT || eph.tocDate > maxT) maxT = eph.tocDate;
   }
 
   post({
-    type: 'nav-export-result', blob,
+    type: 'nav-export-result',
+    blob,
     filename: {
       markerName: msg.markerName,
       startTime: minT?.toISOString() ?? null,
-      durationSec: minT && maxT ? (maxT.getTime() - minT.getTime()) / 1000 : null,
+      durationSec:
+        minT && maxT ? (maxT.getTime() - minT.getTime()) / 1000 : null,
     },
   });
 }
@@ -869,15 +988,26 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   currentRequestId = msg.requestId;
   try {
     switch (msg.type) {
-      case 'add-obs': return await handleAddObs(msg);
-      case 'add-nav': return await handleAddNav(msg);
-      case 'apply-filters': return handleApplyFilters(msg);
-      case 'recompute-positions': return handleRecomputePositions(msg);
-      case 'export-obs': return await handleExportObs(msg);
-      case 'export-nav': return handleExportNav(msg);
-      case 'clear': return handleClear();
+      case 'add-obs':
+        return await handleAddObs(msg);
+      case 'add-nav':
+        return await handleAddNav(msg);
+      case 'apply-filters':
+        return handleApplyFilters(msg);
+      case 'recompute-positions':
+        return handleRecomputePositions(msg);
+      case 'export-obs':
+        return await handleExportObs(msg);
+      case 'export-nav':
+        return handleExportNav(msg);
+      case 'clear':
+        return handleClear();
     }
   } catch (err: unknown) {
-    post({ type: 'error', task: msg.type, message: err instanceof Error ? err.message : 'Worker error' });
+    post({
+      type: 'error',
+      task: msg.type,
+      message: err instanceof Error ? err.message : 'Worker error',
+    });
   }
 };

@@ -1,28 +1,42 @@
 import { useMemo } from 'react';
-import type { AERResult, CoordinateFormats, DistanceResult, ENUResult, PositionResult } from '@/types/position';
-import { ecefToGeodetic, getAer, getEnuDifference } from '@/util/positioning';
-import { geodeticToUtm, geodeticToMaidenhead, geodeticToGeohash } from '@/util/coordinates';
-import { vincenty, rhumbLine, euclidean3D, greatCircleMidpoint, horizonDistance } from '@/util/geodesy';
-import { deg2hms, rad2deg } from '../util/units';
+import type {
+  AERResult,
+  CoordinateFormats,
+  DistanceResult,
+  ENUResult,
+  PositionResult,
+} from '@/types/position';
+import {
+  ecefToGeodetic,
+  getAer,
+  getEnuDifference,
+  geodeticToUtm,
+  geodeticToMaidenhead,
+  geodeticToGeohash,
+  vincenty,
+  rhumbLine,
+  euclidean3D,
+  greatCircleMidpoint,
+  horizonDistance,
+  deg2dms,
+  rad2deg,
+} from 'gnss-js/coordinates';
 
 export function usePositionCalculator(
-  position: [number, number, number]
+  position: [number, number, number],
 ): PositionResult {
+  const [px, py, pz] = position;
   return useMemo(() => {
-    const [latitude, longitude, height] = ecefToGeodetic(
-      position[0],
-      position[1],
-      position[2]
-    );
+    const [latitude, longitude, height] = ecefToGeodetic(px, py, pz);
 
     const latitudeDeg = rad2deg(latitude);
     const longitudeDeg = rad2deg(longitude);
 
-    const [latitudeDegrees, latitudeMinutes, latitudeSeconds] = deg2hms(
-      Math.abs(latitudeDeg)
+    const [latitudeDegrees, latitudeMinutes, latitudeSeconds] = deg2dms(
+      Math.abs(latitudeDeg),
     );
-    const [longitudeDegrees, longitudeMinutes, longitudeSeconds] = deg2hms(
-      Math.abs(longitudeDeg)
+    const [longitudeDegrees, longitudeMinutes, longitudeSeconds] = deg2dms(
+      Math.abs(longitudeDeg),
     );
     const latitudeDirection = latitude >= 0 ? 'N' : 'S';
     const longitudeDirection = longitude >= 0 ? 'E' : 'W';
@@ -44,63 +58,61 @@ export function usePositionCalculator(
       },
       height,
     };
-  }, [position[0], position[1], position[2]]);
+  }, [px, py, pz]);
 }
 
 export function useAerCalculator(
   position: [number, number, number],
-  refPosition: [number, number, number]
+  refPosition: [number, number, number],
 ): AERResult {
+  const [px, py, pz] = position;
+  const [rx, ry, rz] = refPosition;
   return useMemo(() => {
-    const [elevation, azimuth, slant] = getAer(
-      position[0],
-      position[1],
-      position[2],
-      refPosition[0],
-      refPosition[1],
-      refPosition[2]
-    );
+    const [elevation, azimuth, slant] = getAer(px, py, pz, rx, ry, rz);
 
     return {
       elevationDeg: rad2deg(elevation ?? 0),
       azimuthDeg: rad2deg(azimuth ?? 0),
       slant: slant ?? 0,
     };
-  }, [position[0], position[1], position[2], refPosition[0], refPosition[1], refPosition[2]]);
+  }, [px, py, pz, rx, ry, rz]);
 }
 
 export function useENUCalculator(
   position: [number, number, number],
-  refPosition: [number, number, number]
+  refPosition: [number, number, number],
 ): ENUResult {
+  const [px, py, pz] = position;
+  const [rx, ry, rz] = refPosition;
   return useMemo(() => {
-    const [deltaE, deltaN, deltaU] = getEnuDifference(
-      position[0],
-      position[1],
-      position[2],
-      refPosition[0],
-      refPosition[1],
-      refPosition[2]
-    );
+    const [deltaE, deltaN, deltaU] = getEnuDifference(px, py, pz, rx, ry, rz);
 
     return { deltaE, deltaN, deltaU };
-  }, [position[0], position[1], position[2], refPosition[0], refPosition[1], refPosition[2]]);
+  }, [px, py, pz, rx, ry, rz]);
 }
 
 export function useDistanceCalculator(
   position: [number, number, number],
-  refPosition: [number, number, number]
+  refPosition: [number, number, number],
 ): DistanceResult {
+  const [px, py, pz] = position;
+  const [rx, ry, rz] = refPosition;
   return useMemo(() => {
-    const [lat1, lon1, h1] = ecefToGeodetic(refPosition[0], refPosition[1], refPosition[2]);
-    const [lat2, lon2, h2] = ecefToGeodetic(position[0], position[1], position[2]);
+    const [lat1, lon1, h1] = ecefToGeodetic(rx, ry, rz);
+    const [lat2, lon2, h2] = ecefToGeodetic(px, py, pz);
 
-    const { distance: orthodromic, initialBearing, finalBearing } = vincenty(lat1, lon1, lat2, lon2);
-    const { distance: loxodromic, bearing: rhumbBearing } = rhumbLine(lat1, lon1, lat2, lon2);
-    const euclidean = euclidean3D(
-      refPosition[0], refPosition[1], refPosition[2],
-      position[0], position[1], position[2]
+    const {
+      distance: orthodromic,
+      initialBearing,
+      finalBearing,
+    } = vincenty(lat1, lon1, lat2, lon2);
+    const { distance: loxodromic, bearing: rhumbBearing } = rhumbLine(
+      lat1,
+      lon1,
+      lat2,
+      lon2,
     );
+    const euclidean = euclidean3D(rx, ry, rz, px, py, pz);
 
     const [midLat, midLon] = greatCircleMidpoint(lat1, lon1, lat2, lon2);
 
@@ -115,19 +127,20 @@ export function useDistanceCalculator(
       horizonA: horizonDistance(h1),
       horizonB: horizonDistance(h2),
     };
-  }, [position[0], position[1], position[2], refPosition[0], refPosition[1], refPosition[2]]);
+  }, [px, py, pz, rx, ry, rz]);
 }
 
 export function useCoordinateFormats(
-  position: [number, number, number]
+  position: [number, number, number],
 ): CoordinateFormats {
+  const [px, py, pz] = position;
   return useMemo(() => {
-    const [lat, lon] = ecefToGeodetic(position[0], position[1], position[2]);
+    const [lat, lon] = ecefToGeodetic(px, py, pz);
 
     return {
       utm: geodeticToUtm(lat, lon),
       maidenhead: geodeticToMaidenhead(lat, lon),
       geohash: geodeticToGeohash(lat, lon),
     };
-  }, [position[0], position[1], position[2]]);
+  }, [px, py, pz]);
 }

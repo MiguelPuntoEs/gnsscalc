@@ -4,18 +4,18 @@
   "compatibility_date": "2026-03-10",
   "assets": {
     "directory": "./dist",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
   },
   "observability": {
     "logs": {
       "enabled": true,
-      "invocation_logs": true
-    }
+      "invocation_logs": true,
+    },
   },
   "services": [
     {
       "binding": "EPHEMERIS",
-      "service": "gnsscalc-ephemeris"
-    }
-  ]
+      "service": "gnsscalc-ephemeris",
+    },
+  ],
 }

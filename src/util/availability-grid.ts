@@ -3,9 +3,9 @@
  * ephemerides, optionally cross-referenced with observation data.
  */
 
-import type { Ephemeris, KeplerEphemeris, GlonassEphemeris } from './nav';
+import type { Ephemeris, KeplerEphemeris } from 'gnss-js/rinex';
 import type { EpochGrid } from './epoch-grid';
-import { systemCmp } from './rinex';
+import { systemCmp } from 'gnss-js/rinex';
 
 /* ================================================================== */
 /*  Types                                                              */
@@ -13,13 +13,13 @@ import { systemCmp } from './rinex';
 
 /** Cell state encoded as Uint8Array values. */
 export const CellState = {
-  Empty:           0,  // no eph, not observed
-  EphHealthy:      1,  // has eph + healthy (nav-only green)
-  EphUnhealthy:    2,  // has eph + unhealthy (red)
-  ObsEphHealthy:   3,  // observed + eph + healthy (green)
-  ObsEphUnhealthy: 4,  // observed + eph + unhealthy (red)
-  ObsNoEph:        5,  // observed but no eph (yellow)
-  NotObsHasEph:    6,  // not observed but has eph (gray)
+  Empty: 0, // no eph, not observed
+  EphHealthy: 1, // has eph + healthy (nav-only green)
+  EphUnhealthy: 2, // has eph + unhealthy (red)
+  ObsEphHealthy: 3, // observed + eph + healthy (green)
+  ObsEphUnhealthy: 4, // observed + eph + unhealthy (red)
+  ObsNoEph: 5, // observed but no eph (yellow)
+  NotObsHasEph: 6, // not observed but has eph (gray)
 } as const;
 
 export interface AvailabilityGrid {
@@ -37,22 +37,24 @@ export interface AvailabilityGrid {
 
 /** Max age in ms for ephemeris validity. */
 function maxAge(sys: string): number {
-  return (sys === 'R' || sys === 'S') ? 1800_000 : 4 * 3600_000;
+  return sys === 'R' || sys === 'S' ? 1800_000 : 4 * 3600_000;
 }
 
 function isHealthy(eph: Ephemeris): boolean {
   if (eph.system === 'R' || eph.system === 'S') {
-    return (eph as GlonassEphemeris).health === 0;
+    return eph.health === 0;
   }
   return (eph as KeplerEphemeris).svHealth === 0;
 }
 
 /** Binary search: index of first element >= target. */
 function lowerBound(arr: Float64Array, target: number): number {
-  let lo = 0, hi = arr.length;
+  let lo = 0,
+    hi = arr.length;
   while (lo < hi) {
     const mid = (lo + hi) >>> 1;
-    if (arr[mid]! < target) lo = mid + 1; else hi = mid;
+    if (arr[mid]! < target) lo = mid + 1;
+    else hi = mid;
   }
   return lo;
 }
@@ -70,13 +72,17 @@ export function buildAvailabilityGrids(
 
   // ── Group ephemerides by PRN ──
   const ephByPrn = new Map<string, Ephemeris[]>();
-  let minT = Infinity, maxT = -Infinity;
+  let minT = Infinity,
+    maxT = -Infinity;
   for (const eph of ephemerides) {
     const t = eph.tocDate.getTime();
     if (t < minT) minT = t;
     if (t > maxT) maxT = t;
     let arr = ephByPrn.get(eph.prn);
-    if (!arr) { arr = []; ephByPrn.set(eph.prn, arr); }
+    if (!arr) {
+      arr = [];
+      ephByPrn.set(eph.prn, arr);
+    }
     arr.push(eph);
   }
 
@@ -92,7 +98,10 @@ export function buildAvailabilityGrids(
   }
 
   // ── Time bins ──
-  const nBins = Math.min(targetBins, Math.max(10, Math.ceil((maxT - minT) / 60_000)));
+  const nBins = Math.min(
+    targetBins,
+    Math.max(10, Math.ceil((maxT - minT) / 60_000)),
+  );
   const binWidth = (maxT - minT) / nBins;
   const times = new Float64Array(nBins);
   for (let i = 0; i < nBins; i++) times[i] = minT + (i + 0.5) * binWidth;
@@ -102,7 +111,10 @@ export function buildAvailabilityGrids(
   for (const prn of ephByPrn.keys()) {
     const sys = prn.charAt(0);
     let set = systemPrns.get(sys);
-    if (!set) { set = new Set(); systemPrns.set(sys, set); }
+    if (!set) {
+      set = new Set();
+      systemPrns.set(sys, set);
+    }
     set.add(prn);
   }
   // Also add PRNs from obs grid that might not be in nav
@@ -110,7 +122,10 @@ export function buildAvailabilityGrids(
     for (const prn of grid.prns) {
       const sys = prn.charAt(0);
       let set = systemPrns.get(sys);
-      if (!set) { set = new Set(); systemPrns.set(sys, set); }
+      if (!set) {
+        set = new Set();
+        systemPrns.set(sys, set);
+      }
       set.add(prn);
     }
   }
@@ -150,7 +165,10 @@ export function buildAvailabilityGrids(
           for (const eph of ephs) {
             const dt = Math.abs(t - eph.tocDate.getTime());
             if (dt > limit) continue;
-            if (dt < bestDt) { bestDt = dt; bestEph = eph; }
+            if (dt < bestDt) {
+              bestDt = dt;
+              bestEph = eph;
+            }
           }
         }
 
@@ -172,17 +190,23 @@ export function buildAvailabilityGrids(
         let state: number;
         if (hasObs) {
           if (observed && bestEph) {
-            state = isHealthy(bestEph) ? CellState.ObsEphHealthy : CellState.ObsEphUnhealthy;
+            state = isHealthy(bestEph)
+              ? CellState.ObsEphHealthy
+              : CellState.ObsEphUnhealthy;
           } else if (observed) {
             state = CellState.ObsNoEph;
           } else if (bestEph) {
-            state = isHealthy(bestEph) ? CellState.NotObsHasEph : CellState.EphUnhealthy;
+            state = isHealthy(bestEph)
+              ? CellState.NotObsHasEph
+              : CellState.EphUnhealthy;
           } else {
             state = CellState.Empty;
           }
         } else {
           if (bestEph) {
-            state = isHealthy(bestEph) ? CellState.EphHealthy : CellState.EphUnhealthy;
+            state = isHealthy(bestEph)
+              ? CellState.EphHealthy
+              : CellState.EphUnhealthy;
           } else {
             state = CellState.Empty;
           }

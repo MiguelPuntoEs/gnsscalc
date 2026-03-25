@@ -9,10 +9,14 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import type { EpochSkyData } from '../util/orbit';
-import { systemName, systemCmp } from '../util/rinex';
+import type { EpochSkyData } from 'gnss-js/orbit';
+import { systemName, systemCmp } from 'gnss-js/rinex';
 import type { EpochGrid } from '../util/epoch-grid';
-import { gridTimeIndex, gridSnrPerSatBandAt, gridBands } from '../util/epoch-grid';
+import {
+  gridTimeIndex,
+  gridSnrPerSatBandAt,
+  gridBands,
+} from '../util/epoch-grid';
 import { systemColor } from '../util/gnss-constants';
 import { useChartTheme } from '../hooks/useChartTheme';
 
@@ -27,25 +31,38 @@ const BAND_LABELS: Record<string, Record<string, string>> = {
 };
 
 const COMMON_BAND: Record<string, string> = {
-  '1': 'L1/E1/B1', '2': 'L2/G2/B1-2', '5': 'L5/E5a/B2a',
-  '6': 'E6/B3/L6', '7': 'E5b/B2b', '8': 'E5/B2',
+  '1': 'L1/E1/B1',
+  '2': 'L2/G2/B1-2',
+  '5': 'L5/E5a/B2a',
+  '6': 'E6/B3/L6',
+  '7': 'E5b/B2b',
+  '8': 'E5/B2',
 };
 
-export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: EpochSkyData[]; grid: EpochGrid }) {
+export default function ElevationCn0({
+  epochSkyData,
+  grid,
+}: {
+  epochSkyData: EpochSkyData[];
+  grid: EpochGrid;
+}) {
   const theme = useChartTheme();
   const data = useMemo(() => {
     const timeIdx = gridTimeIndex(grid);
     const bands = gridBands(grid);
     if (bands.length === 0) return null;
 
-    const pairs = new Map<string, { elSum: number; cn0Sum: number; n: number }[]>();
+    const pairs = new Map<
+      string,
+      { elSum: number; cn0Sum: number; n: number }[]
+    >();
 
     for (const sky of epochSkyData) {
       const snrBand = gridSnrPerSatBandAt(grid, timeIdx, sky.time);
       if (!snrBand) continue;
       for (const sat of sky.satellites) {
         const sys = sat.prn[0]!;
-        const elDeg = sat.el * 180 / Math.PI;
+        const elDeg = (sat.el * 180) / Math.PI;
         const bin = Math.min(Math.floor(elDeg), 89);
         for (const band of bands) {
           const cn0 = snrBand[`${sat.prn}:${band}`];
@@ -53,7 +70,11 @@ export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: Epo
           const seriesKey = `${sys}:${band}`;
           let arr = pairs.get(seriesKey);
           if (!arr) {
-            arr = Array.from({ length: 90 }, () => ({ elSum: 0, cn0Sum: 0, n: 0 }));
+            arr = Array.from({ length: 90 }, () => ({
+              elSum: 0,
+              cn0Sum: 0,
+              n: 0,
+            }));
             pairs.set(seriesKey, arr);
           }
           const b = arr[bin]!;
@@ -74,8 +95,13 @@ export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: Epo
     }[] = [];
 
     for (const band of bands) {
-      const keys: typeof charts[0]['keys'] = [];
-      const seriesForBand: { sys: string; dataKey: string; name: string; bins: typeof pairs extends Map<string, infer V> ? V : never }[] = [];
+      const keys: (typeof charts)[0]['keys'] = [];
+      const seriesForBand: {
+        sys: string;
+        dataKey: string;
+        name: string;
+        bins: typeof pairs extends Map<string, infer V> ? V : never;
+      }[] = [];
       for (const [seriesKey, bins] of pairs) {
         const [sys, b] = seriesKey.split(':');
         if (b !== band || !sys) continue;
@@ -104,9 +130,18 @@ export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: Epo
       if (rows.length === 0) continue;
 
       for (const s of seriesForBand) {
-        keys.push({ dataKey: s.dataKey, name: s.name, color: systemColor(s.sys) });
+        keys.push({
+          dataKey: s.dataKey,
+          name: s.name,
+          color: systemColor(s.sys),
+        });
       }
-      charts.push({ band, label: COMMON_BAND[band] ?? `Band ${band}`, keys, rows });
+      charts.push({
+        band,
+        label: COMMON_BAND[band] ?? `Band ${band}`,
+        keys,
+        rows,
+      });
     }
 
     return charts.length > 0 ? charts : null;
@@ -119,15 +154,26 @@ export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: Epo
       <span className="text-xs font-semibold uppercase tracking-wide text-fg/50 mb-3 block">
         Elevation vs C/N0
       </span>
-      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(data.length, 3)}, 1fr)` }}>
-        {data.map(chart => (
+      <div
+        className="grid gap-4"
+        style={{
+          gridTemplateColumns: `repeat(${Math.min(data.length, 3)}, 1fr)`,
+        }}
+      >
+        {data.map((chart) => (
           <div key={chart.band}>
             <span className="text-[10px] font-bold uppercase tracking-widest text-fg/35 mb-1 block">
               {chart.label}
             </span>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={chart.rows} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
+              <LineChart
+                data={chart.rows}
+                margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke={theme.gridStroke}
+                />
                 <XAxis
                   dataKey="el"
                   type="number"
@@ -136,7 +182,12 @@ export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: Epo
                   tick={theme.axisStyle}
                   tickLine={false}
                   axisLine={false}
-                  label={{ value: 'Elev (°)', position: 'insideBottomRight', offset: -5, style: { fontSize: 9, fill: theme.labelFill } }}
+                  label={{
+                    value: 'Elev (°)',
+                    position: 'insideBottomRight',
+                    offset: -5,
+                    style: { fontSize: 9, fill: theme.labelFill },
+                  }}
                 />
                 <YAxis
                   domain={[0, 60]}
@@ -145,11 +196,24 @@ export default function ElevationCn0({ epochSkyData, grid }: { epochSkyData: Epo
                   tickLine={false}
                   axisLine={false}
                   width={30}
-                  label={{ value: 'dB-Hz', angle: -90, position: 'insideLeft', offset: 10, style: { fontSize: 9, fill: theme.labelFill } }}
+                  label={{
+                    value: 'dB-Hz',
+                    angle: -90,
+                    position: 'insideLeft',
+                    offset: 10,
+                    style: { fontSize: 9, fill: theme.labelFill },
+                  }}
                 />
-                <Tooltip {...theme.tooltipStyle} formatter={(v) => `${Number(v).toFixed(1)} dB-Hz`} labelFormatter={(l) => `${Number(l)}°`} />
-                <Legend iconSize={8} wrapperStyle={{ fontSize: 10, color: theme.legendColor }} />
-                {chart.keys.map(k => (
+                <Tooltip
+                  {...theme.tooltipStyle}
+                  formatter={(v) => `${Number(v).toFixed(1)} dB-Hz`}
+                  labelFormatter={(l) => `${Number(l)}°`}
+                />
+                <Legend
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 10, color: theme.legendColor }}
+                />
+                {chart.keys.map((k) => (
                   <Line
                     key={k.dataKey}
                     dataKey={k.dataKey}

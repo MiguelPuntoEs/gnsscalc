@@ -23,7 +23,8 @@ export default function InlineField({
     placeholder?: string;
   };
 }) {
-  const changed = editing && originalValue !== undefined && value !== originalValue;
+  const changed =
+    editing && originalValue !== undefined && value !== originalValue;
 
   return (
     <>
@@ -44,7 +45,7 @@ export default function InlineField({
         ) : (
           <input
             value={value}
-            onChange={e => onChange(e.target.value)}
+            onChange={(e) => onChange(e.target.value)}
             type={type}
             step={type === 'number' ? 'any' : undefined}
             maxLength={maxLength}

@@ -52,11 +52,11 @@ pnpm install
 pnpm dev
 ```
 
-| Command | Description |
-|---|---|
-| `pnpm build` | Build for production |
+| Command        | Description                  |
+| -------------- | ---------------------------- |
+| `pnpm build`   | Build for production         |
 | `pnpm preview` | Preview the production build |
-| `pnpm format` | Format code with Prettier |
+| `pnpm format`  | Format code with Prettier    |
 
 ## Author
 

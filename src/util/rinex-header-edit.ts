@@ -5,7 +5,7 @@
  * Operates on the raw text so the data section is preserved byte-for-byte.
  */
 
-import { padL, fmtF, hdrLine } from './rinex-format';
+import { padL, fmtF, hdrLine } from 'gnss-js/rinex';
 
 /* ================================================================== */
 /*  Types                                                              */
@@ -58,9 +58,10 @@ export function splitRinexFile(text: string): RawRinexFile {
   const headerText = text.substring(0, lineEnd);
   const body = text.substring(lineEnd);
 
-  const headerLines = headerText.split('\n')
-    .filter(l => l.length > 0)
-    .map(l => l.endsWith('\r') ? l : l); // preserve as-is
+  const headerLines = headerText
+    .split('\n')
+    .filter((l) => l.length > 0)
+    .map((l) => (l.endsWith('\r') ? l : l)); // preserve as-is
 
   return { headerLines, body };
 }
@@ -71,12 +72,21 @@ export function splitRinexFile(text: string): RawRinexFile {
 
 export function extractEditableFields(lines: string[]): EditableHeaderFields {
   const fields: EditableHeaderFields = {
-    markerName: '', markerType: '',
-    receiverNumber: '', receiverType: '', receiverVersion: '',
-    antNumber: '', antType: '',
-    positionX: 0, positionY: 0, positionZ: 0,
-    antDeltaH: 0, antDeltaE: 0, antDeltaN: 0,
-    observer: '', agency: '',
+    markerName: '',
+    markerType: '',
+    receiverNumber: '',
+    receiverType: '',
+    receiverVersion: '',
+    antNumber: '',
+    antType: '',
+    positionX: 0,
+    positionY: 0,
+    positionZ: 0,
+    antDeltaH: 0,
+    antDeltaE: 0,
+    antDeltaN: 0,
+    observer: '',
+    agency: '',
   };
 
   for (const raw of lines) {
@@ -207,23 +217,32 @@ export function modifyHeaderLines(
   }
 
   // Insert missing fields before END OF HEADER
-  const eohIdx = result.findIndex(l => l.substring(60).trim() === 'END OF HEADER');
+  const eohIdx = result.findIndex(
+    (l) => l.substring(60).trim() === 'END OF HEADER',
+  );
   if (eohIdx !== -1) {
     const toInsert: string[] = [];
     if (!found.has('MARKER NAME') && fields.markerName)
       toInsert.push(hdrLine(fields.markerName, 'MARKER NAME'));
     if (!found.has('MARKER TYPE') && fields.markerType)
       toInsert.push(hdrLine(fields.markerType, 'MARKER TYPE'));
-    if (!found.has('REC # / TYPE / VERS') && (fields.receiverNumber || fields.receiverType))
-      toInsert.push(hdrLine(
-        `${padL(fields.receiverNumber, 20)}${padL(fields.receiverType, 20)}${padL(fields.receiverVersion, 20)}`,
-        'REC # / TYPE / VERS',
-      ));
+    if (
+      !found.has('REC # / TYPE / VERS') &&
+      (fields.receiverNumber || fields.receiverType)
+    )
+      toInsert.push(
+        hdrLine(
+          `${padL(fields.receiverNumber, 20)}${padL(fields.receiverType, 20)}${padL(fields.receiverVersion, 20)}`,
+          'REC # / TYPE / VERS',
+        ),
+      );
     if (!found.has('ANT # / TYPE') && (fields.antNumber || fields.antType))
-      toInsert.push(hdrLine(
-        `${padL(fields.antNumber, 20)}${formatAntennaType(fields.antType)}`,
-        'ANT # / TYPE',
-      ));
+      toInsert.push(
+        hdrLine(
+          `${padL(fields.antNumber, 20)}${formatAntennaType(fields.antType)}`,
+          'ANT # / TYPE',
+        ),
+      );
     if (toInsert.length > 0) {
       result.splice(eohIdx, 0, ...toInsert);
     }
@@ -236,7 +255,10 @@ export function modifyHeaderLines(
 /*  Reconstruct full file text                                         */
 /* ================================================================== */
 
-export function reconstructFile(raw: RawRinexFile, fields: EditableHeaderFields): string {
+export function reconstructFile(
+  raw: RawRinexFile,
+  fields: EditableHeaderFields,
+): string {
   const modified = modifyHeaderLines(raw.headerLines, fields);
   return modified.join('\n') + '\n' + raw.body;
 }

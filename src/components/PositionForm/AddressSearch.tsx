@@ -35,17 +35,19 @@ export default function AddressSearch({
 
     setLoading(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
-        q: trimmed,
-        format: 'json',
-        limit: '5',
-      })}`;
+      const url = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(
+        {
+          q: trimmed,
+          format: 'json',
+          limit: '5',
+        },
+      )}`;
       const res = await fetch(url, {
         signal: controller.signal,
         headers: { 'Accept-Language': navigator.language },
       });
       if (!res.ok) throw new Error(res.statusText);
-      const data: NominatimResult[] = await res.json();
+      const data = (await res.json()) as NominatimResult[];
       setResults(data);
       setOpen(true);
       setActiveIndex(-1);
@@ -67,7 +69,7 @@ export default function AddressSearch({
     if (query.trim().length >= 3) {
       setLoading(true);
     }
-    debounceRef.current = setTimeout(() => search(query), 350);
+    debounceRef.current = setTimeout(() => void search(query), 350);
     return () => clearTimeout(debounceRef.current);
   }, [query]);
 
@@ -99,11 +101,28 @@ export default function AddressSearch({
       <div className="relative">
         <div className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center">
           {loading ? (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="size-3.5 text-fg/30 animate-spin">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              className="size-3.5 text-fg/30 animate-spin"
+            >
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
             </svg>
           ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3.5 text-fg/30">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-3.5 text-fg/30"
+            >
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
@@ -124,7 +143,11 @@ export default function AddressSearch({
             } else if (e.key === 'ArrowUp') {
               e.preventDefault();
               setActiveIndex((i) => Math.max(i - 1, 0));
-            } else if (e.key === 'Enter' && activeIndex >= 0 && results[activeIndex]) {
+            } else if (
+              e.key === 'Enter' &&
+              activeIndex >= 0 &&
+              results[activeIndex]
+            ) {
               e.preventDefault();
               select(results[activeIndex]);
             } else if (e.key === 'Escape') {
@@ -139,7 +162,16 @@ export default function AddressSearch({
             onClick={clear}
             tabIndex={-1}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3.5">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-3.5"
+            >
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
@@ -159,7 +191,16 @@ export default function AddressSearch({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => select(r)}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3.5 shrink-0 mt-0.5 text-fg/40">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="size-3.5 shrink-0 mt-0.5 text-fg/40"
+                  >
                     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>

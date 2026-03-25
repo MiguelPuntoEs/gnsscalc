@@ -5,9 +5,9 @@
  * Reference: RINEX 3.04 specification (IGS/RTCM).
  */
 
-import type { MsmEpoch, MsmSatObs, MsmSignal } from './rtcm3-msm';
-import { msmEpochToDate } from './rtcm3-msm';
-import { padL, padR, fmtF, hdrLine } from './rinex-format';
+import type { MsmEpoch, MsmSatObs } from 'gnss-js/rtcm3';
+import { msmEpochToDate } from 'gnss-js/rtcm3';
+import { padL, padR, fmtF, hdrLine } from 'gnss-js/rinex';
 
 /* ================================================================== */
 /*  Types                                                              */
@@ -24,7 +24,7 @@ export interface RinexObsHeader {
   antennaNumber: string;
   antennaType: string;
   approxPosition: [number, number, number]; // ECEF X, Y, Z in meters
-  antennaDelta: [number, number, number];   // H, E, N in meters
+  antennaDelta: [number, number, number]; // H, E, N in meters
   comment: string;
 }
 
@@ -58,11 +58,13 @@ function groupEpochs(epochs: MsmEpoch[], refTime: Date): EpochGroup[] {
 
     // Merge observations (replace existing sat data if same PRN)
     for (const obs of epoch.observations) {
-      const existing = group.observations.find(o => o.prn === obs.prn);
+      const existing = group.observations.find((o) => o.prn === obs.prn);
       if (existing) {
         // Merge signals
         for (const sig of obs.signals) {
-          const existingSig = existing.signals.find(s => s.rinexCode === sig.rinexCode);
+          const existingSig = existing.signals.find(
+            (s) => s.rinexCode === sig.rinexCode,
+          );
           if (existingSig) {
             Object.assign(existingSig, sig);
           } else {
@@ -75,7 +77,9 @@ function groupEpochs(epochs: MsmEpoch[], refTime: Date): EpochGroup[] {
     }
   }
 
-  return [...groups.values()].sort((a, b) => a.time.getTime() - b.time.getTime());
+  return [...groups.values()].sort(
+    (a, b) => a.time.getTime() - b.time.getTime(),
+  );
 }
 
 /**
@@ -108,13 +112,18 @@ function collectObsTypes(groups: EpochGroup[]): Map<string, string[]> {
   for (const sys of sysOrder) {
     const types = typeSet.get(sys);
     if (types && types.size > 0) {
-      result.set(sys, [...types].sort((a, b) => {
-        const bandA = a[1]!, bandB = b[1]!;
-        if (bandA !== bandB) return bandA.localeCompare(bandB);
-        const typeA = a[0]!, typeB = b[0]!;
-        if (typeA !== typeB) return typeA.localeCompare(typeB);
-        return a.localeCompare(b);
-      }));
+      result.set(
+        sys,
+        [...types].sort((a, b) => {
+          const bandA = a[1]!,
+            bandB = b[1]!;
+          if (bandA !== bandB) return bandA.localeCompare(bandB);
+          const typeA = a[0]!,
+            typeB = b[0]!;
+          if (typeA !== typeB) return typeA.localeCompare(typeB);
+          return a.localeCompare(b);
+        }),
+      );
     }
   }
   return result;
@@ -123,10 +132,6 @@ function collectObsTypes(groups: EpochGroup[]): Map<string, string[]> {
 /* ================================================================== */
 /*  Writer                                                             */
 /* ================================================================== */
-
-const SYS_NAMES: Record<string, string> = {
-  G: 'GPS', R: 'GLO', E: 'GAL', C: 'BDS', J: 'QZS', I: 'IRN', S: 'SBS',
-};
 
 /**
  * Write RINEX 3.04 observation file from decoded MSM epochs.
@@ -149,18 +154,22 @@ export function writeRinexObs(
   // Version line
   const systems = [...obsTypes.keys()];
   const sysChar = systems.length === 1 ? systems[0]! : 'M'; // M for mixed
-  lines.push(hdrLine(
-    `     3.04           OBSERVATION DATA    ${sysChar}`,
-    'RINEX VERSION / TYPE',
-  ));
+  lines.push(
+    hdrLine(
+      `     3.04           OBSERVATION DATA    ${sysChar}`,
+      'RINEX VERSION / TYPE',
+    ),
+  );
 
   // Program / run by / date
   const now = new Date();
   const dateStr = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')} ${String(now.getUTCHours()).padStart(2, '0')}${String(now.getUTCMinutes()).padStart(2, '0')}${String(now.getUTCSeconds()).padStart(2, '0')} UTC`;
-  lines.push(hdrLine(
-    `${'GNSSCalc'.padEnd(20)}${''.padEnd(20)}${dateStr}`,
-    'PGM / RUN BY / DATE',
-  ));
+  lines.push(
+    hdrLine(
+      `${'GNSSCalc'.padEnd(20)}${''.padEnd(20)}${dateStr}`,
+      'PGM / RUN BY / DATE',
+    ),
+  );
 
   // Comment
   if (header.comment) {
@@ -173,36 +182,46 @@ export function writeRinexObs(
   lines.push(hdrLine(header.markerNumber ?? '', 'MARKER NUMBER'));
 
   // Observer / Agency
-  lines.push(hdrLine(
-    `${padL(header.observer ?? '', 20)}${padL(header.agency ?? '', 40)}`,
-    'OBSERVER / AGENCY',
-  ));
+  lines.push(
+    hdrLine(
+      `${padL(header.observer ?? '', 20)}${padL(header.agency ?? '', 40)}`,
+      'OBSERVER / AGENCY',
+    ),
+  );
 
   // Receiver
-  lines.push(hdrLine(
-    `${padL(header.receiverNumber ?? '', 20)}${padL(header.receiverType ?? 'NTRIP', 20)}${padL(header.receiverVersion ?? '', 20)}`,
-    'REC # / TYPE / VERS',
-  ));
+  lines.push(
+    hdrLine(
+      `${padL(header.receiverNumber ?? '', 20)}${padL(header.receiverType ?? 'NTRIP', 20)}${padL(header.receiverVersion ?? '', 20)}`,
+      'REC # / TYPE / VERS',
+    ),
+  );
 
   // Antenna
-  lines.push(hdrLine(
-    `${padL(header.antennaNumber ?? '', 20)}${padL(header.antennaType ?? '', 20)}`,
-    'ANT # / TYPE',
-  ));
+  lines.push(
+    hdrLine(
+      `${padL(header.antennaNumber ?? '', 20)}${padL(header.antennaType ?? '', 20)}`,
+      'ANT # / TYPE',
+    ),
+  );
 
   // Approx position
   const pos = header.approxPosition ?? [0, 0, 0];
-  lines.push(hdrLine(
-    `${fmtF(pos[0], 14, 4)}${fmtF(pos[1], 14, 4)}${fmtF(pos[2], 14, 4)}`,
-    'APPROX POSITION XYZ',
-  ));
+  lines.push(
+    hdrLine(
+      `${fmtF(pos[0], 14, 4)}${fmtF(pos[1], 14, 4)}${fmtF(pos[2], 14, 4)}`,
+      'APPROX POSITION XYZ',
+    ),
+  );
 
   // Antenna delta
   const delta = header.antennaDelta ?? [0, 0, 0];
-  lines.push(hdrLine(
-    `${fmtF(delta[0], 14, 4)}${fmtF(delta[1], 14, 4)}${fmtF(delta[2], 14, 4)}`,
-    'ANTENNA: DELTA H/E/N',
-  ));
+  lines.push(
+    hdrLine(
+      `${fmtF(delta[0], 14, 4)}${fmtF(delta[1], 14, 4)}${fmtF(delta[2], 14, 4)}`,
+      'ANTENNA: DELTA H/E/N',
+    ),
+  );
 
   // Observation types per system
   for (const [sys, types] of obsTypes) {
@@ -215,7 +234,7 @@ export function writeRinexObs(
       } else {
         content = '      ';
       }
-      content += chunk.map(t => ` ${padL(t, 3)}`).join('');
+      content += chunk.map((t) => ` ${padL(t, 3)}`).join('');
       lines.push(hdrLine(content, 'SYS / # / OBS TYPES'));
     }
   }
@@ -226,7 +245,8 @@ export function writeRinexObs(
 
   // Interval (estimate from first two epochs)
   if (groups.length >= 2) {
-    const interval = (groups[1]!.time.getTime() - groups[0]!.time.getTime()) / 1000;
+    const interval =
+      (groups[1]!.time.getTime() - groups[0]!.time.getTime()) / 1000;
     if (interval > 0 && interval < 3600) {
       lines.push(hdrLine(fmtF(interval, 10, 3), 'INTERVAL'));
     }
@@ -234,17 +254,21 @@ export function writeRinexObs(
 
   // Time of first obs
   const first = groups[0]!.time;
-  lines.push(hdrLine(
-    `  ${first.getUTCFullYear()}    ${String(first.getUTCMonth() + 1).padStart(2)}    ${String(first.getUTCDate()).padStart(2)}    ${String(first.getUTCHours()).padStart(2)}    ${String(first.getUTCMinutes()).padStart(2)}   ${first.getUTCSeconds().toFixed(7).padStart(10)}     ${timeSys}`,
-    'TIME OF FIRST OBS',
-  ));
+  lines.push(
+    hdrLine(
+      `  ${first.getUTCFullYear()}    ${String(first.getUTCMonth() + 1).padStart(2)}    ${String(first.getUTCDate()).padStart(2)}    ${String(first.getUTCHours()).padStart(2)}    ${String(first.getUTCMinutes()).padStart(2)}   ${first.getUTCSeconds().toFixed(7).padStart(10)}     ${timeSys}`,
+      'TIME OF FIRST OBS',
+    ),
+  );
 
   // Time of last obs
   const last = groups[groups.length - 1]!.time;
-  lines.push(hdrLine(
-    `  ${last.getUTCFullYear()}    ${String(last.getUTCMonth() + 1).padStart(2)}    ${String(last.getUTCDate()).padStart(2)}    ${String(last.getUTCHours()).padStart(2)}    ${String(last.getUTCMinutes()).padStart(2)}   ${last.getUTCSeconds().toFixed(7).padStart(10)}     ${timeSys}`,
-    'TIME OF LAST OBS',
-  ));
+  lines.push(
+    hdrLine(
+      `  ${last.getUTCFullYear()}    ${String(last.getUTCMonth() + 1).padStart(2)}    ${String(last.getUTCDate()).padStart(2)}    ${String(last.getUTCHours()).padStart(2)}    ${String(last.getUTCMinutes()).padStart(2)}   ${last.getUTCSeconds().toFixed(7).padStart(10)}     ${timeSys}`,
+      'TIME OF LAST OBS',
+    ),
+  );
 
   // GLONASS slot/freq
   // (would need external data; skip for now)
@@ -258,7 +282,9 @@ export function writeRinexObs(
     const sec = t.getUTCSeconds() + t.getUTCMilliseconds() / 1000;
 
     // Sort observations by PRN
-    const sorted = [...group.observations].sort((a, b) => a.prn.localeCompare(b.prn));
+    const sorted = [...group.observations].sort((a, b) =>
+      a.prn.localeCompare(b.prn),
+    );
 
     // Epoch header line
     const epochLine = `> ${t.getUTCFullYear()} ${String(t.getUTCMonth() + 1).padStart(2, '0')} ${String(t.getUTCDate()).padStart(2, '0')} ${String(t.getUTCHours()).padStart(2, '0')} ${String(t.getUTCMinutes()).padStart(2, '0')}${fmtF(sec, 11, 7)}  0${padR(String(sorted.length), 3)}`;
@@ -272,23 +298,29 @@ export function writeRinexObs(
       let line = obs.prn;
 
       for (const obsType of sysTypes) {
-        const typeChar = obsType[0]!;   // C, L, D, S
+        const typeChar = obsType[0]!; // C, L, D, S
         const rinexCode = obsType.slice(1); // "1C", "5X", etc.
-        const sig = obs.signals.find(s => s.rinexCode === rinexCode);
+        const sig = obs.signals.find((s) => s.rinexCode === rinexCode);
 
         let value: number | undefined;
-        let lli = 0;  // Loss of Lock Indicator
-        let ssi = 0;  // Signal Strength Indicator
+        let lli = 0; // Loss of Lock Indicator
+        let ssi = 0; // Signal Strength Indicator
 
         if (sig) {
           switch (typeChar) {
-            case 'C': value = sig.pseudorange; break;
+            case 'C':
+              value = sig.pseudorange;
+              break;
             case 'L':
               value = sig.phase;
               if (sig.halfCycle) lli |= 1; // half-cycle ambiguity
               break;
-            case 'D': value = sig.doppler; break;
-            case 'S': value = sig.cn0; break;
+            case 'D':
+              value = sig.doppler;
+              break;
+            case 'S':
+              value = sig.cn0;
+              break;
           }
           // SSI from C/N0 (RINEX convention: 1-9, roughly cn0/6)
           if (sig.cn0 !== undefined && sig.cn0 > 0) {

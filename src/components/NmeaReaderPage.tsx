@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useCallback, useRef } from 'react';
-import { parseNmeaFile } from '../util/nmea';
-import type { NmeaTrack, NmeaFix } from '../util/nmea';
+import { parseNmeaFile } from 'gnss-js/nmea';
+import type { NmeaTrack, NmeaFix } from 'gnss-js/nmea';
 import CopyableInput from './CopyableInput';
 
 const NmeaTrackMap = lazy(() => import('./NmeaTrackMap'));
@@ -17,7 +17,11 @@ function formatDuration(seconds: number): string {
 
 function formatTime(d: Date): string {
   // If year is 2000, this is a GGA-only time with no date — show time only
-  if (d.getUTCFullYear() === 2000 && d.getUTCMonth() === 0 && d.getUTCDate() === 1) {
+  if (
+    d.getUTCFullYear() === 2000 &&
+    d.getUTCMonth() === 0 &&
+    d.getUTCDate() === 1
+  ) {
     return d.toISOString().substring(11).replace('Z', ' UTC');
   }
   return d.toISOString().replace('T', ' ').replace('Z', ' UTC');
@@ -30,9 +34,10 @@ function formatDistance(metres: number): string {
 
 function generateGpx(fixes: NmeaFix[], name: string): string {
   const pts = fixes
-    .map(f => {
+    .map((f) => {
       const timeAttr = f.time ? ` <time>${f.time.toISOString()}</time>` : '';
-      const eleTag = f.alt !== null ? `\n        <ele>${f.alt.toFixed(1)}</ele>` : '';
+      const eleTag =
+        f.alt !== null ? `\n        <ele>${f.alt.toFixed(1)}</ele>` : '';
       return `      <trkpt lat="${f.lat.toFixed(8)}" lon="${f.lon.toFixed(8)}">${eleTag}${timeAttr ? `\n       ${timeAttr}` : ''}
       </trkpt>`;
     })
@@ -133,6 +138,14 @@ export default function NmeaReaderPage() {
       {/* Upload area */}
       {track ? (
         <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
           className={`card flex items-center gap-3 px-4 py-2.5 border-dashed cursor-pointer transition-colors ${
             isDragging ? 'border-accent bg-accent/10' : ''
           }`}
@@ -156,7 +169,8 @@ export default function NmeaReaderPage() {
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           <span className="text-sm text-fg/60">
-            Drop another file or <span className="text-accent font-medium">browse</span>
+            Drop another file or{' '}
+            <span className="text-accent font-medium">browse</span>
           </span>
           <input
             ref={inputRef}
@@ -168,6 +182,14 @@ export default function NmeaReaderPage() {
         </div>
       ) : (
         <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
           className={`card flex flex-col items-center justify-center gap-3 py-10 border-dashed cursor-pointer transition-colors ${
             isDragging ? 'border-accent bg-accent/10' : ''
           }`}
@@ -191,7 +213,8 @@ export default function NmeaReaderPage() {
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           <p className="text-sm text-fg/60 mb-0">
-            Drop an NMEA log file here or <span className="text-accent font-medium">browse</span>
+            Drop an NMEA log file here or{' '}
+            <span className="text-accent font-medium">browse</span>
           </p>
           <p className="text-xs text-fg/40 mb-0">.nmea, .txt, .log</p>
           <input
@@ -206,9 +229,24 @@ export default function NmeaReaderPage() {
 
       {loading && (
         <div className="card flex items-center justify-center gap-2 py-4">
-          <svg className="size-4 animate-spin text-accent" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <svg
+            className="size-4 animate-spin text-accent"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
           </svg>
           <span className="text-sm text-fg/60">Parsing NMEA file…</span>
         </div>
@@ -226,9 +264,14 @@ export default function NmeaReaderPage() {
           <div className="card-output">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-fg">Track Statistics</span>
+                <span className="text-sm font-semibold text-fg">
+                  Track Statistics
+                </span>
                 {fileName && (
-                  <span className="text-xs text-fg/40 truncate max-w-[200px]" title={fileName}>
+                  <span
+                    className="text-xs text-fg/40 truncate max-w-[200px]"
+                    title={fileName}
+                  >
                     {fileName}
                   </span>
                 )}
@@ -239,7 +282,12 @@ export default function NmeaReaderPage() {
                   className="btn-secondary flex items-center gap-1.5"
                   onClick={() => downloadGpx(track.fixes, fileName ?? 'track')}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-3">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="size-3"
+                  >
                     <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
                     <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
                   </svg>
@@ -250,51 +298,68 @@ export default function NmeaReaderPage() {
                   className="btn-secondary flex items-center gap-1.5"
                   onClick={handleReset}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-3">
-                    <path fillRule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clipRule="evenodd" />
-                    <path fillRule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clipRule="evenodd" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="size-3"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z"
+                      clipRule="evenodd"
+                    />
+                    <path
+                      fillRule="evenodd"
+                      d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                   New file
                 </button>
               </div>
             </div>
             <div className="card-fields">
-              <label>Valid fixes</label>
-              <CopyableInput value={`${stats.validFixes} / ${stats.totalFixes}`} />
+              <span>Valid fixes</span>
+              <CopyableInput
+                value={`${stats.validFixes} / ${stats.totalFixes}`}
+              />
 
               {stats.startTime && (
                 <>
-                  <label>Start</label>
+                  <span>Start</span>
                   <CopyableInput value={formatTime(stats.startTime)} />
                 </>
               )}
 
-              {stats.endTime && stats.duration !== null && stats.duration > 0 && (
-                <>
-                  <label>End</label>
-                  <CopyableInput value={formatTime(stats.endTime)} />
-                  <label>Duration</label>
-                  <CopyableInput value={formatDuration(stats.duration)} />
-                </>
-              )}
+              {stats.endTime &&
+                stats.duration !== null &&
+                stats.duration > 0 && (
+                  <>
+                    <span>End</span>
+                    <CopyableInput value={formatTime(stats.endTime)} />
+                    <span>Duration</span>
+                    <CopyableInput value={formatDuration(stats.duration)} />
+                  </>
+                )}
 
               {stats.totalDistance !== null && (
                 <>
-                  <label>Distance</label>
+                  <span>Distance</span>
                   <CopyableInput value={formatDistance(stats.totalDistance)} />
                 </>
               )}
 
               {stats.maxSpeed !== null && (
                 <>
-                  <label>Max speed</label>
+                  <span>Max speed</span>
                   <CopyableInput value={`${stats.maxSpeed.toFixed(1)} km/h`} />
                 </>
               )}
 
               {stats.avgSatellites !== null && (
                 <>
-                  <label>Avg satellites</label>
+                  <span>Avg satellites</span>
                   <CopyableInput value={stats.avgSatellites.toFixed(1)} />
                 </>
               )}
@@ -303,13 +368,19 @@ export default function NmeaReaderPage() {
                 <>
                   <div className="section-divider" />
                   <div className="section-label">Precision</div>
-                  <label>CEP</label>
-                  <CopyableInput value={`${stats.cep.toFixed(3)} m`} title="Circular Error Probable (50th percentile)" />
-                  <label>2DRMS</label>
-                  <CopyableInput value={`${stats.drms2!.toFixed(3)} m`} title="2x horizontal RMS (~95th percentile)" />
-                  <label>Horizontal RMS</label>
+                  <span>CEP</span>
+                  <CopyableInput
+                    value={`${stats.cep.toFixed(3)} m`}
+                    title="Circular Error Probable (50th percentile)"
+                  />
+                  <span>2DRMS</span>
+                  <CopyableInput
+                    value={`${stats.drms2!.toFixed(3)} m`}
+                    title="2x horizontal RMS (~95th percentile)"
+                  />
+                  <span>Horizontal RMS</span>
                   <CopyableInput value={`${stats.hRms!.toFixed(3)} m`} />
-                  <label>Vertical RMS</label>
+                  <span>Vertical RMS</span>
                   <CopyableInput value={`${stats.vRms!.toFixed(3)} m`} />
                 </>
               )}

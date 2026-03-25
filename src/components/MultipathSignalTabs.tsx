@@ -1,4 +1,4 @@
-import type { MultipathSignalStat } from '../util/multipath';
+import type { MultipathSignalStat } from 'gnss-js/analysis';
 import { systemColor } from '../util/gnss-constants';
 
 export default function MultipathSignalTabs({
@@ -23,7 +23,7 @@ export default function MultipathSignalTabs({
       >
         All signals
       </button>
-      {stats.map(s => {
+      {stats.map((s) => {
         const key = `${s.system}-${s.band}-${s.refBand}`;
         return (
           <button
@@ -36,7 +36,10 @@ export default function MultipathSignalTabs({
                 : 'bg-fg/[0.03] text-fg/40 hover:text-fg/60'
             }`}
           >
-            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: systemColor(s.system) }} />
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full mr-1.5"
+              style={{ backgroundColor: systemColor(s.system) }}
+            />
             {s.label}
             <span className="ml-1.5 text-fg/25">{s.rms.toFixed(3)}m</span>
           </button>

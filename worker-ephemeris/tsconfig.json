@@ -9,5 +9,9 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["index.ts", "../src/util/rtcm3-decoder.ts", "../src/util/rtcm3-ephemeris.ts"]
+  "include": [
+    "index.ts",
+    "../src/util/rtcm3-decoder.ts",
+    "../src/util/rtcm3-ephemeris.ts"
+  ]
 }

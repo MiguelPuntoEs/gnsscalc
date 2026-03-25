@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { decodeMsmFull, msmEpochToDate, resetGloFreqCache } from './rtcm3-msm';
-import type { Rtcm3Frame } from './ntrip';
+import {
+  decodeMsmFull,
+  msmEpochToDate,
+  resetGloFreqCache,
+} from 'gnss-js/rtcm3';
+import type { Rtcm3Frame } from 'gnss-js/rtcm3';
 
 /* ================================================================== */
 /*  Helpers to build synthetic MSM frames                              */
@@ -44,15 +48,15 @@ class BitWriter {
  */
 function buildMsm4Frame(opts: {
   messageType: number;
-  satIndices: number[];   // 1-based satellite indices in the 64-bit mask
-  sigIndices: number[];   // 0-based signal indices in the 32-bit mask
+  satIndices: number[]; // 1-based satellite indices in the 64-bit mask
+  sigIndices: number[]; // 0-based signal indices in the 32-bit mask
   // All cells active unless specified
   cellValues?: {
-    psr: number;     // raw signed 15-bit
-    cp: number;      // raw signed 22-bit
-    ll: number;      // 4-bit lock time
-    hc: number;      // 1-bit half cycle
-    cnr: number;     // 6-bit C/N0
+    psr: number; // raw signed 15-bit
+    cp: number; // raw signed 22-bit
+    ll: number; // 4-bit lock time
+    hc: number; // 1-bit half cycle
+    cnr: number; // 6-bit C/N0
   }[];
 }): Rtcm3Frame {
   const { messageType, satIndices, sigIndices } = opts;
@@ -72,8 +76,8 @@ function buildMsm4Frame(opts: {
   let satMaskHi = 0;
   let satMaskLo = 0;
   for (const idx of satIndices) {
-    if (idx <= 32) satMaskHi |= (1 << (32 - idx));
-    else satMaskLo |= (1 << (64 - idx));
+    if (idx <= 32) satMaskHi |= 1 << (32 - idx);
+    else satMaskLo |= 1 << (64 - idx);
   }
   w.writeU(satMaskHi >>> 0, 32);
   w.writeU(satMaskLo >>> 0, 32);
@@ -81,7 +85,7 @@ function buildMsm4Frame(opts: {
   // Signal mask (32 bits)
   let sigMask = 0;
   for (const idx of sigIndices) {
-    sigMask |= (1 << (31 - idx));
+    sigMask |= 1 << (31 - idx);
   }
   w.writeU(sigMask >>> 0, 32);
 
@@ -95,10 +99,10 @@ function buildMsm4Frame(opts: {
 
   // Satellite data (MSM4): rrint(8) + extsat(4) + rrmod(10) per sat
   for (let j = 0; j < numSat; j++) {
-    w.writeU(80, 8);  // ~80ms rough range integer
+    w.writeU(80, 8); // ~80ms rough range integer
   }
   for (let j = 0; j < numSat; j++) {
-    w.writeU(0, 4);   // extended sat info
+    w.writeU(0, 4); // extended sat info
   }
   for (let j = 0; j < numSat; j++) {
     w.writeU(512, 10); // ~0.5ms fractional rough range
@@ -106,9 +110,15 @@ function buildMsm4Frame(opts: {
 
   // Signal data (MSM4): psr(s15) + cp(s22) + ll(4) + hc(1) + cnr(6)
   const numCells = numSat * numSig;
-  const cells = opts.cellValues ?? Array.from({ length: numCells }, () => ({
-    psr: 1000, cp: 2000, ll: 6, hc: 0, cnr: 42,
-  }));
+  const cells =
+    opts.cellValues ??
+    Array.from({ length: numCells }, () => ({
+      psr: 1000,
+      cp: 2000,
+      ll: 6,
+      hc: 0,
+      cnr: 42,
+    }));
 
   for (let i = 0; i < numCells; i++) w.writeS(cells[i]!.psr, 15);
   for (let i = 0; i < numCells; i++) w.writeS(cells[i]!.cp, 22);
@@ -175,13 +185,17 @@ describe('decodeMsmFull', () => {
     const frame = buildMsm4Frame({
       messageType: 1074,
       satIndices: [1, 5, 10], // G01, G05, G10
-      sigIndices: [1],        // "1C"
+      sigIndices: [1], // "1C"
     });
 
     const epoch = decodeMsmFull(frame);
     expect(epoch).not.toBeNull();
     expect(epoch!.observations).toHaveLength(3);
-    expect(epoch!.observations.map(o => o.prn)).toEqual(['G01', 'G05', 'G10']);
+    expect(epoch!.observations.map((o) => o.prn)).toEqual([
+      'G01',
+      'G05',
+      'G10',
+    ]);
   });
 
   it('decodes GPS MSM4 with multiple signals', () => {
@@ -195,7 +209,10 @@ describe('decodeMsmFull', () => {
     expect(epoch).not.toBeNull();
     expect(epoch!.observations).toHaveLength(1);
     expect(epoch!.observations[0]!.signals).toHaveLength(2);
-    expect(epoch!.observations[0]!.signals.map(s => s.rinexCode)).toEqual(['1C', '2C']);
+    expect(epoch!.observations[0]!.signals.map((s) => s.rinexCode)).toEqual([
+      '1C',
+      '2C',
+    ]);
   });
 
   it('decodes Galileo MSM4', () => {
@@ -274,7 +291,9 @@ describe('msmEpochToDate', () => {
     const date = msmEpochToDate('G', 86400000, refTime);
     expect(date).toBeInstanceOf(Date);
     // Should be within a week of the reference time
-    expect(Math.abs(date.getTime() - refTime.getTime())).toBeLessThan(7 * 86400000);
+    expect(Math.abs(date.getTime() - refTime.getTime())).toBeLessThan(
+      7 * 86400000,
+    );
   });
 
   it('converts BDS epoch time', () => {

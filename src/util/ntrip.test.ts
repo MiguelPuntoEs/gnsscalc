@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseSourcetable, Rtcm3Decoder } from './ntrip';
+import { parseSourcetable } from 'gnss-js/ntrip';
+import { Rtcm3Decoder } from 'gnss-js/rtcm3';
 
 describe('parseSourcetable', () => {
   it('parses STR entries', () => {
-    const text = 'STR;FFMJ2;Frankfurt;RTCM 2.0;1(1),3(19),16(59);0;GPS;GREF;GER;50.12;8.68;0;1;GPSNet V1.9;none;N;N;560;Demo\nENDSOURCETABLE';
+    const text =
+      'STR;FFMJ2;Frankfurt;RTCM 2.0;1(1),3(19),16(59);0;GPS;GREF;GER;50.12;8.68;0;1;GPSNet V1.9;none;N;N;560;Demo\nENDSOURCETABLE';
     const st = parseSourcetable(text);
     expect(st.streams).toHaveLength(1);
     expect(st.streams[0]!.mountpoint).toBe('FFMJ2');
@@ -19,7 +21,8 @@ describe('parseSourcetable', () => {
   });
 
   it('parses CAS entries', () => {
-    const text = 'CAS;129.217.182.51;80;EUREF;BKG;0;GER;51.5;7.5;;0;Trial Broadcaster\nENDSOURCETABLE';
+    const text =
+      'CAS;129.217.182.51;80;EUREF;BKG;0;GER;51.5;7.5;;0;Trial Broadcaster\nENDSOURCETABLE';
     const st = parseSourcetable(text);
     expect(st.casters).toHaveLength(1);
     expect(st.casters[0]!.host).toBe('129.217.182.51');
@@ -30,7 +33,8 @@ describe('parseSourcetable', () => {
   });
 
   it('parses NET entries', () => {
-    const text = 'NET;GREF;BKG;B;N;http://gref-ip.de/home.html;none;peter@bkg.bund.de;none\nENDSOURCETABLE';
+    const text =
+      'NET;GREF;BKG;B;N;http://gref-ip.de/home.html;none;peter@bkg.bund.de;none\nENDSOURCETABLE';
     const st = parseSourcetable(text);
     expect(st.networks).toHaveLength(1);
     expect(st.networks[0]!.identifier).toBe('GREF');
@@ -69,30 +73,33 @@ describe('Rtcm3Decoder', () => {
       crc ^= data[i]! << 16;
       for (let j = 0; j < 8; j++) {
         crc <<= 1;
-        if (crc & 0x1000000) crc ^= 0x1864CFB;
+        if (crc & 0x1000000) crc ^= 0x1864cfb;
       }
     }
-    return crc & 0xFFFFFF;
+    return crc & 0xffffff;
   }
 
-  function buildRtcm3Frame(messageType: number, payloadSize: number): Uint8Array {
+  function buildRtcm3Frame(
+    messageType: number,
+    payloadSize: number,
+  ): Uint8Array {
     const length = payloadSize;
     const frame = new Uint8Array(3 + length + 3);
     // Sync byte
-    frame[0] = 0xD3;
+    frame[0] = 0xd3;
     // Reserved (6 bits = 0) + length (10 bits)
     frame[1] = (length >> 8) & 0x03;
-    frame[2] = length & 0xFF;
+    frame[2] = length & 0xff;
     // First 12 bits of payload = message type
     if (length >= 2) {
-      frame[3] = (messageType >> 4) & 0xFF;
-      frame[4] = ((messageType & 0x0F) << 4);
+      frame[3] = (messageType >> 4) & 0xff;
+      frame[4] = (messageType & 0x0f) << 4;
     }
     // Compute valid CRC-24Q over header + payload
     const crc = crc24q(frame, 3 + length);
-    frame[3 + length] = (crc >> 16) & 0xFF;
-    frame[3 + length + 1] = (crc >> 8) & 0xFF;
-    frame[3 + length + 2] = crc & 0xFF;
+    frame[3 + length] = (crc >> 16) & 0xff;
+    frame[3 + length + 1] = (crc >> 8) & 0xff;
+    frame[3 + length + 2] = crc & 0xff;
     return frame;
   }
 
@@ -134,7 +141,7 @@ describe('Rtcm3Decoder', () => {
     const decoder = new Rtcm3Decoder();
     const frame = buildRtcm3Frame(1097, 25);
     const withGarbage = new Uint8Array(5 + frame.length);
-    withGarbage.set([0x00, 0xFF, 0xAA, 0xBB, 0xCC], 0);
+    withGarbage.set([0x00, 0xff, 0xaa, 0xbb, 0xcc], 0);
     withGarbage.set(frame, 5);
     const result = decoder.decode(withGarbage);
     expect(result).toHaveLength(1);

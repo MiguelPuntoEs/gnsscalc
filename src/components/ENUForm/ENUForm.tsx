@@ -17,13 +17,13 @@ export default function ENUForm({
     <div className="card-output flex flex-col gap-2">
       <h3 className="text-sm font-semibold text-fg m-0">{title}</h3>
       <div className="card-fields">
-        <label title="East offset (meters)">&Delta;E</label>
+        <span title="East offset (meters)">&Delta;E</span>
         <CopyableInput value={`${deltaE.toFixed(3)} m`} />
 
-        <label title="North offset (meters)">&Delta;N</label>
+        <span title="North offset (meters)">&Delta;N</span>
         <CopyableInput value={`${deltaN.toFixed(3)} m`} />
 
-        <label title="Up offset (meters)">&Delta;U</label>
+        <span title="Up offset (meters)">&Delta;U</span>
         <CopyableInput value={`${deltaU.toFixed(3)} m`} />
       </div>
     </div>

@@ -1,13 +1,27 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
-import type { SatCn0, EphemerisInfo } from '../util/ntrip';
+import type { SatCn0 } from 'gnss-js/rtcm3';
+import type { EphemerisInfo } from 'gnss-js/rtcm3';
 import { CONSTELLATION_COLORS } from '../util/gnss-constants';
 
 const SYSTEM_PREFIX_TO_NAME: Record<string, string> = {
-  G: 'GPS', R: 'GLONASS', E: 'Galileo', C: 'BeiDou',
-  J: 'QZSS', I: 'NavIC', S: 'SBAS',
+  G: 'GPS',
+  R: 'GLONASS',
+  E: 'Galileo',
+  C: 'BeiDou',
+  J: 'QZSS',
+  I: 'NavIC',
+  S: 'SBAS',
 };
 
-const CONSTELLATION_ORDER = ['GPS', 'GLONASS', 'Galileo', 'BeiDou', 'QZSS', 'SBAS', 'NavIC'];
+const CONSTELLATION_ORDER = [
+  'GPS',
+  'GLONASS',
+  'Galileo',
+  'BeiDou',
+  'QZSS',
+  'SBAS',
+  'NavIC',
+];
 
 /* ─── Types ───────────────────────────────────────────────────── */
 
@@ -36,7 +50,7 @@ interface Props {
 /* ─── Helpers ─────────────────────────────────────────────────── */
 
 function rad2deg(r: number): string {
-  return (r * 180 / Math.PI).toFixed(2) + '°';
+  return ((r * 180) / Math.PI).toFixed(2) + '°';
 }
 
 function formatSciNum(n: number, digits = 4): string {
@@ -46,7 +60,15 @@ function formatSciNum(n: number, digits = 4): string {
 
 /* ─── Tooltip component ──────────────────────────────────────── */
 
-function SatelliteTooltip({ sat, color, tileRect }: { sat: SatInfo; color: string; tileRect: DOMRect | null }) {
+function SatelliteTooltip({
+  sat,
+  color,
+  tileRect,
+}: {
+  sat: SatInfo;
+  color: string;
+  tileRect: DOMRect | null;
+}) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
@@ -87,16 +109,22 @@ function SatelliteTooltip({ sat, color, tileRect }: { sat: SatInfo; color: strin
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="font-mono font-bold text-sm" style={{ color }}>{sat.prn}</span>
+        <span className="font-mono font-bold text-sm" style={{ color }}>
+          {sat.prn}
+        </span>
         <div className="flex items-center gap-1.5">
           {sat.hasEphemeris && (
-            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
-              style={{ background: color + '20', color }}>
+            <span
+              className="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+              style={{ background: color + '20', color }}
+            >
               EPH
             </span>
           )}
           {eph != null && (
-            <span className={`text-[9px] font-medium ${eph.health === 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <span
+              className={`text-[9px] font-medium ${eph.health === 0 ? 'text-green-400' : 'text-red-400'}`}
+            >
               {eph.health === 0 ? 'Healthy' : 'Unhealthy'}
             </span>
           )}
@@ -108,9 +136,14 @@ function SatelliteTooltip({ sat, color, tileRect }: { sat: SatInfo; color: strin
         <div className="mb-2.5">
           <div className="flex justify-between text-fg/40 mb-1">
             <span>C/N&#x2080;</span>
-            <span className="font-mono text-fg/70">{sat.cn0.toFixed(1)} dB-Hz</span>
+            <span className="font-mono text-fg/70">
+              {sat.cn0.toFixed(1)} dB-Hz
+            </span>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: color + '15' }}>
+          <div
+            className="h-1.5 rounded-full overflow-hidden"
+            style={{ background: color + '15' }}
+          >
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{
@@ -138,29 +171,74 @@ function SatelliteTooltip({ sat, color, tileRect }: { sat: SatInfo; color: strin
               <EphRow label="Velocity X" value={`${eph.vx?.toFixed(4)} km/s`} />
               <EphRow label="Velocity Y" value={`${eph.vy?.toFixed(4)} km/s`} />
               <EphRow label="Velocity Z" value={`${eph.vz?.toFixed(4)} km/s`} />
-              {eph.freqChannel != null && <EphRow label="Freq channel" value={`${eph.freqChannel > 0 ? '+' : ''}${eph.freqChannel}`} />}
-              {eph.af0 != null && <EphRow label="Clock bias" value={`${(eph.af0 * 1e6).toFixed(3)} µs`} />}
+              {eph.freqChannel != null && (
+                <EphRow
+                  label="Freq channel"
+                  value={`${eph.freqChannel > 0 ? '+' : ''}${eph.freqChannel}`}
+                />
+              )}
+              {eph.af0 != null && (
+                <EphRow
+                  label="Clock bias"
+                  value={`${(eph.af0 * 1e6).toFixed(3)} µs`}
+                />
+              )}
             </div>
           ) : (
             /* Keplerian (GPS/Galileo/BDS/QZSS) */
             <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[10px]">
-              {eph.sqrtA != null && <EphRow label="Semi-major axis" value={`${(eph.sqrtA ** 2 / 1000).toFixed(0)} km`} />}
-              {eph.eccentricity != null && <EphRow label="Eccentricity" value={formatSciNum(eph.eccentricity)} />}
-              {eph.inclination != null && <EphRow label="Inclination" value={rad2deg(eph.inclination)} />}
-              {eph.omega0 != null && <EphRow label="RAAN (Ω₀)" value={rad2deg(eph.omega0)} />}
-              {eph.argPerigee != null && <EphRow label="Arg. perigee (ω)" value={rad2deg(eph.argPerigee)} />}
-              {eph.meanAnomaly != null && <EphRow label="Mean anomaly (M₀)" value={rad2deg(eph.meanAnomaly)} />}
+              {eph.sqrtA != null && (
+                <EphRow
+                  label="Semi-major axis"
+                  value={`${(eph.sqrtA ** 2 / 1000).toFixed(0)} km`}
+                />
+              )}
+              {eph.eccentricity != null && (
+                <EphRow
+                  label="Eccentricity"
+                  value={formatSciNum(eph.eccentricity)}
+                />
+              )}
+              {eph.inclination != null && (
+                <EphRow label="Inclination" value={rad2deg(eph.inclination)} />
+              )}
+              {eph.omega0 != null && (
+                <EphRow label="RAAN (Ω₀)" value={rad2deg(eph.omega0)} />
+              )}
+              {eph.argPerigee != null && (
+                <EphRow
+                  label="Arg. perigee (ω)"
+                  value={rad2deg(eph.argPerigee)}
+                />
+              )}
+              {eph.meanAnomaly != null && (
+                <EphRow
+                  label="Mean anomaly (M₀)"
+                  value={rad2deg(eph.meanAnomaly)}
+                />
+              )}
               {eph.toe != null && <EphRow label="toe" value={`${eph.toe} s`} />}
-              {eph.week != null && <EphRow label="Week" value={`${eph.week}`} />}
-              {eph.af0 != null && <EphRow label="Clock bias" value={`${(eph.af0 * 1e6).toFixed(3)} µs`} />}
-              {eph.ura != null && <EphRow label="URA index" value={`${eph.ura}`} />}
+              {eph.week != null && (
+                <EphRow label="Week" value={`${eph.week}`} />
+              )}
+              {eph.af0 != null && (
+                <EphRow
+                  label="Clock bias"
+                  value={`${(eph.af0 * 1e6).toFixed(3)} µs`}
+                />
+              )}
+              {eph.ura != null && (
+                <EphRow label="URA index" value={`${eph.ura}`} />
+              )}
             </div>
           )}
         </div>
       )}
 
       {!eph && sat.observed && (
-        <div className="text-[10px] text-fg/20 italic pt-1">Observed in MSM — no ephemeris yet</div>
+        <div className="text-[10px] text-fg/20 italic pt-1">
+          Observed in MSM — no ephemeris yet
+        </div>
       )}
     </div>
   );
@@ -203,7 +281,9 @@ function SatelliteTile({ sat, color }: { sat: SatInfo; color: string }) {
           style={{
             background: hasEph
               ? `linear-gradient(135deg, ${color}18, ${color}08)`
-              : obs ? `${color}08` : 'rgba(255,255,255,0.02)',
+              : obs
+                ? `${color}08`
+                : 'rgba(255,255,255,0.02)',
             border: `1px solid ${hasEph ? color + '50' : obs ? color + '20' : 'rgba(255,255,255,0.04)'}`,
             boxShadow: hasEph
               ? `0 0 16px ${color}30, 0 0 4px ${color}20, inset 0 1px 0 ${color}10`
@@ -224,7 +304,11 @@ function SatelliteTile({ sat, color }: { sat: SatInfo; color: string }) {
           <span
             className="text-[10px] font-mono font-semibold leading-none transition-colors duration-300"
             style={{
-              color: hasEph ? color : obs ? color + 'bb' : 'rgba(255,255,255,0.12)',
+              color: hasEph
+                ? color
+                : obs
+                  ? color + 'bb'
+                  : 'rgba(255,255,255,0.12)',
             }}
           >
             {sat.prn}
@@ -232,7 +316,10 @@ function SatelliteTile({ sat, color }: { sat: SatInfo; color: string }) {
 
           {/* C/N0 mini bar */}
           {sat.cn0 != null ? (
-            <div className="w-7 h-[3px] rounded-full overflow-hidden" style={{ background: color + '15' }}>
+            <div
+              className="w-7 h-[3px] rounded-full overflow-hidden"
+              style={{ background: color + '15' }}
+            >
               <div
                 className="h-full rounded-full"
                 style={{
@@ -270,7 +357,9 @@ function ConstellationSection({ group }: { group: ConstellationGroup }) {
             className="size-2 rounded-full"
             style={{ background: color, boxShadow: `0 0 8px ${color}60` }}
           />
-          <span className="text-xs font-bold tracking-wide" style={{ color }}>{name}</span>
+          <span className="text-xs font-bold tracking-wide" style={{ color }}>
+            {name}
+          </span>
         </div>
         <div className="flex items-center gap-3 ml-auto text-[10px] text-fg/30">
           <span>
@@ -284,7 +373,7 @@ function ConstellationSection({ group }: { group: ConstellationGroup }) {
 
       {/* Satellite tiles */}
       <div className="p-2.5 flex flex-wrap gap-1.5">
-        {sats.map(sat => (
+        {sats.map((sat) => (
           <SatelliteTile key={sat.prn} sat={sat} color={color} />
         ))}
       </div>
@@ -294,7 +383,10 @@ function ConstellationSection({ group }: { group: ConstellationGroup }) {
 
 /* ─── Main panel ─────────────────────────────────────────────── */
 
-export default function SatelliteStatusPanel({ satellites, ephemerides }: Props) {
+export default function SatelliteStatusPanel({
+  satellites,
+  ephemerides,
+}: Props) {
   const groups = useMemo(() => {
     // Collect all known PRNs from observations and ephemerides
     const satMap = new Map<string, SatInfo>();
@@ -338,7 +430,9 @@ export default function SatelliteStatusPanel({ satellites, ephemerides }: Props)
 
     // Sort satellites within each group by PRN number
     for (const list of grouped.values()) {
-      list.sort((a, b) => a.prn.localeCompare(b.prn, undefined, { numeric: true }));
+      list.sort((a, b) =>
+        a.prn.localeCompare(b.prn, undefined, { numeric: true }),
+      );
     }
 
     // Build ordered constellation groups
@@ -350,8 +444,8 @@ export default function SatelliteStatusPanel({ satellites, ephemerides }: Props)
         name,
         color: CONSTELLATION_COLORS[name] ?? '#94a3b8',
         sats,
-        observed: sats.filter(s => s.observed).length,
-        withEph: sats.filter(s => s.hasEphemeris).length,
+        observed: sats.filter((s) => s.observed).length,
+        withEph: sats.filter((s) => s.hasEphemeris).length,
       });
     }
 
@@ -362,8 +456,8 @@ export default function SatelliteStatusPanel({ satellites, ephemerides }: Props)
         name,
         color: CONSTELLATION_COLORS[name] ?? '#94a3b8',
         sats,
-        observed: sats.filter(s => s.observed).length,
-        withEph: sats.filter(s => s.hasEphemeris).length,
+        observed: sats.filter((s) => s.observed).length,
+        withEph: sats.filter((s) => s.hasEphemeris).length,
       });
     }
 
@@ -374,7 +468,9 @@ export default function SatelliteStatusPanel({ satellites, ephemerides }: Props)
     return (
       <div className="rounded-lg border border-border/20 px-4 py-8 text-center">
         <div className="text-fg/20 text-sm">Waiting for satellite data…</div>
-        <div className="text-fg/10 text-xs mt-1">MSM and ephemeris messages will appear here</div>
+        <div className="text-fg/10 text-xs mt-1">
+          MSM and ephemeris messages will appear here
+        </div>
       </div>
     );
   }
@@ -404,15 +500,17 @@ export default function SatelliteStatusPanel({ satellites, ephemerides }: Props)
             Observed
           </span>
           <span className="flex items-center gap-1">
-            <span className="inline-block size-2 rounded-sm border border-green-400/50 bg-green-400/10"
-              style={{ boxShadow: '0 0 4px rgba(74,222,128,0.3)' }} />
+            <span
+              className="inline-block size-2 rounded-sm border border-green-400/50 bg-green-400/10"
+              style={{ boxShadow: '0 0 4px rgba(74,222,128,0.3)' }}
+            />
             Ephemeris
           </span>
         </div>
       </div>
 
       {/* Constellation groups */}
-      {groups.map(group => (
+      {groups.map((group) => (
         <ConstellationSection key={group.name} group={group} />
       ))}
     </div>

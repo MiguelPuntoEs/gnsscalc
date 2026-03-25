@@ -1,10 +1,23 @@
 import { useEffect, useState } from 'react';
-import { getGpsLeap, getGpsTime, getWeekNumber, MILLISECONDS_IN_SECOND } from 'gnss-js';
+import {
+  getGpsLeap,
+  getGpsTime,
+  getWeekNumber,
+  MILLISECONDS_IN_SECOND,
+} from 'gnss-js/time';
 
-function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
+function StatCard({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex-1 min-w-36 rounded-xl bg-bg-raised border border-border/60 px-4 py-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-fg/35 mb-1">{label}</div>
+      <div className="text-[10px] font-bold uppercase tracking-widest text-fg/35 mb-1">
+        {label}
+      </div>
       <div className="tabular-nums font-semibold">{children}</div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 export default function useEditableValue(
   value: string,
   onCommit?: (value: string) => unknown,
-  validate?: (value: string) => string | null
+  validate?: (value: string) => string | null,
 ) {
   const [inputValue, setInputValue] = useState(value);
   const [error, setError] = useState(false);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Rtcm3Decoder } from './rtcm3-decoder';
-import { decodeEphemeris } from './rtcm3-ephemeris';
+import { Rtcm3Decoder } from 'gnss-js/rtcm3';
+import { decodeEphemeris } from 'gnss-js/rtcm3';
 
 describe('BCEP00BKG0 live connection', () => {
   it('connects and decodes ephemeris from IGS stream', async () => {
@@ -16,7 +16,7 @@ describe('BCEP00BKG0 live connection', () => {
       'User-Agent': 'NTRIP GNSSCalc/1.0',
       'X-Ntrip-Host': 'products.igs-ip.net',
       'X-Ntrip-Port': '2101',
-      'Authorization': 'Basic ' + btoa(`${username}:${password}`),
+      Authorization: 'Basic ' + btoa(`${username}:${password}`),
     };
 
     const controller = new AbortController();
@@ -45,7 +45,7 @@ describe('BCEP00BKG0 live connection', () => {
       }
     }
 
-    reader.cancel();
+    void reader.cancel();
     controller.abort();
 
     console.log(`Decoded ${seen.size} satellites in 8 seconds:`);
@@ -63,9 +63,9 @@ describe('BCEP00BKG0 live connection', () => {
     console.log('\nBy constellation:', bySystem);
 
     expect(seen.size).toBeGreaterThan(0);
-    expect(bySystem['G']).toBeGreaterThan(0);  // GPS
-    expect(bySystem['E']).toBeGreaterThan(0);  // Galileo
-    expect(bySystem['R']).toBeGreaterThan(0);  // GLONASS
-    expect(bySystem['C']).toBeGreaterThan(0);  // BeiDou
+    expect(bySystem['G']).toBeGreaterThan(0); // GPS
+    expect(bySystem['E']).toBeGreaterThan(0); // Galileo
+    expect(bySystem['R']).toBeGreaterThan(0); // GLONASS
+    expect(bySystem['C']).toBeGreaterThan(0); // BeiDou
   }, 25000);
 });

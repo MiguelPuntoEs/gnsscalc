@@ -11,10 +11,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { parseRinexStream } from './rinex';
-import { parseNavFile } from './nav';
-import { computeAllPositions, navTimesFromEph, computeDop } from './orbit';
-import { analyzeQuality } from './quality-analysis';
+import { parseRinexStream } from 'gnss-js/rinex';
+import { parseNavFile } from 'gnss-js/rinex';
+import {
+  computeAllPositions,
+  navTimesFromEph,
+  computeDop,
+} from 'gnss-js/orbit';
+import { analyzeQuality } from 'gnss-js/analysis';
 
 const E2E = join(__dirname, '../../test-fixtures');
 const HAS_DATA = existsSync(join(E2E, 'ABMF.crx'));
@@ -53,7 +57,7 @@ describe.skipIf(!HAS_DATA)('E2E: ABMF CRX 3.0 observation', () => {
     expect(result.stats.meanSnr).toBeLessThan(60);
     for (const sys of result.stats.systems) {
       const sysSnr = result.epochs
-        .map(e => e.snrPerSystem[sys])
+        .map((e) => e.snrPerSystem[sys])
         .filter((v): v is number => v != null);
       if (sysSnr.length > 0) {
         const mean = sysSnr.reduce((a, b) => a + b, 0) / sysSnr.length;
@@ -101,14 +105,14 @@ describe.skipIf(!HAS_DATA)('E2E: BRDC mixed navigation', () => {
   it('parses multi-GNSS nav file', () => {
     const result = parseNavFile(text);
     expect(result.header.version).toBe(3.04);
-    const systems = new Set(result.ephemerides.map(e => e.system));
+    const systems = new Set(result.ephemerides.map((e) => e.system));
     expect(systems.size).toBeGreaterThanOrEqual(2); // G, R, E
   });
 
   it('has ephemerides for multiple PRNs per system', () => {
     const result = parseNavFile(text);
     const gpsPrns = new Set(
-      result.ephemerides.filter(e => e.system === 'G').map(e => e.prn),
+      result.ephemerides.filter((e) => e.system === 'G').map((e) => e.prn),
     );
     expect(gpsPrns.size).toBeGreaterThan(10);
   });
@@ -166,10 +170,12 @@ describe.skipIf(!HAS_DATA)('E2E: observation + navigation pipeline', () => {
 
     // AzEl should be valid when receiver position is provided
     if (obs.header.approxPosition) {
-      const allPts = positions.prns.flatMap(
-        prn => positions.positions[prn]!.filter((p): p is NonNullable<typeof p> => p != null),
+      const allPts = positions.prns.flatMap((prn) =>
+        positions.positions[prn]!.filter(
+          (p): p is NonNullable<typeof p> => p != null,
+        ),
       );
-      const withEl = allPts.filter(p => p.el !== 0);
+      const withEl = allPts.filter((p) => p.el !== 0);
       expect(withEl.length).toBeGreaterThan(0);
       for (const pt of withEl.slice(0, 20)) {
         expect(pt.az).toBeGreaterThanOrEqual(0);
@@ -196,7 +202,8 @@ describe.skipIf(!HAS_DATA)('E2E: observation + navigation pipeline', () => {
       const sats: { az: number; el: number }[] = [];
       for (const prn of positions.prns) {
         const pt = positions.positions[prn]![0];
-        if (pt && pt.el > 0.05) { // > ~3° elevation
+        if (pt && pt.el > 0.05) {
+          // > ~3° elevation
           sats.push({ az: pt.az, el: pt.el });
         }
       }

@@ -5,7 +5,10 @@ import {
   DECIMAL_PLACES_FOR_HEIGHT,
   DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE,
 } from '../../constants/position';
-import { usePositionCalculator, useCoordinateFormats } from '../../hooks/positioning';
+import {
+  usePositionCalculator,
+  useCoordinateFormats,
+} from '../../hooks/positioning';
 import type { Position } from '../../types/position';
 import {
   formatLatitudeDegMinSecs,
@@ -103,7 +106,11 @@ function CollapsibleSection({
           fill="currentColor"
           className={`size-2.5 transition-transform ${open ? 'rotate-90' : ''}`}
         >
-          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+          <path
+            fillRule="evenodd"
+            d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+            clipRule="evenodd"
+          />
         </svg>
         {label}
       </button>
@@ -152,7 +159,7 @@ export default function PositionForm({
               navigator.geolocation.getCurrentPosition(
                 ({ coords: { latitude, longitude, altitude } }) =>
                   onPositionChange(
-                    getPositionFromGeodetic(latitude, longitude, altitude ?? 0)
+                    getPositionFromGeodetic(latitude, longitude, altitude ?? 0),
                   ),
                 (error) => {
                   const messages: Record<number, string> = {
@@ -165,7 +172,7 @@ export default function PositionForm({
                   };
                   alert(messages[error.code] ?? 'Could not get your location.');
                 },
-                { enableHighAccuracy: true, timeout: 10000 }
+                { enableHighAccuracy: true, timeout: 10000 },
               );
             }
           }}
@@ -230,24 +237,24 @@ export default function PositionForm({
           label="Lat"
           numeric
           value={(latitude.value ?? 0).toFixed(
-            DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE
+            DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE,
           )}
           onCommit={createNumberHandler((value) =>
             computationHandle(() =>
-              getPositionFromGeodetic(value, longitude.value ?? 0, height)
-            )
+              getPositionFromGeodetic(value, longitude.value ?? 0, height),
+            ),
           )}
         />
         <Field
           label="Lon"
           numeric
           value={(longitude.value ?? 0).toFixed(
-            DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE
+            DECIMAL_PLACES_FOR_LATITUDE_LONGITUDE,
           )}
           onCommit={createNumberHandler((value) =>
             computationHandle(() =>
-              getPositionFromGeodetic(latitude.value ?? 0, value, height)
-            )
+              getPositionFromGeodetic(latitude.value ?? 0, value, height),
+            ),
           )}
         />
         <Field
@@ -259,9 +266,9 @@ export default function PositionForm({
               getPositionFromGeodetic(
                 latitude.value ?? 0,
                 longitude.value ?? 0,
-                value
-              )
-            )
+                value,
+              ),
+            ),
           )}
         />
       </div>
@@ -275,7 +282,11 @@ export default function PositionForm({
           mask={`00º 00' 00.000" N`}
           onCommit={(value) =>
             computationHandle(() =>
-              getPositionFromGeodeticString(value, longitudeString, heightString)
+              getPositionFromGeodeticString(
+                value,
+                longitudeString,
+                heightString,
+              ),
             )
           }
         />
@@ -285,7 +296,11 @@ export default function PositionForm({
           mask={`000º 00' 00.000" E`}
           onCommit={(value) =>
             computationHandle(() =>
-              getPositionFromGeodeticString(latitudeString, value, heightString)
+              getPositionFromGeodeticString(
+                latitudeString,
+                value,
+                heightString,
+              ),
             )
           }
         />
@@ -293,19 +308,19 @@ export default function PositionForm({
 
       {/* UTM (collapsible) */}
       <CollapsibleSection label="UTM">
-        <label>Zone</label>
+        <span>Zone</span>
         <CopyableInput value={`${utm.zone}${utm.hemisphere}`} />
-        <label>Easting</label>
+        <span>Easting</span>
         <CopyableInput value={`${utm.easting.toFixed(2)} m`} />
-        <label>Northing</label>
+        <span>Northing</span>
         <CopyableInput value={`${utm.northing.toFixed(2)} m`} />
       </CollapsibleSection>
 
       {/* Other formats (collapsible) */}
       <CollapsibleSection label="Other">
-        <label title="Maidenhead grid locator">Maidenhead</label>
+        <span title="Maidenhead grid locator">Maidenhead</span>
         <CopyableInput value={maidenhead} />
-        <label title="Geohash spatial encoding">Geohash</label>
+        <span title="Geohash spatial encoding">Geohash</span>
         <CopyableInput value={geohash} />
       </CollapsibleSection>
     </form>

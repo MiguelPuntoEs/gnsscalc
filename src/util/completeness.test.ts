@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { CompletenessAccumulator } from './completeness';
-import type { RinexHeader } from './rinex';
+import { CompletenessAccumulator } from 'gnss-js/analysis';
+import type { RinexHeader } from 'gnss-js/rinex';
 
 function makeHeader(obsTypes: Record<string, string[]>): RinexHeader {
   return {
@@ -47,10 +47,10 @@ describe('CompletenessAccumulator', () => {
     acc.onObservation(3000, 'G01', codes, [23456791.0, 123456791.0, 0]);
 
     const result = acc.finalize();
-    const s1c = result.cells.find(c => c.code === 'S1C');
+    const s1c = result.cells.find((c) => c.code === 'S1C');
     expect(s1c).toBeDefined();
     expect(s1c!.expected).toBe(3); // seen in epoch 1, so expected increments for all 3
-    expect(s1c!.present).toBe(1);  // only non-null/non-zero in epoch 1
+    expect(s1c!.present).toBe(1); // only non-null/non-zero in epoch 1
     expect(s1c!.percent).toBeCloseTo(100 / 3);
   });
 
@@ -69,7 +69,7 @@ describe('CompletenessAccumulator', () => {
     acc.onObservation(4000, 'G01', codes, [23456792.0, 41.0]);
 
     const result = acc.finalize();
-    const s1c = result.cells.find(c => c.code === 'S1C');
+    const s1c = result.cells.find((c) => c.code === 'S1C');
     expect(s1c!.expected).toBe(2); // only counts from epoch 3 onwards
     expect(s1c!.present).toBe(2);
     expect(s1c!.percent).toBeCloseTo(100);
@@ -101,7 +101,7 @@ describe('CompletenessAccumulator', () => {
     acc.onObservation(2000, 'G03', codes, [23456790.1, null]); // G03 S1C missing
 
     const result = acc.finalize();
-    const s1cStat = result.signalStats.find(s => s.code === 'S1C');
+    const s1cStat = result.signalStats.find((s) => s.code === 'S1C');
     expect(s1cStat).toBeDefined();
     expect(s1cStat!.satellites).toBe(2);
     // G01: 2 expected, 2 present; G03: 2 expected, 1 present → total 4 expected, 3 present

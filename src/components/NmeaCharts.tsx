@@ -16,9 +16,8 @@ import {
   ReferenceLine,
   Legend,
 } from 'recharts';
-import type { NmeaFix } from '../util/nmea';
-import { geodeticToEcef, getEnuDifference } from '../util/positioning';
-import { deg2rad } from '../util/units';
+import type { NmeaFix } from 'gnss-js/nmea';
+import { geodeticToEcef, getEnuDifference, deg2rad } from 'gnss-js/coordinates';
 import { useChartTheme } from '../hooks/useChartTheme';
 
 interface ChartData {
@@ -53,7 +52,9 @@ function satColor(sats: number | null): string {
 
 function computeEnuData(fixes: NmeaFix[]): EnuPoint[] {
   // Convert all fixes to ECEF
-  const ecef = fixes.map(f => geodeticToEcef(deg2rad(f.lat), deg2rad(f.lon), f.alt ?? 0));
+  const ecef = fixes.map((f) =>
+    geodeticToEcef(deg2rad(f.lat), deg2rad(f.lon), f.alt ?? 0),
+  );
 
   // Compute mean ECEF as reference
   const n = ecef.length;
@@ -63,8 +64,12 @@ function computeEnuData(fixes: NmeaFix[]): EnuPoint[] {
 
   return fixes.map((f, i) => {
     const [dE, dN, dU] = getEnuDifference(
-      ecef[i]![0], ecef[i]![1], ecef[i]![2],
-      meanX, meanY, meanZ,
+      ecef[i]![0],
+      ecef[i]![1],
+      ecef[i]![2],
+      meanX,
+      meanY,
+      meanZ,
     );
     return {
       label: formatTimeLabel(f, i),
@@ -88,35 +93,45 @@ function knotsToKmh(knots: number): number {
   return knots * 1.852;
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">
-      <span className="text-xs font-semibold uppercase tracking-wide text-fg/50 mb-3 block">{title}</span>
-      <div style={{ width: '100%', height: 180 }}>
-        {children}
-      </div>
+      <span className="text-xs font-semibold uppercase tracking-wide text-fg/50 mb-3 block">
+        {title}
+      </span>
+      <div style={{ width: '100%', height: 180 }}>{children}</div>
     </div>
   );
 }
 
 export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
   const theme = useChartTheme();
-  const data = useMemo<ChartData[]>(() =>
-    fixes.map((f, i) => ({
-      label: formatTimeLabel(f, i),
-      time: i,
-      alt: f.alt,
-      satellites: f.satellites,
-      speed: f.speed !== null ? knotsToKmh(f.speed) : null,
-    })),
+  const data = useMemo<ChartData[]>(
+    () =>
+      fixes.map((f, i) => ({
+        label: formatTimeLabel(f, i),
+        time: i,
+        alt: f.alt,
+        satellites: f.satellites,
+        speed: f.speed !== null ? knotsToKmh(f.speed) : null,
+      })),
     [fixes],
   );
 
-  const enuData = useMemo(() => fixes.length >= 2 ? computeEnuData(fixes) : [], [fixes]);
+  const enuData = useMemo(
+    () => (fixes.length >= 2 ? computeEnuData(fixes) : []),
+    [fixes],
+  );
 
-  const hasAlt = data.some(d => d.alt !== null);
-  const hasSat = data.some(d => d.satellites !== null);
-  const hasSpeed = data.some(d => d.speed !== null);
+  const hasAlt = data.some((d) => d.alt !== null);
+  const hasSat = data.some((d) => d.satellites !== null);
+  const hasSpeed = data.some((d) => d.speed !== null);
   const hasEnu = enuData.length >= 2;
 
   // Compute symmetric domain for the scatter plot so E/N axes have the same scale
@@ -140,7 +155,10 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
       {hasAlt && (
         <ChartCard title="Altitude (m)">
           <ResponsiveContainer>
-            <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+            <AreaChart
+              data={data}
+              margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
@@ -182,7 +200,10 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
       {hasSat && (
         <ChartCard title="Satellites">
           <ResponsiveContainer>
-            <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+            <LineChart
+              data={data}
+              margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
@@ -217,7 +238,10 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
       {hasSpeed && (
         <ChartCard title="Speed (km/h)">
           <ResponsiveContainer>
-            <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+            <AreaChart
+              data={data}
+              margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
               <XAxis
                 dataKey="label"
@@ -265,8 +289,13 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
             </span>
             <div className="flex justify-center">
               <ResponsiveContainer width="100%" aspect={1} maxHeight={400}>
-                <ScatterChart margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
+                <ScatterChart
+                  margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={theme.gridStroke}
+                  />
                   <XAxis
                     dataKey="dE"
                     type="number"
@@ -275,7 +304,13 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
                     tickLine={false}
                     axisLine={false}
                     domain={[-scatterDomain, scatterDomain]}
-                    label={{ value: 'East (m)', position: 'insideBottom', offset: -2, fill: theme.axisStyle.fill, fontSize: 10 }}
+                    label={{
+                      value: 'East (m)',
+                      position: 'insideBottom',
+                      offset: -2,
+                      fill: theme.axisStyle.fill,
+                      fontSize: 10,
+                    }}
                   />
                   <YAxis
                     dataKey="dN"
@@ -286,19 +321,25 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
                     axisLine={false}
                     width={50}
                     domain={[-scatterDomain, scatterDomain]}
-                    label={{ value: 'North (m)', angle: -90, position: 'insideLeft', offset: 10, fill: theme.axisStyle.fill, fontSize: 10 }}
+                    label={{
+                      value: 'North (m)',
+                      angle: -90,
+                      position: 'insideLeft',
+                      offset: 10,
+                      fill: theme.axisStyle.fill,
+                      fontSize: 10,
+                    }}
                   />
                   <ZAxis range={[8, 8]} />
                   <Tooltip
                     {...theme.tooltipStyle}
-                    formatter={(value) => [`${Number(value ?? 0).toFixed(3)} m`]}
+                    formatter={(value) => [
+                      `${Number(value ?? 0).toFixed(3)} m`,
+                    ]}
                   />
                   <ReferenceLine x={0} stroke="rgba(255,255,255,0.15)" />
                   <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
-                  <Scatter
-                    data={enuData}
-                    fillOpacity={0.6}
-                  >
+                  <Scatter data={enuData} fillOpacity={0.6}>
                     {enuData.map((pt, i) => (
                       <Cell key={i} fill={satColor(pt.satellites)} />
                     ))}
@@ -311,8 +352,14 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
           {/* ENU time series */}
           <ChartCard title="ENU deviation from mean (m)">
             <ResponsiveContainer>
-              <LineChart data={enuData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
+              <LineChart
+                data={enuData}
+                margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke={theme.gridStroke}
+                />
                 <XAxis
                   dataKey="label"
                   tick={theme.axisStyle}
@@ -337,9 +384,30 @@ export default function NmeaCharts({ fixes }: { fixes: NmeaFix[] }) {
                   wrapperStyle={{ fontSize: 11, color: theme.legendColor }}
                 />
                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
-                <Line type="monotone" dataKey="dE" stroke="#7c8aff" strokeWidth={1.5} dot={false} name="East" />
-                <Line type="monotone" dataKey="dN" stroke="#4ade80" strokeWidth={1.5} dot={false} name="North" />
-                <Line type="monotone" dataKey="dU" stroke="#f59e0b" strokeWidth={1.5} dot={false} name="Up" />
+                <Line
+                  type="monotone"
+                  dataKey="dE"
+                  stroke="#7c8aff"
+                  strokeWidth={1.5}
+                  dot={false}
+                  name="East"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="dN"
+                  stroke="#4ade80"
+                  strokeWidth={1.5}
+                  dot={false}
+                  name="North"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="dU"
+                  stroke="#f59e0b"
+                  strokeWidth={1.5}
+                  dot={false}
+                  name="Up"
+                />
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>

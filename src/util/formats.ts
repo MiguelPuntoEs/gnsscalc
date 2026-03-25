@@ -23,7 +23,7 @@ export function formatLongitudeDegMinSecs({
 }
 
 export function createNumberHandler<T>(
-  handler: (value: number) => T
+  handler: (value: number) => T,
 ): (value: string) => T | undefined {
   return (value: string) => {
     const parsed = Number(value);

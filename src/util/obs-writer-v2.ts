@@ -5,9 +5,9 @@
  * a valid RINEX 2.11 observation file.
  */
 
-import type { RinexHeader } from './rinex';
+import type { RinexHeader } from 'gnss-js/rinex';
 import type { CompactEpoch } from './obs-writer';
-import { padL, padR, fmtF, hdrLine } from './rinex-format';
+import { padL, padR, fmtF, hdrLine } from 'gnss-js/rinex';
 
 /* ── RINEX 3 → 2 code mapping ──────────────────────────────────── */
 
@@ -17,18 +17,66 @@ import { padL, padR, fmtF, hdrLine } from './rinex-format';
  */
 const V3_TO_V2: Record<string, string> = {
   // GPS
-  C1C: 'C1', C1S: 'C1', C1L: 'C1', C1X: 'C1', C1W: 'P1', C1P: 'P1',
-  C2C: 'C2', C2S: 'P2', C2L: 'P2', C2X: 'P2', C2W: 'P2', C2P: 'P2',
-  C5I: 'C5', C5Q: 'C5', C5X: 'C5',
-  L1C: 'L1', L1S: 'L1', L1L: 'L1', L1X: 'L1', L1W: 'L1', L1P: 'L1',
-  L2C: 'L2', L2S: 'L2', L2L: 'L2', L2X: 'L2', L2W: 'L2', L2P: 'L2',
-  L5I: 'L5', L5Q: 'L5', L5X: 'L5',
-  D1C: 'D1', D1S: 'D1', D1L: 'D1', D1X: 'D1', D1W: 'D1', D1P: 'D1',
-  D2C: 'D2', D2S: 'D2', D2L: 'D2', D2X: 'D2', D2W: 'D2', D2P: 'D2',
-  D5I: 'D5', D5Q: 'D5', D5X: 'D5',
-  S1C: 'S1', S1S: 'S1', S1L: 'S1', S1X: 'S1', S1W: 'S1', S1P: 'S1',
-  S2C: 'S2', S2S: 'S2', S2L: 'S2', S2X: 'S2', S2W: 'S2', S2P: 'S2',
-  S5I: 'S5', S5Q: 'S5', S5X: 'S5',
+  C1C: 'C1',
+  C1S: 'C1',
+  C1L: 'C1',
+  C1X: 'C1',
+  C1W: 'P1',
+  C1P: 'P1',
+  C2C: 'C2',
+  C2S: 'P2',
+  C2L: 'P2',
+  C2X: 'P2',
+  C2W: 'P2',
+  C2P: 'P2',
+  C5I: 'C5',
+  C5Q: 'C5',
+  C5X: 'C5',
+  L1C: 'L1',
+  L1S: 'L1',
+  L1L: 'L1',
+  L1X: 'L1',
+  L1W: 'L1',
+  L1P: 'L1',
+  L2C: 'L2',
+  L2S: 'L2',
+  L2L: 'L2',
+  L2X: 'L2',
+  L2W: 'L2',
+  L2P: 'L2',
+  L5I: 'L5',
+  L5Q: 'L5',
+  L5X: 'L5',
+  D1C: 'D1',
+  D1S: 'D1',
+  D1L: 'D1',
+  D1X: 'D1',
+  D1W: 'D1',
+  D1P: 'D1',
+  D2C: 'D2',
+  D2S: 'D2',
+  D2L: 'D2',
+  D2X: 'D2',
+  D2W: 'D2',
+  D2P: 'D2',
+  D5I: 'D5',
+  D5Q: 'D5',
+  D5X: 'D5',
+  S1C: 'S1',
+  S1S: 'S1',
+  S1L: 'S1',
+  S1X: 'S1',
+  S1W: 'S1',
+  S1P: 'S1',
+  S2C: 'S2',
+  S2S: 'S2',
+  S2L: 'S2',
+  S2X: 'S2',
+  S2W: 'S2',
+  S2P: 'S2',
+  S5I: 'S5',
+  S5Q: 'S5',
+  S5X: 'S5',
 };
 
 function v3ToV2Code(code3: string): string | null {
@@ -110,51 +158,70 @@ export async function writeRinex2ObsBlob(
       if (sys === 'G' || sys === 'R') hasSystems.add(sys);
     }
   }
-  const sysChar = hasSystems.has('G') && hasSystems.has('R') ? 'M' : hasSystems.has('R') ? 'R' : 'G';
+  const sysChar =
+    hasSystems.has('G') && hasSystems.has('R')
+      ? 'M'
+      : hasSystems.has('R')
+        ? 'R'
+        : 'G';
 
   // ── Header ──
-  batch.push(hdrLine(
-    `     2.11           OBSERVATION DATA    ${sysChar}`,
-    'RINEX VERSION / TYPE',
-  ));
+  batch.push(
+    hdrLine(
+      `     2.11           OBSERVATION DATA    ${sysChar}`,
+      'RINEX VERSION / TYPE',
+    ),
+  );
 
   const now = new Date();
   const dateStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')} ${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}`;
-  batch.push(hdrLine(
-    `${padL('GNSSCalc', 20)}${padL('', 20)}${dateStr}`,
-    'PGM / RUN BY / DATE',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL('GNSSCalc', 20)}${padL('', 20)}${dateStr}`,
+      'PGM / RUN BY / DATE',
+    ),
+  );
 
   batch.push(hdrLine('Converted from RINEX 3 by GNSSCalc', 'COMMENT'));
   batch.push(hdrLine(header.markerName || 'UNKNOWN', 'MARKER NAME'));
   batch.push(hdrLine('', 'MARKER NUMBER'));
 
-  batch.push(hdrLine(
-    `${padL(header.observer || '', 20)}${padL(header.agency || '', 40)}`,
-    'OBSERVER / AGENCY',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL(header.observer || '', 20)}${padL(header.agency || '', 40)}`,
+      'OBSERVER / AGENCY',
+    ),
+  );
 
-  batch.push(hdrLine(
-    `${padL(header.receiverNumber || '', 20)}${padL(header.receiverType || '', 20)}${padL(header.receiverVersion || '', 20)}`,
-    'REC # / TYPE / VERS',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL(header.receiverNumber || '', 20)}${padL(header.receiverType || '', 20)}${padL(header.receiverVersion || '', 20)}`,
+      'REC # / TYPE / VERS',
+    ),
+  );
 
-  batch.push(hdrLine(
-    `${padL(header.antNumber || '', 20)}${padL(header.antType || '', 20)}`,
-    'ANT # / TYPE',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL(header.antNumber || '', 20)}${padL(header.antType || '', 20)}`,
+      'ANT # / TYPE',
+    ),
+  );
 
   const pos = header.approxPosition ?? [0, 0, 0];
-  batch.push(hdrLine(
-    `${fmtF(pos[0], 14, 4)}${fmtF(pos[1], 14, 4)}${fmtF(pos[2], 14, 4)}`,
-    'APPROX POSITION XYZ',
-  ));
+  batch.push(
+    hdrLine(
+      `${fmtF(pos[0], 14, 4)}${fmtF(pos[1], 14, 4)}${fmtF(pos[2], 14, 4)}`,
+      'APPROX POSITION XYZ',
+    ),
+  );
 
   const delta = header.antDelta ?? [0, 0, 0];
-  batch.push(hdrLine(
-    `${fmtF(delta[0], 14, 4)}${fmtF(delta[1], 14, 4)}${fmtF(delta[2], 14, 4)}`,
-    'ANTENNA: DELTA H/E/N',
-  ));
+  batch.push(
+    hdrLine(
+      `${fmtF(delta[0], 14, 4)}${fmtF(delta[1], 14, 4)}${fmtF(delta[2], 14, 4)}`,
+      'ANTENNA: DELTA H/E/N',
+    ),
+  );
 
   batch.push(hdrLine('     1     1', 'WAVELENGTH FACT L1/2'));
 
@@ -167,16 +234,18 @@ export async function writeRinex2ObsBlob(
     } else {
       content = '      ';
     }
-    content += chunk.map(c => padR(c, 6)).join('');
+    content += chunk.map((c) => padR(c, 6)).join('');
     batch.push(hdrLine(content, '# / TYPES OF OBSERV'));
   }
 
   const first = new Date(epochs[0]!.time);
   const timeSys = sysChar === 'R' ? 'GLO' : 'GPS';
-  batch.push(hdrLine(
-    `  ${first.getUTCFullYear()}    ${String(first.getUTCMonth() + 1).padStart(2)}    ${String(first.getUTCDate()).padStart(2)}    ${String(first.getUTCHours()).padStart(2)}    ${String(first.getUTCMinutes()).padStart(2)}   ${(first.getUTCSeconds() + first.getUTCMilliseconds() / 1000).toFixed(7).padStart(10)}     ${timeSys}`,
-    'TIME OF FIRST OBS',
-  ));
+  batch.push(
+    hdrLine(
+      `  ${first.getUTCFullYear()}    ${String(first.getUTCMonth() + 1).padStart(2)}    ${String(first.getUTCDate()).padStart(2)}    ${String(first.getUTCHours()).padStart(2)}    ${String(first.getUTCMinutes()).padStart(2)}   ${(first.getUTCSeconds() + first.getUTCMilliseconds() / 1000).toFixed(7).padStart(10)}     ${timeSys}`,
+      'TIME OF FIRST OBS',
+    ),
+  );
 
   batch.push(hdrLine('', 'END OF HEADER'));
   await flush();
@@ -188,7 +257,9 @@ export async function writeRinex2ObsBlob(
     const sec = t.getUTCSeconds() + t.getUTCMilliseconds() / 1000;
 
     // Only GPS + GLONASS in v2
-    const prns = [...epoch.sats.keys()].filter(p => p[0] === 'G' || p[0] === 'R').sort();
+    const prns = [...epoch.sats.keys()]
+      .filter((p) => p[0] === 'G' || p[0] === 'R')
+      .sort();
     if (prns.length === 0) continue;
 
     // Epoch header line: yy mm dd hh mm ss.sssssss  flag numSats PRN list
@@ -219,7 +290,7 @@ export async function writeRinex2ObsBlob(
       const valArr = epoch.sats.get(prn)!;
 
       // Build v2 values array
-      const v2Vals: number[] = new Array(v2Codes.length).fill(NaN);
+      const v2Vals: number[] = new Array<number>(v2Codes.length).fill(NaN);
       for (let j = 0; j < sysCodes3.length; j++) {
         const v2Idx = v3ToV2Map.get(sysCodes3[j]!);
         if (v2Idx != null && j < valArr.length && !isNaN(valArr[j]!)) {

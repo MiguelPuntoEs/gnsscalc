@@ -13,20 +13,20 @@ export default function AERForm({
 }) {
   const { elevationDeg, azimuthDeg, slant } = useAerCalculator(
     position,
-    refPosition
+    refPosition,
   );
 
   return (
     <div className="card-output flex flex-col gap-2">
       <h3 className="text-sm font-semibold text-fg m-0">{title}</h3>
       <div className="card-fields">
-        <label title="Elevation angle (degrees)">&theta;</label>
+        <span title="Elevation angle (degrees)">&theta;</span>
         <CopyableInput value={`${elevationDeg.toFixed(5)}°`} />
 
-        <label title="Azimuth angle (degrees)">&phi;</label>
+        <span title="Azimuth angle (degrees)">&phi;</span>
         <CopyableInput value={`${azimuthDeg.toFixed(5)}°`} />
 
-        <label title="Slant range (meters)">&rho;</label>
+        <span title="Slant range (meters)">&rho;</span>
         <CopyableInput value={`${slant.toFixed(3)} m`} />
       </div>
     </div>

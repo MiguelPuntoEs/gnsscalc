@@ -3,13 +3,13 @@
  * Kept separate so importing types doesn't pull in @react-pdf/renderer.
  */
 
-import type { RinexHeader, RinexStats } from './rinex';
-import type { RinexWarnings } from './rinex-warnings';
+import type { RinexHeader, RinexStats } from 'gnss-js/rinex';
+import type { RinexWarnings } from 'gnss-js/rinex';
 import type { EpochGrid } from './epoch-grid';
-import type { AllPositionsData } from './orbit';
-import type { MultipathResult } from './multipath';
-import type { CycleSlipResult } from './cycle-slip';
-import type { CompletenessResult } from './completeness';
+import type { AllPositionsData } from 'gnss-js/orbit';
+import type { MultipathResult } from 'gnss-js/analysis';
+import type { CycleSlipResult } from 'gnss-js/analysis';
+import type { CompletenessResult } from 'gnss-js/analysis';
 
 export interface ReportData {
   header: RinexHeader;

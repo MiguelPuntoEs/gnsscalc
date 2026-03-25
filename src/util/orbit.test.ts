@@ -2,15 +2,18 @@ import { describe, it, expect } from 'vitest';
 import {
   keplerPosition,
   glonassPosition,
-  ecefToGeodetic,
-  geodeticToEcef,
   ecefToAzEl,
   computeDop,
   selectEphemeris,
   computeSatPosition,
   navTimesFromEph,
-} from './orbit';
-import type { KeplerEphemeris, GlonassEphemeris, Ephemeris } from './nav';
+} from 'gnss-js/orbit';
+import { ecefToGeodetic, geodeticToEcef } from 'gnss-js/coordinates';
+import type {
+  KeplerEphemeris,
+  GlonassEphemeris,
+  Ephemeris,
+} from 'gnss-js/rinex';
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
@@ -23,19 +26,24 @@ function makeGpsEph(overrides: Partial<KeplerEphemeris> = {}): KeplerEphemeris {
     prn: 'G01',
     toc: 0,
     tocDate: new Date('2024-01-01T00:00:00Z'),
-    af0: 0, af1: 0, af2: 0,
+    af0: 0,
+    af1: 0,
+    af2: 0,
     iode: 0,
-    crs: 0, deltaN: 0,
-    m0: 0,          // mean anomaly at toe
-    cuc: 0, e: 0.01, cus: 0,
+    crs: 0,
+    deltaN: 0,
+    m0: 0, // mean anomaly at toe
+    cuc: 0,
+    e: 0.01,
+    cus: 0,
     sqrtA,
-    toe: 0,         // reference time (seconds of GPS week)
+    toe: 0, // reference time (seconds of GPS week)
     cic: 0,
-    omega0: 0,      // right ascension of ascending node
+    omega0: 0, // right ascension of ascending node
     cis: 0,
-    i0: 0.96,       // inclination ~55°
+    i0: 0.96, // inclination ~55°
     crc: 0,
-    omega: 0,       // argument of perigee
+    omega: 0, // argument of perigee
     omegaDot: 0,
     idot: 0,
     week: 0,
@@ -45,17 +53,28 @@ function makeGpsEph(overrides: Partial<KeplerEphemeris> = {}): KeplerEphemeris {
   };
 }
 
-function makeGloEph(overrides: Partial<GlonassEphemeris> = {}): GlonassEphemeris {
+function makeGloEph(
+  overrides: Partial<GlonassEphemeris> = {},
+): GlonassEphemeris {
   // GLONASS at ~25,500 km orbit, position in km
   return {
     system: 'R',
     prn: 'R01',
     tocDate: new Date('2024-01-01T00:00:00Z'),
-    tauN: 0, gammaN: 0, messageFrameTime: 0,
-    x: 10_000, xDot: 0, xAcc: 0,   // km, km/s, km/s²
-    y: 20_000, yDot: 0, yAcc: 0,
-    z: 10_000, zDot: 0, zAcc: 0,
-    health: 0, freqNum: 1,
+    tauN: 0,
+    gammaN: 0,
+    messageFrameTime: 0,
+    x: 10_000,
+    xDot: 0,
+    xAcc: 0, // km, km/s, km/s²
+    y: 20_000,
+    yDot: 0,
+    yAcc: 0,
+    z: 10_000,
+    zDot: 0,
+    zAcc: 0,
+    health: 0,
+    freqNum: 1,
     ...overrides,
   };
 }
@@ -106,7 +125,14 @@ describe('keplerPosition', () => {
 
   it('applies harmonic corrections (crs, crc, cus, cuc, cis, cic)', () => {
     const eph1 = makeGpsEph();
-    const eph2 = makeGpsEph({ crs: 10, crc: 10, cus: 1e-5, cuc: 1e-5, cis: 1e-5, cic: 1e-5 });
+    const eph2 = makeGpsEph({
+      crs: 10,
+      crc: 10,
+      cus: 1e-5,
+      cuc: 1e-5,
+      cis: 1e-5,
+      cic: 1e-5,
+    });
 
     const p1 = keplerPosition(eph1, 1000);
     const p2 = keplerPosition(eph2, 1000);
@@ -266,10 +292,10 @@ describe('computeDop', () => {
   it('computes DOP for 4 well-distributed satellites', () => {
     // 4 sats at varying elevations, evenly spaced in azimuth
     const sats = [
-      { az: 0, el: Math.PI / 6 },               // 30° el
-      { az: Math.PI / 2, el: Math.PI / 4 },      // 45° el
-      { az: Math.PI, el: Math.PI / 3 },           // 60° el
-      { az: 3 * Math.PI / 2, el: Math.PI / 5 },  // 36° el
+      { az: 0, el: Math.PI / 6 }, // 30° el
+      { az: Math.PI / 2, el: Math.PI / 4 }, // 45° el
+      { az: Math.PI, el: Math.PI / 3 }, // 60° el
+      { az: (3 * Math.PI) / 2, el: Math.PI / 5 }, // 36° el
     ];
 
     const dop = computeDop(sats);
@@ -288,14 +314,14 @@ describe('computeDop', () => {
       { az: 0, el: Math.PI / 6 },
       { az: Math.PI / 2, el: Math.PI / 4 },
       { az: Math.PI, el: Math.PI / 3 },
-      { az: 3 * Math.PI / 2, el: Math.PI / 5 },
+      { az: (3 * Math.PI) / 2, el: Math.PI / 5 },
     ];
     const sats8 = [
       ...sats4,
       { az: Math.PI / 4, el: Math.PI / 3 },
-      { az: 3 * Math.PI / 4, el: Math.PI / 6 },
-      { az: 5 * Math.PI / 4, el: Math.PI / 4 },
-      { az: 7 * Math.PI / 4, el: Math.PI / 5 },
+      { az: (3 * Math.PI) / 4, el: Math.PI / 6 },
+      { az: (5 * Math.PI) / 4, el: Math.PI / 4 },
+      { az: (7 * Math.PI) / 4, el: Math.PI / 5 },
     ];
 
     const dop4 = computeDop(sats4)!;
@@ -306,10 +332,10 @@ describe('computeDop', () => {
   it('high-elevation-only geometry gives poor VDOP', () => {
     // All satellites near zenith → poor vertical geometry
     const sats = [
-      { az: 0, el: 1.4 },         // ~80°
+      { az: 0, el: 1.4 }, // ~80°
       { az: Math.PI / 2, el: 1.3 },
       { az: Math.PI, el: 1.4 },
-      { az: 3 * Math.PI / 2, el: 1.3 },
+      { az: (3 * Math.PI) / 2, el: 1.3 },
     ];
     const dop = computeDop(sats)!;
     expect(dop.vdop).toBeGreaterThan(dop.hdop); // VDOP should be worse

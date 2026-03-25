@@ -8,20 +8,27 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import type { MultipathResult } from '../util/multipath';
+import type { MultipathResult } from 'gnss-js/analysis';
 import { useChartTheme } from '../hooks/useChartTheme';
 import ChartCard from './ChartCard';
 
 const MP_HIST_BINS = 40;
 
-export default function MultipathDistribution({ result, selectedSignal }: { result: MultipathResult; selectedSignal: string | null }) {
+export default function MultipathDistribution({
+  result,
+  selectedSignal,
+}: {
+  result: MultipathResult;
+  selectedSignal: string | null;
+}) {
   const theme = useChartTheme();
   const data = useMemo(() => {
     const allMp: number[] = [];
     for (const s of result.series) {
       if (selectedSignal) {
         const [sys, band, refBand] = selectedSignal.split('-');
-        if (s.system !== sys || s.band !== band || s.refBand !== refBand) continue;
+        if (s.system !== sys || s.band !== band || s.refBand !== refBand)
+          continue;
       }
       for (const p of s.points) allMp.push(p.mp);
     }
@@ -35,7 +42,10 @@ export default function MultipathDistribution({ result, selectedSignal }: { resu
 
     const bins = new Array(MP_HIST_BINS).fill(0) as number[];
     for (const v of allMp) {
-      const idx = Math.min(MP_HIST_BINS - 1, Math.max(0, Math.floor((v + range) / binWidth)));
+      const idx = Math.min(
+        MP_HIST_BINS - 1,
+        Math.max(0, Math.floor((v + range) / binWidth)),
+      );
       bins[idx]!++;
     }
 
@@ -50,7 +60,10 @@ export default function MultipathDistribution({ result, selectedSignal }: { resu
   return (
     <ChartCard title="Multipath distribution" height={180}>
       <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+        <BarChart
+          data={data}
+          margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
           <XAxis
             dataKey="mp"
@@ -71,10 +84,18 @@ export default function MultipathDistribution({ result, selectedSignal }: { resu
           />
           <Tooltip
             {...theme.tooltipStyle}
-            formatter={(value: unknown) => [`${Number(value).toLocaleString()} observations`, 'Count']}
+            formatter={(value: unknown) => [
+              `${Number(value).toLocaleString()} observations`,
+              'Count',
+            ]}
             labelFormatter={(v: unknown) => `MP: ${Number(v).toFixed(3)} m`}
           />
-          <Bar dataKey="count" fill="#7c8aff" fillOpacity={0.7} radius={[2, 2, 0, 0]} />
+          <Bar
+            dataKey="count"
+            fill="#7c8aff"
+            fillOpacity={0.7}
+            radius={[2, 2, 0, 0]}
+          />
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { EditableHeaderFields } from '../util/rinex-header-edit';
-import type { RinexHeader } from '../util/rinex';
+import type { RinexHeader } from 'gnss-js/rinex';
 import InlineField from './InlineField';
 import { PencilIcon, UndoIcon, ChevronIcon } from './HeaderEditorIcons';
 
@@ -55,7 +55,6 @@ export default function RinexHeaderEditor({
   header,
   onFieldsChange,
 }: RinexHeaderEditorProps) {
-
   const [fields, setFields] = useState<EditableHeaderFields | null>(null);
   const [editing, setEditing] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
@@ -70,14 +69,17 @@ export default function RinexHeaderEditor({
     } else {
       setEditing(false);
     }
-  }, [editing, header]);
+  }, [editing, header, fields]);
 
-  const updateField = useCallback(<K extends keyof EditableHeaderFields>(
-    key: K,
-    value: EditableHeaderFields[K],
-  ) => {
-    setFields(prev => prev ? { ...prev, [key]: value } : prev);
-  }, []);
+  const updateField = useCallback(
+    <K extends keyof EditableHeaderFields>(
+      key: K,
+      value: EditableHeaderFields[K],
+    ) => {
+      setFields((prev) => (prev ? { ...prev, [key]: value } : prev));
+    },
+    [],
+  );
 
   // Notify parent when fields change (edits persist after closing edit mode)
   useEffect(() => {
@@ -85,7 +87,8 @@ export default function RinexHeaderEditor({
       onFieldsChange?.(null);
       return;
     }
-    const hasChanges = JSON.stringify(fields) !== JSON.stringify(originalFields);
+    const hasChanges =
+      JSON.stringify(fields) !== JSON.stringify(originalFields);
     onFieldsChange?.(hasChanges ? fields : null);
   }, [fields, originalFields, onFieldsChange]);
 
@@ -101,7 +104,9 @@ export default function RinexHeaderEditor({
   const changedCount = useMemo(() => {
     if (!fields) return 0;
     let count = 0;
-    for (const key of Object.keys(originalFields) as (keyof EditableHeaderFields)[]) {
+    for (const key of Object.keys(
+      originalFields,
+    ) as (keyof EditableHeaderFields)[]) {
       if (String(fields[key]) !== String(originalFields[key])) count++;
     }
     return count;
@@ -112,20 +117,28 @@ export default function RinexHeaderEditor({
 
   const hasReceiver = !!(header.receiverType || header.receiverNumber);
   const hasAntenna = !!(header.antType || header.antNumber);
-  const hasPosition = !!(header.approxPosition && (header.approxPosition[0] !== 0 || header.approxPosition[1] !== 0 || header.approxPosition[2] !== 0));
+  const hasPosition = !!(
+    header.approxPosition &&
+    (header.approxPosition[0] !== 0 ||
+      header.approxPosition[1] !== 0 ||
+      header.approxPosition[2] !== 0)
+  );
   const hasObserver = !!(header.observer || header.agency);
 
   const summaryParts: string[] = [];
   if (hasReceiver) summaryParts.push(header.receiverType || 'Receiver');
   if (hasAntenna) summaryParts.push(header.antType || 'Antenna');
   if (hasPosition) summaryParts.push('Position');
-  if (hasObserver) summaryParts.push(header.agency || header.observer || 'Observer');
+  if (hasObserver)
+    summaryParts.push(header.agency || header.observer || 'Observer');
 
   return (
     <details ref={detailsRef} className="group overflow-hidden">
       <summary className="flex items-center gap-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
         <ChevronIcon className="size-4 text-fg/30 shrink-0 transition-transform group-open:rotate-90" />
-        <span className="text-sm font-semibold text-fg shrink-0">Station & Header</span>
+        <span className="text-sm font-semibold text-fg shrink-0">
+          Station & Header
+        </span>
         {!editing && !hasChanges && summaryParts.length > 0 && (
           <span className="text-[10px] text-fg/30 truncate min-w-0">
             {summaryParts.join(' · ')}
@@ -133,7 +146,8 @@ export default function RinexHeaderEditor({
         )}
         {hasChanges && (
           <span className="text-[10px] text-accent shrink-0">
-            {changedCount} field{changedCount !== 1 ? 's' : ''} edited — applied on export
+            {changedCount} field{changedCount !== 1 ? 's' : ''} edited — applied
+            on export
           </span>
         )}
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
@@ -141,7 +155,10 @@ export default function RinexHeaderEditor({
             <button
               type="button"
               className="btn-secondary flex items-center gap-1 !py-0.5 !px-2 !text-[11px]"
-              onClick={(e) => { e.preventDefault(); handleRevert(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                handleRevert();
+              }}
               title="Revert all changes"
             >
               <UndoIcon className="size-2.5" />
@@ -155,7 +172,10 @@ export default function RinexHeaderEditor({
                 ? 'text-accent hover:text-accent/80'
                 : 'text-fg/40 hover:text-fg/70'
             }`}
-            onClick={(e) => { e.preventDefault(); handleEditToggle(); }}
+            onClick={(e) => {
+              e.preventDefault();
+              handleEditToggle();
+            }}
             title={editing ? 'Stop editing' : 'Edit header fields'}
           >
             <PencilIcon className="size-3" />
@@ -168,10 +188,10 @@ export default function RinexHeaderEditor({
         <div className="card-fields">
           <InlineField
             label="Marker"
-            value={f ? f.markerName : (header.markerName || '—')}
+            value={f ? f.markerName : header.markerName || '—'}
             originalValue={editing ? orig.markerName : undefined}
             editing={editing}
-            onChange={v => updateField('markerName', v)}
+            onChange={(v) => updateField('markerName', v)}
             maxLength={60}
           />
 
@@ -181,7 +201,7 @@ export default function RinexHeaderEditor({
               value={f ? f.markerType : header.markerType}
               originalValue={editing ? orig.markerType : undefined}
               editing={editing}
-              onChange={v => updateField('markerType', v)}
+              onChange={(v) => updateField('markerType', v)}
               maxLength={60}
             />
           )}
@@ -196,7 +216,7 @@ export default function RinexHeaderEditor({
                   value={f ? f.receiverNumber : header.receiverNumber}
                   originalValue={editing ? orig.receiverNumber : undefined}
                   editing={editing}
-                  onChange={v => updateField('receiverNumber', v)}
+                  onChange={(v) => updateField('receiverNumber', v)}
                   maxLength={20}
                 />
               )}
@@ -205,8 +225,15 @@ export default function RinexHeaderEditor({
                 value={f ? f.receiverType : header.receiverType}
                 originalValue={editing ? orig.receiverType : undefined}
                 editing={editing}
-                onChange={v => updateField('receiverType', v)}
-                autocomplete={editing ? { getSuggestions: getReceivers, placeholder: 'e.g. LEICA GR25' } : undefined}
+                onChange={(v) => updateField('receiverType', v)}
+                autocomplete={
+                  editing
+                    ? {
+                        getSuggestions: getReceivers,
+                        placeholder: 'e.g. LEICA GR25',
+                      }
+                    : undefined
+                }
               />
               {(editing || header.receiverVersion) && (
                 <InlineField
@@ -214,7 +241,7 @@ export default function RinexHeaderEditor({
                   value={f ? f.receiverVersion : header.receiverVersion}
                   originalValue={editing ? orig.receiverVersion : undefined}
                   editing={editing}
-                  onChange={v => updateField('receiverVersion', v)}
+                  onChange={(v) => updateField('receiverVersion', v)}
                   maxLength={20}
                 />
               )}
@@ -231,7 +258,7 @@ export default function RinexHeaderEditor({
                   value={f ? f.antNumber : header.antNumber}
                   originalValue={editing ? orig.antNumber : undefined}
                   editing={editing}
-                  onChange={v => updateField('antNumber', v)}
+                  onChange={(v) => updateField('antNumber', v)}
                   maxLength={20}
                 />
               )}
@@ -240,37 +267,59 @@ export default function RinexHeaderEditor({
                 value={f ? f.antType : header.antType}
                 originalValue={editing ? orig.antType : undefined}
                 editing={editing}
-                onChange={v => updateField('antType', v)}
-                autocomplete={editing ? { getSuggestions: getAntennas, placeholder: 'e.g. LEIAR25.R4      LEIT' } : undefined}
+                onChange={(v) => updateField('antType', v)}
+                autocomplete={
+                  editing
+                    ? {
+                        getSuggestions: getAntennas,
+                        placeholder: 'e.g. LEIAR25.R4      LEIT',
+                      }
+                    : undefined
+                }
               />
             </>
           )}
 
-          {(editing || (header.antDelta && (header.antDelta[0] !== 0 || header.antDelta[1] !== 0 || header.antDelta[2] !== 0))) && (
+          {(editing ||
+            (header.antDelta &&
+              (header.antDelta[0] !== 0 ||
+                header.antDelta[1] !== 0 ||
+                header.antDelta[2] !== 0))) && (
             <>
-              {!hasAntenna && <><div className="section-divider" /><div className="section-label">Antenna</div></>}
+              {!hasAntenna && (
+                <>
+                  <div className="section-divider" />
+                  <div className="section-label">Antenna</div>
+                </>
+              )}
               <InlineField
                 label="Offset H"
-                value={f ? numStr(f.antDeltaH) : numStr(header.antDelta?.[0] ?? 0)}
+                value={
+                  f ? numStr(f.antDeltaH) : numStr(header.antDelta?.[0] ?? 0)
+                }
                 originalValue={editing ? numStr(orig.antDeltaH) : undefined}
                 editing={editing}
-                onChange={v => updateField('antDeltaH', parseFloat(v) || 0)}
+                onChange={(v) => updateField('antDeltaH', parseFloat(v) || 0)}
                 type="number"
               />
               <InlineField
                 label="Offset E"
-                value={f ? numStr(f.antDeltaE) : numStr(header.antDelta?.[1] ?? 0)}
+                value={
+                  f ? numStr(f.antDeltaE) : numStr(header.antDelta?.[1] ?? 0)
+                }
                 originalValue={editing ? numStr(orig.antDeltaE) : undefined}
                 editing={editing}
-                onChange={v => updateField('antDeltaE', parseFloat(v) || 0)}
+                onChange={(v) => updateField('antDeltaE', parseFloat(v) || 0)}
                 type="number"
               />
               <InlineField
                 label="Offset N"
-                value={f ? numStr(f.antDeltaN) : numStr(header.antDelta?.[2] ?? 0)}
+                value={
+                  f ? numStr(f.antDeltaN) : numStr(header.antDelta?.[2] ?? 0)
+                }
                 originalValue={editing ? numStr(orig.antDeltaN) : undefined}
                 editing={editing}
-                onChange={v => updateField('antDeltaN', parseFloat(v) || 0)}
+                onChange={(v) => updateField('antDeltaN', parseFloat(v) || 0)}
                 type="number"
               />
             </>
@@ -282,26 +331,38 @@ export default function RinexHeaderEditor({
               <div className="section-label">Approx position (ECEF)</div>
               <InlineField
                 label="X (m)"
-                value={f ? numStr(f.positionX) : numStr(header.approxPosition?.[0] ?? 0)}
+                value={
+                  f
+                    ? numStr(f.positionX)
+                    : numStr(header.approxPosition?.[0] ?? 0)
+                }
                 originalValue={editing ? numStr(orig.positionX) : undefined}
                 editing={editing}
-                onChange={v => updateField('positionX', parseFloat(v) || 0)}
+                onChange={(v) => updateField('positionX', parseFloat(v) || 0)}
                 type="number"
               />
               <InlineField
                 label="Y (m)"
-                value={f ? numStr(f.positionY) : numStr(header.approxPosition?.[1] ?? 0)}
+                value={
+                  f
+                    ? numStr(f.positionY)
+                    : numStr(header.approxPosition?.[1] ?? 0)
+                }
                 originalValue={editing ? numStr(orig.positionY) : undefined}
                 editing={editing}
-                onChange={v => updateField('positionY', parseFloat(v) || 0)}
+                onChange={(v) => updateField('positionY', parseFloat(v) || 0)}
                 type="number"
               />
               <InlineField
                 label="Z (m)"
-                value={f ? numStr(f.positionZ) : numStr(header.approxPosition?.[2] ?? 0)}
+                value={
+                  f
+                    ? numStr(f.positionZ)
+                    : numStr(header.approxPosition?.[2] ?? 0)
+                }
                 originalValue={editing ? numStr(orig.positionZ) : undefined}
                 editing={editing}
-                onChange={v => updateField('positionZ', parseFloat(v) || 0)}
+                onChange={(v) => updateField('positionZ', parseFloat(v) || 0)}
                 type="number"
               />
             </>
@@ -316,7 +377,7 @@ export default function RinexHeaderEditor({
                 value={f ? f.observer : header.observer}
                 originalValue={editing ? orig.observer : undefined}
                 editing={editing}
-                onChange={v => updateField('observer', v)}
+                onChange={(v) => updateField('observer', v)}
                 maxLength={20}
               />
               <InlineField
@@ -324,14 +385,12 @@ export default function RinexHeaderEditor({
                 value={f ? f.agency : header.agency}
                 originalValue={editing ? orig.agency : undefined}
                 editing={editing}
-                onChange={v => updateField('agency', v)}
+                onChange={(v) => updateField('agency', v)}
                 maxLength={40}
               />
             </>
           )}
-
         </div>
-
       </div>
     </details>
   );

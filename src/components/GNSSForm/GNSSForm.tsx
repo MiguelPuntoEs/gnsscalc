@@ -21,8 +21,8 @@ import {
   getDateFromUtc,
   getGpsLeap,
   MILLISECONDS_IN_SECOND,
-} from 'gnss-js';
-import type { HourCode } from 'gnss-js';
+} from 'gnss-js/time';
+import type { HourCode } from 'gnss-js/time';
 
 import { SCALE } from '../../constants/time';
 import { createNumberHandler } from '../../util/formats';
@@ -60,7 +60,7 @@ export default function GNSSForm({
   const result = useTimeCalculator(date);
 
   const computationHandle = (
-    func: () => Date | undefined
+    func: () => Date | undefined,
   ): Date | undefined => {
     const resultDate = func();
     if (resultDate) {
@@ -74,7 +74,9 @@ export default function GNSSForm({
       label: 'Week no.',
       value: result.weekNumber.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromGpsData(value, result.timeOfWeek))
+        computationHandle(() =>
+          getDateFromGpsData(value, result.timeOfWeek * MILLISECONDS_IN_SECOND),
+        ),
       ),
       numeric: true,
     },
@@ -82,7 +84,9 @@ export default function GNSSForm({
       label: 'Time of week',
       value: result.timeOfWeek.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromGpsData(result.weekNumber, value))
+        computationHandle(() =>
+          getDateFromGpsData(result.weekNumber, value * MILLISECONDS_IN_SECOND),
+        ),
       ),
       numeric: true,
     },
@@ -94,8 +98,8 @@ export default function GNSSForm({
       value: result.gpsTime.toString(),
       onCommit: createNumberHandler((value) =>
         computationHandle(() =>
-          getDateFromGpsTime(value * MILLISECONDS_IN_SECOND)
-        )
+          getDateFromGpsTime(value * MILLISECONDS_IN_SECOND),
+        ),
       ),
       numeric: true,
     },
@@ -104,8 +108,8 @@ export default function GNSSForm({
       value: result.galTime.toString(),
       onCommit: createNumberHandler((value) =>
         computationHandle(() =>
-          getDateFromGalTime(value * MILLISECONDS_IN_SECOND)
-        )
+          getDateFromGalTime(value * MILLISECONDS_IN_SECOND),
+        ),
       ),
       numeric: true,
     },
@@ -114,8 +118,8 @@ export default function GNSSForm({
       value: result.bdsTime.toString(),
       onCommit: createNumberHandler((value) =>
         computationHandle(() =>
-          getDateFromBdsTime(value * MILLISECONDS_IN_SECOND)
-        )
+          getDateFromBdsTime(value * MILLISECONDS_IN_SECOND),
+        ),
       ),
       numeric: true,
     },
@@ -124,8 +128,8 @@ export default function GNSSForm({
       value: result.unixTime.toString(),
       onCommit: createNumberHandler((value) =>
         computationHandle(() =>
-          getDateFromUnixTime(value * MILLISECONDS_IN_SECOND)
-        )
+          getDateFromUnixTime(value * MILLISECONDS_IN_SECOND),
+        ),
       ),
       numeric: true,
     },
@@ -137,8 +141,12 @@ export default function GNSSForm({
       value: result.gloN4.toString(),
       onCommit: createNumberHandler((value) =>
         computationHandle(() =>
-          getDateFromGloN(value, result.gloNa, result.timeOfDay)
-        )
+          getDateFromGloN(
+            value,
+            result.gloNa,
+            result.timeOfDay * MILLISECONDS_IN_SECOND,
+          ),
+        ),
       ),
       numeric: true,
     },
@@ -147,8 +155,12 @@ export default function GNSSForm({
       value: result.gloNa.toString(),
       onCommit: createNumberHandler((value) =>
         computationHandle(() =>
-          getDateFromGloN(result.gloN4, value, result.timeOfDay)
-        )
+          getDateFromGloN(
+            result.gloN4,
+            value,
+            result.timeOfDay * MILLISECONDS_IN_SECOND,
+          ),
+        ),
       ),
       numeric: true,
     },
@@ -159,7 +171,7 @@ export default function GNSSForm({
       label: 'Day of Year',
       value: result.dayOfYear.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromDayOfYear(value, date))
+        computationHandle(() => getDateFromDayOfYear(value, date)),
       ),
       numeric: true,
     },
@@ -168,8 +180,8 @@ export default function GNSSForm({
       value: result.weekOfYear.toString(),
       onCommit: createNumberHandler((value) =>
         computationHandle(() =>
-          getDateFromWeekOfYear(value, result.dateGps, result.timeGps)
-        )
+          getDateFromWeekOfYear(value, result.dateGps, result.timeGps),
+        ),
       ),
       numeric: true,
     },
@@ -177,7 +189,9 @@ export default function GNSSForm({
       label: 'Time of Day',
       value: result.timeOfDay.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromTimeOfDay(value, date))
+        computationHandle(() =>
+          getDateFromTimeOfDay(value * MILLISECONDS_IN_SECOND, date),
+        ),
       ),
       numeric: true,
     },
@@ -185,7 +199,7 @@ export default function GNSSForm({
       label: 'Day of Week',
       value: result.dayOfWeek.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromDayOfWeek(value, date))
+        computationHandle(() => getDateFromDayOfWeek(value, date)),
       ),
       numeric: true,
     },
@@ -208,7 +222,7 @@ export default function GNSSForm({
       label: 'Julian Date',
       value: result.julianDate.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromJulianDate(value, SCALE))
+        computationHandle(() => getDateFromJulianDate(value, SCALE)),
       ),
       numeric: true,
     },
@@ -216,7 +230,7 @@ export default function GNSSForm({
       label: 'MJD',
       value: result.mjd.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromMJD(value, SCALE))
+        computationHandle(() => getDateFromMJD(value, SCALE)),
       ),
       numeric: true,
     },
@@ -224,7 +238,7 @@ export default function GNSSForm({
       label: 'MJD2000',
       value: result.mjd2000.toString(),
       onCommit: createNumberHandler((value) =>
-        computationHandle(() => getDateFromMJD2000(value, SCALE))
+        computationHandle(() => getDateFromMJD2000(value, SCALE)),
       ),
       numeric: true,
     },
@@ -300,7 +314,7 @@ export default function GNSSForm({
   const nowTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const rinexEdit = useEditableValue(result.rinex, (value: string) =>
-    computationHandle(() => getDateFromRINEX(value))
+    computationHandle(() => getDateFromRINEX(value)),
   );
 
   return (
@@ -311,17 +325,37 @@ export default function GNSSForm({
         <div className="flex gap-2">
           <button
             className={`inline-flex items-center gap-1 text-xs transition-colors rounded-md px-2 py-1 border cursor-pointer ${
-              rinexCopied ? 'text-green-400 border-green-400/30' : 'text-fg/50 hover:text-fg border-fg/10 hover:border-fg/20'
+              rinexCopied
+                ? 'text-green-400 border-green-400/30'
+                : 'text-fg/50 hover:text-fg border-fg/10 hover:border-fg/20'
             }`}
             type="button"
             onClick={copyRinex}
           >
             {rinexCopied ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-3"
+              >
                 <path d="M20 6 9 17l-5-5" />
               </svg>
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-3"
+              >
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
               </svg>
@@ -336,7 +370,7 @@ export default function GNSSForm({
               now.setMilliseconds(0);
               const gpsLeap = getGpsLeap(now);
               onDateChange(
-                new Date(now.getTime() + gpsLeap * MILLISECONDS_IN_SECOND)
+                new Date(now.getTime() + gpsLeap * MILLISECONDS_IN_SECOND),
               );
               setNowPressed(true);
               clearTimeout(nowTimeout.current);

@@ -1,5 +1,5 @@
-import { getTimeDifferenceFromObject } from 'gnss-js';
-import type { TimeDifference } from 'gnss-js';
+import { getTimeDifferenceFromObject } from 'gnss-js/time';
+import type { TimeDifference } from 'gnss-js/time';
 import useTimeDifferenceCalculator from '../../hooks/timeDifference';
 import { createNumberHandler } from '../../util/formats';
 import Field from '../Field';
@@ -30,7 +30,16 @@ export default function GNSSTimeDifference({
           type="button"
           onClick={() => onTimeDifferenceChange(0)}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-3">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-3"
+          >
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
             <path d="M3 3v5h5" />
           </svg>
@@ -42,28 +51,28 @@ export default function GNSSTimeDifference({
           label="Days"
           value={days.toString()}
           onCommit={createNumberHandler((value) =>
-            computationHandle({ seconds, minutes, hours, days: value })
+            computationHandle({ seconds, minutes, hours, days: value }),
           )}
         />
         <Field
           label="Hours"
           value={hours.toString()}
           onCommit={createNumberHandler((value) =>
-            computationHandle({ seconds, minutes, hours: value, days })
+            computationHandle({ seconds, minutes, hours: value, days }),
           )}
         />
         <Field
           label="Minutes"
           value={minutes.toString()}
           onCommit={createNumberHandler((value) =>
-            computationHandle({ seconds, minutes: value, hours, days })
+            computationHandle({ seconds, minutes: value, hours, days }),
           )}
         />
         <Field
           label="Seconds"
           value={seconds.toString()}
           onCommit={createNumberHandler((value) =>
-            computationHandle({ seconds: value, minutes, hours, days })
+            computationHandle({ seconds: value, minutes, hours, days }),
           )}
         />
       </div>

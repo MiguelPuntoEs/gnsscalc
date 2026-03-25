@@ -4,7 +4,7 @@ import {
   verifyChecksum,
   parseNmeaFile,
   computeStats,
-} from './nmea';
+} from 'gnss-js/nmea';
 
 describe('nmeaCoordToDecimal', () => {
   it('converts latitude ddmm.mmmm N', () => {
@@ -36,21 +36,34 @@ describe('nmeaCoordToDecimal', () => {
 
 describe('verifyChecksum', () => {
   it('validates a correct checksum', () => {
-    expect(verifyChecksum('$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*76')).toBe(true);
+    expect(
+      verifyChecksum(
+        '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*76',
+      ),
+    ).toBe(true);
   });
 
   it('rejects an incorrect checksum', () => {
-    expect(verifyChecksum('$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*FF')).toBe(false);
+    expect(
+      verifyChecksum(
+        '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*FF',
+      ),
+    ).toBe(false);
   });
 
   it('returns false when no checksum present', () => {
-    expect(verifyChecksum('$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,')).toBe(false);
+    expect(
+      verifyChecksum(
+        '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,',
+      ),
+    ).toBe(false);
   });
 });
 
 describe('parseNmeaFile', () => {
   it('parses a GGA sentence', () => {
-    const content = '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*76';
+    const content =
+      '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*76';
     const { fixes, stats } = parseNmeaFile(content);
     expect(fixes).toHaveLength(1);
     expect(fixes[0]!.lat).toBeCloseTo(53.36134, 4);
@@ -62,7 +75,8 @@ describe('parseNmeaFile', () => {
   });
 
   it('parses an RMC sentence', () => {
-    const content = '$GPRMC,092750.000,A,5321.6802,N,00630.3372,W,0.02,31.66,280511,,,A*43';
+    const content =
+      '$GPRMC,092750.000,A,5321.6802,N,00630.3372,W,0.02,31.66,280511,,,A*43';
     const { fixes } = parseNmeaFile(content);
     expect(fixes).toHaveLength(1);
     expect(fixes[0]!.lat).toBeCloseTo(53.36134, 4);
@@ -89,7 +103,8 @@ describe('parseNmeaFile', () => {
   });
 
   it('skips invalid GGA (fix quality 0)', () => {
-    const content = '$GPGGA,092750.000,5321.6802,N,00630.3372,W,0,0,,,M,,M,,*49';
+    const content =
+      '$GPGGA,092750.000,5321.6802,N,00630.3372,W,0,0,,,M,,M,,*49';
     const { fixes } = parseNmeaFile(content);
     expect(fixes).toHaveLength(0);
   });
@@ -101,14 +116,16 @@ describe('parseNmeaFile', () => {
   });
 
   it('handles multi-constellation talker IDs (GN, GL, GA)', () => {
-    const content = '$GNGGA,092750.000,5321.6802,N,00630.3372,W,1,12,0.80,61.7,M,55.2,M,,*59';
+    const content =
+      '$GNGGA,092750.000,5321.6802,N,00630.3372,W,1,12,0.80,61.7,M,55.2,M,,*59';
     const { fixes } = parseNmeaFile(content);
     expect(fixes).toHaveLength(1);
     expect(fixes[0]!.satellites).toBe(12);
   });
 
   it('rejects lines with bad checksum', () => {
-    const content = '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*FF';
+    const content =
+      '$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,*FF';
     const { fixes } = parseNmeaFile(content);
     expect(fixes).toHaveLength(0);
   });
@@ -124,8 +141,26 @@ describe('parseNmeaFile', () => {
 describe('computeStats', () => {
   it('computes duration, distance, satellites and precision', () => {
     const fixes = [
-      { time: new Date('2024-01-01T00:00:00Z'), lat: 40.0, lon: -3.0, alt: 600, satellites: 10, fixQuality: 1, speed: 5.0, course: null },
-      { time: new Date('2024-01-01T00:05:00Z'), lat: 41.0, lon: -2.0, alt: 800, satellites: 8, fixQuality: 1, speed: 10.0, course: null },
+      {
+        time: new Date('2024-01-01T00:00:00Z'),
+        lat: 40.0,
+        lon: -3.0,
+        alt: 600,
+        satellites: 10,
+        fixQuality: 1,
+        speed: 5.0,
+        course: null,
+      },
+      {
+        time: new Date('2024-01-01T00:05:00Z'),
+        lat: 41.0,
+        lon: -2.0,
+        alt: 800,
+        satellites: 8,
+        fixQuality: 1,
+        speed: 10.0,
+        course: null,
+      },
     ];
     const stats = computeStats(fixes);
     expect(stats.validFixes).toBe(2);

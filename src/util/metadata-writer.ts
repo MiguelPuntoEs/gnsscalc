@@ -5,8 +5,8 @@
  * Similar to GFZRNX -meta output.
  */
 
-import type { RinexHeader, RinexStats } from './rinex';
-import type { RinexWarnings } from './rinex-warnings';
+import type { RinexHeader, RinexStats } from 'gnss-js/rinex';
+import type { RinexWarnings } from 'gnss-js/rinex';
 
 export interface RinexMetadata {
   marker: {
@@ -48,11 +48,21 @@ export interface RinexMetadata {
     errors: number;
     warnings: number;
     info: number;
-    items: { code: string; severity: string; message: string; count: number; examples?: string[] }[];
+    items: {
+      code: string;
+      severity: string;
+      message: string;
+      count: number;
+      examples?: string[];
+    }[];
   };
 }
 
-export function buildMetadata(header: RinexHeader, stats: RinexStats, warnings?: RinexWarnings): RinexMetadata {
+export function buildMetadata(
+  header: RinexHeader,
+  stats: RinexStats,
+  warnings?: RinexWarnings,
+): RinexMetadata {
   return {
     marker: {
       name: header.markerName || '',
@@ -98,6 +108,10 @@ export function buildMetadata(header: RinexHeader, stats: RinexStats, warnings?:
   };
 }
 
-export function writeMetadataJson(header: RinexHeader, stats: RinexStats, warnings?: RinexWarnings): string {
+export function writeMetadataJson(
+  header: RinexHeader,
+  stats: RinexStats,
+  warnings?: RinexWarnings,
+): string {
   return JSON.stringify(buildMetadata(header, stats, warnings), null, 2);
 }

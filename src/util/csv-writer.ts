@@ -14,7 +14,9 @@ function formatEpochUTC(ms: number): string {
   const dy = String(d.getUTCDate()).padStart(2, '0');
   const h = String(d.getUTCHours()).padStart(2, '0');
   const mi = String(d.getUTCMinutes()).padStart(2, '0');
-  const s = (d.getUTCSeconds() + d.getUTCMilliseconds() / 1000).toFixed(3).padStart(6, '0');
+  const s = (d.getUTCSeconds() + d.getUTCMilliseconds() / 1000)
+    .toFixed(3)
+    .padStart(6, '0');
   return `${y}-${mo}-${dy}T${h}:${mi}:${s}Z`;
 }
 
@@ -49,7 +51,7 @@ export function writeObsCsv(
       const sysCodes = obsTypes.get(sys);
       if (!sysCodes) continue;
       const valArr = epoch.sats.get(prn)!;
-      const values = allCodes.map(code => {
+      const values = allCodes.map((code) => {
         const idx = sysCodes.indexOf(code);
         if (idx < 0 || idx >= valArr.length) return '';
         const v = valArr[idx]!;

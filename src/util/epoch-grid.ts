@@ -18,8 +18,8 @@
  *   Total         ~100 MB   (transferred, not cloned)
  */
 
-import type { RinexHeader, RinexStats } from './rinex';
-import { systemCmp } from './rinex';
+import type { RinexHeader, RinexStats } from 'gnss-js/rinex';
+import { systemCmp } from 'gnss-js/rinex';
 import type { CompactEpoch } from './obs-writer';
 
 /* ================================================================== */
@@ -80,10 +80,16 @@ export function compactToGrid(
   if (n === 0) {
     return {
       nEpochs: 0,
-      times: new Float64Array(0), totalSats: new Uint8Array(0), meanSnr: new Float32Array(0),
-      systems: [], satsPerSystem: new Uint8Array(0), snrPerSystem: new Float32Array(0),
-      prns: [], snrPerSat: new Float32Array(0),
-      bandKeys: [], snrPerSatBand: new Float32Array(0),
+      times: new Float64Array(0),
+      totalSats: new Uint8Array(0),
+      meanSnr: new Float32Array(0),
+      systems: [],
+      satsPerSystem: new Uint8Array(0),
+      snrPerSystem: new Float32Array(0),
+      prns: [],
+      snrPerSat: new Float32Array(0),
+      bandKeys: [],
+      snrPerSatBand: new Float32Array(0),
     };
   }
 
@@ -92,7 +98,8 @@ export function compactToGrid(
   for (const [sys, codes] of sysCodeList) {
     const snrIndices: { idx: number; band: string }[] = [];
     for (let i = 0; i < codes.length; i++) {
-      if (codes[i]![0] === 'S') snrIndices.push({ idx: i, band: codes[i]![1]! });
+      if (codes[i]![0] === 'S')
+        snrIndices.push({ idx: i, band: codes[i]![1]! });
     }
     sysSnrInfo.set(sys, snrIndices);
   }
@@ -157,7 +164,8 @@ export function compactToGrid(
     const sysSatCount = new Uint8Array(nSys);
     const sysSnrSum = new Float64Array(nSys);
     const sysSnrN = new Uint16Array(nSys);
-    let allSnrSum = 0, allSnrN = 0;
+    let allSnrSum = 0,
+      allSnrN = 0;
 
     for (const [prn, valArr] of epoch.sats) {
       const sys = prn[0]!;
@@ -171,7 +179,8 @@ export function compactToGrid(
       if (!snrInfo || snrInfo.length === 0) continue;
 
       // Average all SNR values for this satellite → snrPerSat
-      let satSnrSum = 0, satSnrN = 0;
+      let satSnrSum = 0,
+        satSnrN = 0;
       for (const { idx, band } of snrInfo) {
         const val = idx < valArr.length ? valArr[idx]! : NaN;
         if (!isNaN(val) && val > 0) {
@@ -198,7 +207,8 @@ export function compactToGrid(
     // Write per-system counts and SNR
     for (let s = 0; s < nSys; s++) {
       satsPerSystem[rowSys + s] = sysSatCount[s]!;
-      if (sysSnrN[s]! > 0) snrPerSystem[rowSys + s] = sysSnrSum[s]! / sysSnrN[s]!;
+      if (sysSnrN[s]! > 0)
+        snrPerSystem[rowSys + s] = sysSnrSum[s]! / sysSnrN[s]!;
     }
 
     if (allSnrN > 0) meanSnr[i] = allSnrSum / allSnrN;
@@ -206,10 +216,16 @@ export function compactToGrid(
 
   return {
     nEpochs: n,
-    times, totalSats, meanSnr,
-    systems, satsPerSystem, snrPerSystem,
-    prns, snrPerSat,
-    bandKeys, snrPerSatBand,
+    times,
+    totalSats,
+    meanSnr,
+    systems,
+    satsPerSystem,
+    snrPerSystem,
+    prns,
+    snrPerSat,
+    bandKeys,
+    snrPerSatBand,
   };
 }
 
@@ -236,7 +252,8 @@ export function compactToStats(
   }
 
   let satCountSum = 0;
-  let snrSum = 0, snrN = 0;
+  let snrSum = 0,
+    snrN = 0;
 
   for (const epoch of compactEpochs) {
     satCountSum += epoch.sats.size;
@@ -244,23 +261,35 @@ export function compactToStats(
     for (const [prn, valArr] of epoch.sats) {
       const sys = prn[0]!;
       if (!satellitesSeen[sys]) satellitesSeen[sys] = new Set();
-      satellitesSeen[sys]!.add(prn);
+      satellitesSeen[sys].add(prn);
 
       // Compute mean SNR for this satellite in this epoch
       const indices = sysSnrIdx.get(sys);
       if (!indices) continue;
-      let sum = 0, count = 0;
+      let sum = 0,
+        count = 0;
       for (const idx of indices) {
         const v = idx < valArr.length ? valArr[idx]! : NaN;
-        if (!isNaN(v) && v > 0) { sum += v; count++; }
+        if (!isNaN(v) && v > 0) {
+          sum += v;
+          count++;
+        }
       }
-      if (count > 0) { snrSum += sum / count; snrN++; }
+      if (count > 0) {
+        snrSum += sum / count;
+        snrN++;
+      }
     }
   }
 
-  const startTime = n > 0 ? new Date(compactEpochs[0]!.time) : header.timeOfFirstObs;
-  const endTime = n > 0 ? new Date(compactEpochs[n - 1]!.time) : header.timeOfLastObs;
-  const duration = startTime && endTime ? (endTime.getTime() - startTime.getTime()) / 1000 : null;
+  const startTime =
+    n > 0 ? new Date(compactEpochs[0]!.time) : header.timeOfFirstObs;
+  const endTime =
+    n > 0 ? new Date(compactEpochs[n - 1]!.time) : header.timeOfLastObs;
+  const duration =
+    startTime && endTime
+      ? (endTime.getTime() - startTime.getTime()) / 1000
+      : null;
 
   let interval = header.interval;
   if (interval === null && n >= 2) {
@@ -339,7 +368,8 @@ export function gridToChartRows(
     const time = grid.times[mid]!;
 
     let totalSum = 0;
-    let snrSum = 0, snrN = 0;
+    let snrSum = 0,
+      snrN = 0;
     const sysCountSum = new Float64Array(nSys);
     const sysSnrSum = new Float64Array(nSys);
     const sysSnrN = new Uint32Array(nSys);
@@ -347,13 +377,19 @@ export function gridToChartRows(
     for (let j = i; j < end; j++) {
       totalSum += grid.totalSats[j]!;
       const m = grid.meanSnr[j]!;
-      if (!isNaN(m)) { snrSum += m; snrN++; }
+      if (!isNaN(m)) {
+        snrSum += m;
+        snrN++;
+      }
 
       const rowSys = j * nSys;
       for (let s = 0; s < nSys; s++) {
         sysCountSum[s]! += grid.satsPerSystem[rowSys + s]!;
         const v = grid.snrPerSystem[rowSys + s]!;
-        if (!isNaN(v)) { sysSnrSum[s]! += v; sysSnrN[s]!++; }
+        if (!isNaN(v)) {
+          sysSnrSum[s]! += v;
+          sysSnrN[s]!++;
+        }
       }
     }
 
@@ -367,9 +403,10 @@ export function gridToChartRows(
     for (let s = 0; s < nSys; s++) {
       const sys = systems[s]!;
       row[`sat_${sys}`] = Math.round(sysCountSum[s]! / gn);
-      row[`snr_${sys}`] = sysSnrN[s]! > 0
-        ? Math.round((sysSnrSum[s]! / sysSnrN[s]!) * 10) / 10
-        : null;
+      row[`snr_${sys}`] =
+        sysSnrN[s]! > 0
+          ? Math.round((sysSnrSum[s]! / sysSnrN[s]!) * 10) / 10
+          : null;
     }
 
     rows.push(row);
@@ -396,7 +433,8 @@ export function gridSnrPerSatDownsampled(grid: EpochGrid): {
 } {
   const { nEpochs, prns } = grid;
   const nPrn = prns.length;
-  if (nEpochs === 0) return { times: new Float64Array(0), snr: new Float32Array(0), nCols: 0 };
+  if (nEpochs === 0)
+    return { times: new Float64Array(0), snr: new Float32Array(0), nCols: 0 };
 
   const step = Math.max(1, Math.ceil(nEpochs / MAX_CHART_POINTS));
   const nCols = Math.ceil(nEpochs / step);
@@ -424,7 +462,7 @@ export function gridCn0Histogram(
 ): Record<string, string | number>[] {
   const bins = Array.from({ length: 12 }, (_, i) => i * 5);
   const counts: Record<string, number[]> = {};
-  for (const sys of systems) counts[sys] = new Array(12).fill(0);
+  for (const sys of systems) counts[sys] = new Array<number>(12).fill(0);
 
   const { nEpochs, prns } = grid;
   const nPrn = prns.length;
@@ -435,9 +473,9 @@ export function gridCn0Histogram(
       const val = grid.snrPerSat[row + p]!;
       if (isNaN(val)) continue;
       const sys = prns[p]![0]!;
-      if (!counts[sys]) counts[sys] = new Array(12).fill(0);
+      if (!counts[sys]) counts[sys] = new Array<number>(12).fill(0);
       const b = Math.min(Math.floor(val / 5), 11);
-      counts[sys]![b]!++;
+      counts[sys][b]!++;
     }
   }
 

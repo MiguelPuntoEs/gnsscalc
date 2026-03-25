@@ -1,8 +1,15 @@
 import { useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMap,
+} from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { NmeaFix } from '../util/nmea';
+import type { NmeaFix } from 'gnss-js/nmea';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -33,8 +40,14 @@ function FixPopup({ label, fix }: { label: string; fix: NmeaFix }) {
   return (
     <div className="text-xs leading-relaxed">
       <strong>{label}</strong>
-      {fix.time && <div>{fix.time.toISOString().replace('T', ' ').replace('Z', ' UTC')}</div>}
-      <div>{fix.lat.toFixed(6)}°, {fix.lon.toFixed(6)}°</div>
+      {fix.time && (
+        <div>
+          {fix.time.toISOString().replace('T', ' ').replace('Z', ' UTC')}
+        </div>
+      )}
+      <div>
+        {fix.lat.toFixed(6)}°, {fix.lon.toFixed(6)}°
+      </div>
       {fix.alt !== null && <div>Alt: {fix.alt.toFixed(1)} m</div>}
       {fix.satellites !== null && <div>Sats: {fix.satellites}</div>}
     </div>
@@ -66,8 +79,8 @@ function FitBounds({ fixes }: { fixes: NmeaFix[] }) {
   const map = useMap();
 
   const bounds = useMemo(() => {
-    const lats = fixes.map(f => f.lat);
-    const lons = fixes.map(f => f.lon);
+    const lats = fixes.map((f) => f.lat);
+    const lons = fixes.map((f) => f.lon);
     return L.latLngBounds(
       [Math.min(...lats), Math.min(...lons)],
       [Math.max(...lats), Math.max(...lons)],
@@ -84,16 +97,18 @@ function FitBounds({ fixes }: { fixes: NmeaFix[] }) {
 }
 
 export default function NmeaTrackMap({ fixes }: { fixes: NmeaFix[] }) {
-  const hasSatData = fixes.some(f => f.satellites !== null);
+  const hasSatData = fixes.some((f) => f.satellites !== null);
 
   // Build colored segments — each segment gets the color of its starting fix
   const segments = useMemo<ColoredSegment[]>(() => {
     if (!hasSatData || fixes.length < 2) {
       // No sat data: single segment with accent color
-      return [{
-        positions: fixes.map(f => [f.lat, f.lon] as [number, number]),
-        color: '#7c8aff',
-      }];
+      return [
+        {
+          positions: fixes.map((f) => [f.lat, f.lon] as [number, number]),
+          color: '#7c8aff',
+        },
+      ];
     }
 
     const segs: ColoredSegment[] = [];
@@ -107,7 +122,10 @@ export default function NmeaTrackMap({ fixes }: { fixes: NmeaFix[] }) {
         last.positions.push([next.lat, next.lon]);
       } else {
         segs.push({
-          positions: [[f.lat, f.lon], [next.lat, next.lon]],
+          positions: [
+            [f.lat, f.lon],
+            [next.lat, next.lon],
+          ],
           color,
         });
       }
@@ -143,10 +161,14 @@ export default function NmeaTrackMap({ fixes }: { fixes: NmeaFix[] }) {
           />
         ))}
         <Marker position={[first.lat, first.lon]} icon={startIcon}>
-          <Popup><FixPopup label="Start" fix={first} /></Popup>
+          <Popup>
+            <FixPopup label="Start" fix={first} />
+          </Popup>
         </Marker>
         <Marker position={[last.lat, last.lon]} icon={endIcon}>
-          <Popup><FixPopup label="End" fix={last} /></Popup>
+          <Popup>
+            <FixPopup label="End" fix={last} />
+          </Popup>
         </Marker>
         <FitBounds fixes={fixes} />
       </MapContainer>
@@ -154,21 +176,33 @@ export default function NmeaTrackMap({ fixes }: { fixes: NmeaFix[] }) {
         {hasSatData ? (
           <>
             <div className="flex items-center gap-1.5">
-              <span className="inline-block w-4 h-0.5 rounded-full" style={{ backgroundColor: satColor(4) }} />
+              <span
+                className="inline-block w-4 h-0.5 rounded-full"
+                style={{ backgroundColor: satColor(4) }}
+              />
               ≤4 sats
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="inline-block w-4 h-0.5 rounded-full" style={{ backgroundColor: satColor(8) }} />
+              <span
+                className="inline-block w-4 h-0.5 rounded-full"
+                style={{ backgroundColor: satColor(8) }}
+              />
               8 sats
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="inline-block w-4 h-0.5 rounded-full" style={{ backgroundColor: satColor(12) }} />
+              <span
+                className="inline-block w-4 h-0.5 rounded-full"
+                style={{ backgroundColor: satColor(12) }}
+              />
               ≥12 sats
             </div>
           </>
         ) : (
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-4 h-0.5 rounded-full" style={{ backgroundColor: '#7c8aff' }} />
+            <span
+              className="inline-block w-4 h-0.5 rounded-full"
+              style={{ backgroundColor: '#7c8aff' }}
+            />
             Track ({fixes.length} fixes)
           </div>
         )}

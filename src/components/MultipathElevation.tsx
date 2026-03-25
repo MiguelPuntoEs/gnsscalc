@@ -12,11 +12,11 @@ import {
   Legend,
   Cell,
 } from 'recharts';
-import type { MultipathResult } from '../util/multipath';
-import type { AllPositionsData } from '../util/orbit';
+import type { MultipathResult } from 'gnss-js/analysis';
+import type { AllPositionsData } from 'gnss-js/orbit';
 import { systemColor } from '../util/gnss-constants';
 import { useChartTheme } from '../hooks/useChartTheme';
-import { systemName, systemCmp } from '../util/rinex';
+import { systemName } from 'gnss-js/rinex';
 import ChartCard from './ChartCard';
 
 type ElevLookup = (prn: string, time: number) => number | null;
@@ -44,14 +44,19 @@ function buildElevLookup(allPositions: AllPositionsData): ElevLookup {
     const m = maps.get(prn);
     if (!m) return null;
     const { times, els } = m;
-    let lo = 0, hi = times.length - 1;
+    let lo = 0,
+      hi = times.length - 1;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
-      if (times[mid]! < time) lo = mid + 1; else hi = mid;
+      if (times[mid]! < time) lo = mid + 1;
+      else hi = mid;
     }
     const best = lo;
     const prev = best > 0 ? best - 1 : best;
-    const idx = Math.abs(times[prev]! - time) < Math.abs(times[best]! - time) ? prev : best;
+    const idx =
+      Math.abs(times[prev]! - time) < Math.abs(times[best]! - time)
+        ? prev
+        : best;
     if (Math.abs(times[idx]! - time) > 60000) return null;
     return els[idx]!;
   };
@@ -76,7 +81,8 @@ export default function MultipathElevation({
     for (const s of result.series) {
       if (selectedSignal) {
         const [sys, band, refBand] = selectedSignal.split('-');
-        if (s.system !== sys || s.band !== band || s.refBand !== refBand) continue;
+        if (s.system !== sys || s.band !== band || s.refBand !== refBand)
+          continue;
       }
       for (const p of s.points) {
         const el = elevLookup(s.prn, p.time);
@@ -92,7 +98,10 @@ export default function MultipathElevation({
     for (const pt of scatter) {
       sysSet.add(pt.system);
       if (!bins.has(pt.system)) {
-        bins.set(pt.system, Array.from({ length: numBins }, () => ({ sumSq: 0, count: 0 })));
+        bins.set(
+          pt.system,
+          Array.from({ length: numBins }, () => ({ sumSq: 0, count: 0 })),
+        );
       }
       const idx = Math.min(numBins - 1, Math.floor(pt.el / ELEV_BIN_SIZE));
       const b = bins.get(pt.system)![idx]!;
@@ -108,17 +117,22 @@ export default function MultipathElevation({
     const binnedRows: Record<string, number | string | null>[] = [];
     for (let i = 0; i < numBins; i++) {
       const center = i * ELEV_BIN_SIZE + ELEV_BIN_SIZE / 2;
-      const row: Record<string, number | string | null> = { el: `${i * ELEV_BIN_SIZE}-${(i + 1) * ELEV_BIN_SIZE}`, elCenter: center };
+      const row: Record<string, number | string | null> = {
+        el: `${i * ELEV_BIN_SIZE}-${(i + 1) * ELEV_BIN_SIZE}`,
+        elCenter: center,
+      };
       for (const sys of sysList) {
         const b = bins.get(sys)?.[i];
-        row[`rms_${sys}`] = b && b.count >= 5 ? Math.sqrt(b.sumSq / b.count) : null;
+        row[`rms_${sys}`] =
+          b && b.count >= 5 ? Math.sqrt(b.sumSq / b.count) : null;
       }
       binnedRows.push(row);
     }
 
     const maxScatter = 3000;
     const step = Math.max(1, Math.ceil(scatter.length / maxScatter));
-    const dsScatter = step === 1 ? scatter : scatter.filter((_, i) => i % step === 0);
+    const dsScatter =
+      step === 1 ? scatter : scatter.filter((_, i) => i % step === 0);
 
     return { scatterData: dsScatter, binnedData: binnedRows, systems: sysList };
   }, [result, selectedSignal, allPositions]);
@@ -129,29 +143,49 @@ export default function MultipathElevation({
     <>
       <ChartCard title="Multipath RMS vs elevation" height={220}>
         <ResponsiveContainer>
-          <LineChart data={binnedData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+          <LineChart
+            data={binnedData}
+            margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
             <XAxis
               dataKey="el"
               tick={theme.axisStyle}
               tickLine={false}
               axisLine={false}
-              label={{ value: 'Elevation (deg)', position: 'insideBottom', offset: -2, style: { fontSize: 9, fill: theme.labelFill } }}
+              label={{
+                value: 'Elevation (deg)',
+                position: 'insideBottom',
+                offset: -2,
+                style: { fontSize: 9, fill: theme.labelFill },
+              }}
             />
             <YAxis
               tick={theme.axisStyle}
               tickLine={false}
               axisLine={false}
               width={45}
-              label={{ value: 'RMS (m)', angle: -90, position: 'insideLeft', offset: 5, style: { fontSize: 9, fill: theme.labelFill } }}
+              label={{
+                value: 'RMS (m)',
+                angle: -90,
+                position: 'insideLeft',
+                offset: 5,
+                style: { fontSize: 9, fill: theme.labelFill },
+              }}
               domain={[0, 'auto']}
             />
             <Tooltip
               {...theme.tooltipStyle}
-              formatter={(value: unknown) => [`${Number(value).toFixed(3)} m`, 'RMS']}
+              formatter={(value: unknown) => [
+                `${Number(value).toFixed(3)} m`,
+                'RMS',
+              ]}
             />
-            <Legend iconSize={10} wrapperStyle={{ fontSize: 11, color: theme.legendColor }} />
-            {systems.map(sys => (
+            <Legend
+              iconSize={10}
+              wrapperStyle={{ fontSize: 11, color: theme.legendColor }}
+            />
+            {systems.map((sys) => (
               <Line
                 key={sys}
                 type="monotone"
@@ -198,7 +232,12 @@ export default function MultipathElevation({
                 name as string,
               ]}
             />
-            <Scatter data={scatterData} fill="#7c8aff" fillOpacity={0.15} r={1.5}>
+            <Scatter
+              data={scatterData}
+              fill="#7c8aff"
+              fillOpacity={0.15}
+              r={1.5}
+            >
               {scatterData.map((d, i) => (
                 <Cell key={i} fill={systemColor(d.system)} fillOpacity={0.2} />
               ))}

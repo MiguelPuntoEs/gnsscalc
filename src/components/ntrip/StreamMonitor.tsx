@@ -1,8 +1,14 @@
 import { useState, useMemo } from 'react';
-import type { NtripStream, StreamStats, SatCn0 } from '../../util/ntrip';
-import { SYS_SHORT, systemColor, SYSTEM_COLORS, CONSTELLATION_COLORS, SYSTEM_META } from '../../util/gnss-constants';
-import { geodeticToEcef } from '../../util/positioning';
-import { computeLiveSkyPositions } from '../../util/orbit';
+import type { NtripStream } from 'gnss-js/ntrip';
+import type { StreamStats, SatCn0 } from 'gnss-js/rtcm3';
+import {
+  systemColor,
+  CONSTELLATION_COLORS,
+  SYSTEM_META,
+} from '../../util/gnss-constants';
+import { SYS_SHORT } from 'gnss-js/constants';
+import { geodeticToEcef } from 'gnss-js/coordinates';
+import { computeLiveSkyPositions } from 'gnss-js/orbit';
 import SatelliteStatusPanel from '../SatelliteStatusPanel';
 import { RecordIcon, StopIcon, DownloadIcon } from './Icons';
 import StationInfoCard from './StationInfoCard';
@@ -29,24 +35,48 @@ function formatDuration(ms: number): string {
 
 /** Human-readable names for RINEX signal codes */
 const SIGNAL_LABELS: Record<string, string> = {
-  '1C': 'L1 C/A', '1S': 'L1C-D', '1L': 'L1C-P', '1X': 'L1C',
-  '2C': 'L2 C/A', '2S': 'L2C-M', '2L': 'L2C-L', '2X': 'L2C',
-  '2P': 'L2 P(Y)', '2W': 'L2 Z',
-  '5I': 'L5 I', '5Q': 'L5 Q', '5X': 'L5',
-  '1B': 'E1 B', '1A': 'E1 A',
-  '7I': 'E5b I', '7Q': 'E5b Q', '7X': 'E5b',
-  '8I': 'E5ab I', '8Q': 'E5ab Q', '8X': 'E5ab',
-  '6B': 'E6 B', '6C': 'E6 C',
-  '2I': 'B1 I', '2Q': 'B1 Q',
-  '6I': 'B3 I', '6Q': 'B3 Q',
-  '1D': 'B1C-D', '1P': 'B1C-P',
-  '5D': 'B2a D', '5P': 'B2a P',
-  '4A': 'G1a L1OF', '4B': 'G1a L1OC',
-  '3I': 'G3 I', '3Q': 'G3 Q',
+  '1C': 'L1 C/A',
+  '1S': 'L1C-D',
+  '1L': 'L1C-P',
+  '1X': 'L1C',
+  '2C': 'L2 C/A',
+  '2S': 'L2C-M',
+  '2L': 'L2C-L',
+  '2X': 'L2C',
+  '2P': 'L2 P(Y)',
+  '2W': 'L2 Z',
+  '5I': 'L5 I',
+  '5Q': 'L5 Q',
+  '5X': 'L5',
+  '1B': 'E1 B',
+  '1A': 'E1 A',
+  '7I': 'E5b I',
+  '7Q': 'E5b Q',
+  '7X': 'E5b',
+  '8I': 'E5ab I',
+  '8Q': 'E5ab Q',
+  '8X': 'E5ab',
+  '6B': 'E6 B',
+  '6C': 'E6 C',
+  '2I': 'B1 I',
+  '2Q': 'B1 Q',
+  '6I': 'B3 I',
+  '6Q': 'B3 Q',
+  '1D': 'B1C-D',
+  '1P': 'B1C-P',
+  '5D': 'B2a D',
+  '5P': 'B2a P',
+  '4A': 'G1a L1OF',
+  '4B': 'G1a L1OC',
+  '3I': 'G3 I',
+  '3Q': 'G3 Q',
 };
 
 const OBS_TYPE_LABELS: Record<string, string> = {
-  C: 'Pseudorange', L: 'Carrier phase', S: 'Signal strength', D: 'Doppler',
+  C: 'Pseudorange',
+  L: 'Carrier phase',
+  S: 'Signal strength',
+  D: 'Doppler',
 };
 
 /* ─── Cn0Chart ─────────────────────────────────────────────────── */
@@ -65,23 +95,32 @@ function Cn0Chart({ satellites }: { satellites: Map<string, SatCn0> }) {
 
   // Group satellites with resolved C/N0 for selected signal
   const grouped = useMemo(() => {
-    const groups: Record<string, { prn: string; system: string; cn0: number }[]> = {};
+    const groups: Record<
+      string,
+      { prn: string; system: string; cn0: number }[]
+    > = {};
     for (const sat of satellites.values()) {
       let cn0: number | undefined;
       if (selectedSignal === 'best') {
         cn0 = sat.cn0;
       } else {
-        const sig = sat.signals.find(s => s.code === selectedSignal);
+        const sig = sat.signals.find((s) => s.code === selectedSignal);
         cn0 = sig?.cn0;
       }
       if (cn0 === undefined || cn0 <= 0) continue;
-      (groups[sat.system] ??= []).push({ prn: sat.prn, system: sat.system, cn0 });
+      (groups[sat.system] ??= []).push({
+        prn: sat.prn,
+        system: sat.system,
+        cn0,
+      });
     }
     for (const sats of Object.values(groups)) {
       sats.sort((a, b) => a.prn.localeCompare(b.prn));
     }
     const order = 'GRECIJS';
-    return Object.entries(groups).sort(([a], [b]) => order.indexOf(a) - order.indexOf(b));
+    return Object.entries(groups).sort(
+      ([a], [b]) => order.indexOf(a) - order.indexOf(b),
+    );
   }, [satellites, selectedSignal]);
 
   if (grouped.length === 0 && availableSignals.length === 0) return null;
@@ -115,7 +154,7 @@ function Cn0Chart({ satellites }: { satellites: Map<string, SatCn0> }) {
             >
               Best
             </button>
-            {availableSignals.map(code => (
+            {availableSignals.map((code) => (
               <button
                 key={code}
                 onClick={() => setSelectedSignal(code)}
@@ -136,21 +175,45 @@ function Cn0Chart({ satellites }: { satellites: Map<string, SatCn0> }) {
             const meta = SYSTEM_META[sys];
             return (
               <span key={sys} className="flex items-center gap-1">
-                <span className="inline-block size-2 rounded-full" style={{ backgroundColor: meta?.color ?? '#94a3b8' }} />
-                <span className="text-[10px] text-fg/40">{meta?.name ?? sys}</span>
+                <span
+                  className="inline-block size-2 rounded-full"
+                  style={{ backgroundColor: meta?.color ?? '#94a3b8' }}
+                />
+                <span className="text-[10px] text-fg/40">
+                  {meta?.name ?? sys}
+                </span>
               </span>
             );
           })}
         </div>
       </div>
       <div className="overflow-x-auto">
-        <svg width={Math.max(totalW, 100)} height={maxH + labelH} className="block">
-          {[20, 30, 40, 50].map(threshold => {
+        <svg
+          width={Math.max(totalW, 100)}
+          height={maxH + labelH}
+          className="block"
+        >
+          {[20, 30, 40, 50].map((threshold) => {
             const y = maxH - (threshold / maxCn0) * maxH;
             return (
               <g key={threshold}>
-                <line x1={0} y1={y} x2={totalW} y2={y} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="2,3" />
-                <text x={-2} y={y + 3} textAnchor="end" className="fill-fg/20 text-[8px]">{threshold}</text>
+                <line
+                  x1={0}
+                  y1={y}
+                  x2={totalW}
+                  y2={y}
+                  stroke="currentColor"
+                  strokeOpacity={0.08}
+                  strokeDasharray="2,3"
+                />
+                <text
+                  x={-2}
+                  y={y + 3}
+                  textAnchor="end"
+                  className="fill-fg/20 text-[8px]"
+                >
+                  {threshold}
+                </text>
               </g>
             );
           })}
@@ -205,10 +268,16 @@ function Cn0Chart({ satellites }: { satellites: Map<string, SatCn0> }) {
 
 /* ─── LiveObsTypeMatrix ────────────────────────────────────────── */
 
-function LiveObsTypeMatrix({ obsTypes }: { obsTypes: Record<string, Set<string>> }) {
+function LiveObsTypeMatrix({
+  obsTypes,
+}: {
+  obsTypes: Record<string, Set<string>>;
+}) {
   const sysList = useMemo(() => {
     const order = 'GRECIJS';
-    return Object.keys(obsTypes).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return Object.keys(obsTypes).sort(
+      (a, b) => order.indexOf(a) - order.indexOf(b),
+    );
   }, [obsTypes]);
 
   // Collect all codes, group by measurement type
@@ -223,7 +292,9 @@ function LiveObsTypeMatrix({ obsTypes }: { obsTypes: Record<string, Set<string>>
       (g[t] ??= []).push(code);
     }
     const typeOrder = ['C', 'L', 'D', 'S'];
-    const st = Object.keys(g).sort((a, b) => typeOrder.indexOf(a) - typeOrder.indexOf(b));
+    const st = Object.keys(g).sort(
+      (a, b) => typeOrder.indexOf(a) - typeOrder.indexOf(b),
+    );
     for (const t of st) g[t]!.sort();
     return { sortedTypes: st, grouped: g };
   }, [obsTypes]);
@@ -232,38 +303,58 @@ function LiveObsTypeMatrix({ obsTypes }: { obsTypes: Record<string, Set<string>>
 
   return (
     <div className="rounded-lg border border-border/40 bg-bg-raised/30 p-3">
-      <span className="text-xs font-medium text-fg/60 mb-2 block">Observation Types</span>
+      <span className="text-xs font-medium text-fg/60 mb-2 block">
+        Observation Types
+      </span>
       <div className="overflow-x-auto">
-        {sortedTypes.map(type => {
+        {sortedTypes.map((type) => {
           const codes = grouped[type]!;
           return (
             <div key={type} className="mb-2.5 last:mb-0">
               <div className="text-[10px] uppercase tracking-wider text-fg/30 mb-1">
                 {OBS_TYPE_LABELS[type] ?? type}
               </div>
-              <div className="grid gap-px" style={{
-                gridTemplateColumns: `36px repeat(${codes.length}, minmax(28px, 1fr))`,
-              }}>
+              <div
+                className="grid gap-px"
+                style={{
+                  gridTemplateColumns: `36px repeat(${codes.length}, minmax(28px, 1fr))`,
+                }}
+              >
                 <div />
-                {codes.map(code => (
-                  <div key={code} className="text-center text-[9px] font-mono text-fg/30 pb-0.5">
+                {codes.map((code) => (
+                  <div
+                    key={code}
+                    className="text-center text-[9px] font-mono text-fg/30 pb-0.5"
+                  >
                     {code}
                   </div>
                 ))}
-                {sysList.map(sys => {
+                {sysList.map((sys) => {
                   const sysSet = obsTypes[sys]!;
                   const color = systemColor(sys);
                   return (
                     <div key={sys} className="contents">
-                      <div className="text-[10px] font-medium h-5 flex items-center" style={{ color }}>
+                      <div
+                        className="text-[10px] font-medium h-5 flex items-center"
+                        style={{ color }}
+                      >
                         {SYS_SHORT[sys] ?? sys}
                       </div>
-                      {codes.map(code => {
+                      {codes.map((code) => {
                         const has = sysSet.has(code);
                         return (
-                          <div key={code} className="flex items-center justify-center h-5">
+                          <div
+                            key={code}
+                            className="flex items-center justify-center h-5"
+                          >
                             {has ? (
-                              <span className="size-2.5 rounded-full" style={{ backgroundColor: color, opacity: 0.85 }} />
+                              <span
+                                className="size-2.5 rounded-full"
+                                style={{
+                                  backgroundColor: color,
+                                  opacity: 0.85,
+                                }}
+                              />
                             ) : (
                               <span className="size-1.5 rounded-full bg-fg/6" />
                             )}
@@ -296,20 +387,33 @@ export interface StreamMonitorProps {
   streamEntry?: NtripStream | null;
 }
 
-export default function StreamMonitor({ mountpoint, stats, onDisconnect, recording, onToggleRecord, onDownloadRinex, rinexEpochs, streamEntry }: StreamMonitorProps) {
+export default function StreamMonitor({
+  mountpoint,
+  stats,
+  onDisconnect,
+  recording,
+  onToggleRecord,
+  onDownloadRinex,
+  rinexEpochs,
+  streamEntry,
+}: StreamMonitorProps) {
   const elapsed = Date.now() - stats.startTime;
-  const sortedTypes = useMemo(() =>
-    [...stats.messageTypes.values()].sort((a, b) => b.count - a.count),
-    [stats.messageTypes, stats.totalFrames] // re-sort when new frames arrive
+  const sortedTypes = useMemo(
+    () => [...stats.messageTypes.values()].sort((a, b) => b.count - a.count),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- totalFrames triggers re-sort when the Map is mutated in place
+    [stats.messageTypes, stats.totalFrames],
   );
 
   // Resolve station position: prefer RTCM3 1005/1006, fall back to sourcetable lat/lon
   const rxPos = useMemo<[number, number, number] | null>(() => {
     if (stats.stationMeta.position) return stats.stationMeta.position;
-    if (streamEntry && (streamEntry.latitude !== 0 || streamEntry.longitude !== 0)) {
+    if (
+      streamEntry &&
+      (streamEntry.latitude !== 0 || streamEntry.longitude !== 0)
+    ) {
       return geodeticToEcef(
-        streamEntry.latitude * Math.PI / 180,
-        streamEntry.longitude * Math.PI / 180,
+        (streamEntry.latitude * Math.PI) / 180,
+        (streamEntry.longitude * Math.PI) / 180,
         0, // approximate altitude
       );
     }
@@ -334,24 +438,37 @@ export default function StreamMonitor({ mountpoint, stats, onDisconnect, recordi
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
               <span className="relative inline-flex rounded-full size-2 bg-green-500" />
             </span>
-            <span className="text-sm font-medium text-fg/90 font-mono">/{mountpoint}</span>
+            <span className="text-sm font-medium text-fg/90 font-mono">
+              /{mountpoint}
+            </span>
           </div>
-          <button className="btn-secondary !px-2 !py-0.5 !text-[11px] !text-fg/50" onClick={onDisconnect}>
+          <button
+            className="btn-secondary !px-2 !py-0.5 !text-[11px] !text-fg/50"
+            onClick={onDisconnect}
+          >
             Disconnect
           </button>
         </div>
         <div className="card-fields">
-          <label>Duration</label>
+          <span>Duration</span>
           <span className="text-sm text-fg/80">{formatDuration(elapsed)}</span>
-          <label>Data received</label>
-          <span className="text-sm text-fg/80">{formatBytes(stats.totalBytes)}</span>
-          <label>Throughput</label>
-          <span className="text-sm text-fg/80">{formatBytes(Math.round(stats.bytesPerSecond))}/s</span>
-          <label>RTCM3 frames</label>
-          <span className="text-sm text-fg/80">{stats.totalFrames.toLocaleString()}</span>
-          <label>Frame rate</label>
-          <span className="text-sm text-fg/80">{stats.framesPerSecond.toFixed(1)} msg/s</span>
-          <label>Message types</label>
+          <span>Data received</span>
+          <span className="text-sm text-fg/80">
+            {formatBytes(stats.totalBytes)}
+          </span>
+          <span>Throughput</span>
+          <span className="text-sm text-fg/80">
+            {formatBytes(Math.round(stats.bytesPerSecond))}/s
+          </span>
+          <span>RTCM3 frames</span>
+          <span className="text-sm text-fg/80">
+            {stats.totalFrames.toLocaleString()}
+          </span>
+          <span>Frame rate</span>
+          <span className="text-sm text-fg/80">
+            {stats.framesPerSecond.toFixed(1)} msg/s
+          </span>
+          <span>Message types</span>
           <span className="text-sm text-fg/80">{stats.messageTypes.size}</span>
         </div>
       </div>
@@ -367,7 +484,9 @@ export default function StreamMonitor({ mountpoint, stats, onDisconnect, recordi
               <RecordIcon className="size-3 text-red-500" />
               <span className="text-xs">Record RINEX</span>
             </button>
-            <span className="text-[10px] text-fg/25">Capture observations to a .obs file</span>
+            <span className="text-[10px] text-fg/25">
+              Capture observations to a .obs file
+            </span>
           </>
         )}
         {recording && (
@@ -392,7 +511,9 @@ export default function StreamMonitor({ mountpoint, stats, onDisconnect, recordi
         )}
         {!recording && rinexEpochs > 0 && (
           <>
-            <span className="text-xs text-fg/50 tabular-nums">{rinexEpochs.toLocaleString()} epochs captured</span>
+            <span className="text-xs text-fg/50 tabular-nums">
+              {rinexEpochs.toLocaleString()} epochs captured
+            </span>
             <div className="flex items-center gap-2 ml-auto">
               <button
                 className="btn-secondary !px-2.5 !py-1 flex items-center gap-1.5 !border-accent/40 !text-accent hover:!bg-accent/10"
@@ -425,11 +546,16 @@ export default function StreamMonitor({ mountpoint, stats, onDisconnect, recordi
       )}
 
       {/* Observation type matrix */}
-      {Object.keys(stats.obsTypes).length > 0 && <LiveObsTypeMatrix obsTypes={stats.obsTypes} />}
+      {Object.keys(stats.obsTypes).length > 0 && (
+        <LiveObsTypeMatrix obsTypes={stats.obsTypes} />
+      )}
 
       {/* Satellite constellation status with ephemeris */}
       {(stats.satellites.size > 0 || stats.ephemerides.size > 0) && (
-        <SatelliteStatusPanel satellites={stats.satellites} ephemerides={stats.ephemerides} />
+        <SatelliteStatusPanel
+          satellites={stats.satellites}
+          ephemerides={stats.ephemerides}
+        />
       )}
 
       {/* Message type breakdown */}
@@ -447,22 +573,41 @@ export default function StreamMonitor({ mountpoint, stats, onDisconnect, recordi
               </tr>
             </thead>
             <tbody>
-              {sortedTypes.map(mt => {
-                const rate = elapsed > 0 ? (mt.count / (elapsed / 1000)).toFixed(1) : '0';
+              {sortedTypes.map((mt) => {
+                const rate =
+                  elapsed > 0 ? (mt.count / (elapsed / 1000)).toFixed(1) : '0';
                 return (
-                  <tr key={mt.messageType} className="border-t border-border/20">
-                    <td className="px-3 py-1.5 font-mono font-medium text-fg/90">{mt.messageType}</td>
+                  <tr
+                    key={mt.messageType}
+                    className="border-t border-border/20"
+                  >
+                    <td className="px-3 py-1.5 font-mono font-medium text-fg/90">
+                      {mt.messageType}
+                    </td>
                     <td className="px-3 py-1.5 text-fg/60">{mt.name}</td>
                     <td className="px-3 py-1.5">
                       {mt.constellation && (
-                        <span className="text-[10px] font-semibold" style={{ color: CONSTELLATION_COLORS[mt.constellation] ?? '#94a3b8' }}>
+                        <span
+                          className="text-[10px] font-semibold"
+                          style={{
+                            color:
+                              CONSTELLATION_COLORS[mt.constellation] ??
+                              '#94a3b8',
+                          }}
+                        >
                           {mt.constellation}
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-1.5 text-fg/70 text-right font-mono tabular-nums">{mt.count.toLocaleString()}</td>
-                    <td className="px-3 py-1.5 text-fg/50 text-right font-mono tabular-nums">{formatBytes(mt.totalBytes)}</td>
-                    <td className="px-3 py-1.5 text-fg/50 text-right font-mono tabular-nums">{rate}/s</td>
+                    <td className="px-3 py-1.5 text-fg/70 text-right font-mono tabular-nums">
+                      {mt.count.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-1.5 text-fg/50 text-right font-mono tabular-nums">
+                      {formatBytes(mt.totalBytes)}
+                    </td>
+                    <td className="px-3 py-1.5 text-fg/50 text-right font-mono tabular-nums">
+                      {rate}/s
+                    </td>
                   </tr>
                 );
               })}

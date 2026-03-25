@@ -12,7 +12,10 @@ export async function readFileText(file: File): Promise<string> {
       chunks.push(value);
     }
     const decoder = new TextDecoder();
-    return chunks.map(c => decoder.decode(c, { stream: true })).join('') + decoder.decode();
+    return (
+      chunks.map((c) => decoder.decode(c, { stream: true })).join('') +
+      decoder.decode()
+    );
   }
   return file.text();
 }

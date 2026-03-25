@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import type { EpochSkyData } from '../util/orbit';
+import type { EpochSkyData } from 'gnss-js/orbit';
 import { useChartTheme } from '../hooks/useChartTheme';
 import ChartCard from './ChartCard';
 
@@ -43,22 +43,72 @@ export default function DopTimeline({ skyData }: { skyData: EpochSkyData[] }) {
   }, [skyData]);
 
   const tickInterval = Math.max(1, Math.floor(data.length / 6));
-  const hasDop = data.some(d => d.pdop !== null);
+  const hasDop = data.some((d) => d.pdop !== null);
   if (!hasDop) return null;
 
   return (
     <ChartCard title="Dilution of precision (DOP)">
       <ResponsiveContainer>
-        <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
-          <XAxis dataKey="label" tick={theme.axisStyle} interval={tickInterval} tickLine={false} axisLine={false} />
-          <YAxis tick={theme.axisStyle} tickLine={false} axisLine={false} width={30} domain={[0, 'auto']} />
+          <XAxis
+            dataKey="label"
+            tick={theme.axisStyle}
+            interval={tickInterval}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tick={theme.axisStyle}
+            tickLine={false}
+            axisLine={false}
+            width={30}
+            domain={[0, 'auto']}
+          />
           <Tooltip {...theme.tooltipStyle} />
-          <Legend iconSize={10} wrapperStyle={{ fontSize: 11, color: theme.legendColor }} />
-          <Line type="monotone" dataKey="gdop" stroke="#f87171" strokeWidth={1.5} dot={false} connectNulls name="GDOP" />
-          <Line type="monotone" dataKey="pdop" stroke="#60a5fa" strokeWidth={1.5} dot={false} connectNulls name="PDOP" />
-          <Line type="monotone" dataKey="hdop" stroke="#4ade80" strokeWidth={1.5} dot={false} connectNulls name="HDOP" />
-          <Line type="monotone" dataKey="vdop" stroke="#fbbf24" strokeWidth={1.5} dot={false} connectNulls name="VDOP" />
+          <Legend
+            iconSize={10}
+            wrapperStyle={{ fontSize: 11, color: theme.legendColor }}
+          />
+          <Line
+            type="monotone"
+            dataKey="gdop"
+            stroke="#f87171"
+            strokeWidth={1.5}
+            dot={false}
+            connectNulls
+            name="GDOP"
+          />
+          <Line
+            type="monotone"
+            dataKey="pdop"
+            stroke="#60a5fa"
+            strokeWidth={1.5}
+            dot={false}
+            connectNulls
+            name="PDOP"
+          />
+          <Line
+            type="monotone"
+            dataKey="hdop"
+            stroke="#4ade80"
+            strokeWidth={1.5}
+            dot={false}
+            connectNulls
+            name="HDOP"
+          />
+          <Line
+            type="monotone"
+            dataKey="vdop"
+            stroke="#fbbf24"
+            strokeWidth={1.5}
+            dot={false}
+            connectNulls
+            name="VDOP"
+          />
         </LineChart>
       </ResponsiveContainer>
     </ChartCard>

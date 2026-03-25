@@ -5,21 +5,21 @@
   "observability": {
     "logs": {
       "enabled": true,
-      "invocation_logs": true
-    }
+      "invocation_logs": true,
+    },
   },
   "durable_objects": {
     "bindings": [
       {
         "name": "EPHEMERIS_COLLECTOR",
-        "class_name": "EphemerisCollector"
-      }
-    ]
+        "class_name": "EphemerisCollector",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["EphemerisCollector"]
-    }
-  ]
+      "new_sqlite_classes": ["EphemerisCollector"],
+    },
+  ],
 }

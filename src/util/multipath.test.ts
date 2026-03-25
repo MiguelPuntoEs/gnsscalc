@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { MultipathAccumulator } from './multipath';
-import type { RinexHeader } from './rinex';
-import { C_LIGHT, FREQ } from './gnss-constants';
+import { MultipathAccumulator } from 'gnss-js/analysis';
+import type { RinexHeader } from 'gnss-js/rinex';
+import { C_LIGHT, FREQ } from 'gnss-js/constants';
 
-function makeHeader(obsTypes: Record<string, string[]>, interval = 30): RinexHeader {
+function makeHeader(
+  obsTypes: Record<string, string[]>,
+  interval = 30,
+): RinexHeader {
   return {
     version: 3.03,
     type: 'O',
@@ -105,7 +108,8 @@ describe('MultipathAccumulator', () => {
     for (const series of result.series) {
       // RMS should be sqrt(mean(mp^2))
       const manualRms = Math.sqrt(
-        series.points.reduce((s, p) => s + p.mp * p.mp, 0) / series.points.length,
+        series.points.reduce((s, p) => s + p.mp * p.mp, 0) /
+          series.points.length,
       );
       expect(series.rms).toBeCloseTo(manualRms, 10);
     }
@@ -129,13 +133,20 @@ describe('MultipathAccumulator', () => {
     for (let i = 0; i < 12; i++) {
       const t = gapTime + i * 30 * 1000;
       const range = 20_000_000 + 800 * (t / 1000);
-      const values: (number | null)[] = [range, range / lam1 + 1e6, range, range / lam2 + 2e6];
+      const values: (number | null)[] = [
+        range,
+        range / lam1 + 1e6,
+        range,
+        range / lam2 + 2e6,
+      ];
       acc.onObservation(t, 'G01', ['C1C', 'L1C', 'C2W', 'L2W'], values);
     }
 
     const result = acc.finalize();
     // Should have 2 arcs per band pair (L1-L2), so at least 2 series for G01
-    const g01Series = result.series.filter(s => s.prn === 'G01' && s.band === '1');
+    const g01Series = result.series.filter(
+      (s) => s.prn === 'G01' && s.band === '1',
+    );
     expect(g01Series.length).toBe(2);
   });
 
@@ -158,13 +169,20 @@ describe('MultipathAccumulator', () => {
     for (let i = 12; i < 24; i++) {
       const t = i * 30 * 1000;
       const range = 20_000_000 + 800 * i * 30;
-      const values: (number | null)[] = [range, range / lam1 + 1e6, range, range / lam2 + 2e6];
+      const values: (number | null)[] = [
+        range,
+        range / lam1 + 1e6,
+        range,
+        range / lam2 + 2e6,
+      ];
       acc.onObservation(t, 'G01', ['C1C', 'L1C', 'C2W', 'L2W'], values);
     }
 
     const result = acc.finalize();
     // The slip should have caused 2 arcs for band pair 1-2
-    const series12 = result.series.filter(s => s.prn === 'G01' && s.band === '1' && s.refBand === '2');
+    const series12 = result.series.filter(
+      (s) => s.prn === 'G01' && s.band === '1' && s.refBand === '2',
+    );
     expect(series12.length).toBe(2);
   });
 
@@ -177,7 +195,9 @@ describe('MultipathAccumulator', () => {
 
     const result = acc.finalize();
     // Should have signal stats for GPS MP L1-L2
-    const stat = result.signalStats.find(s => s.system === 'G' && s.band === '1');
+    const stat = result.signalStats.find(
+      (s) => s.system === 'G' && s.band === '1',
+    );
     expect(stat).toBeDefined();
     expect(stat!.satellites).toBe(2);
     expect(stat!.count).toBeGreaterThan(0);
@@ -190,7 +210,12 @@ describe('MultipathAccumulator', () => {
 
     for (let i = 0; i < 20; i++) {
       const t = i * 30 * 1000;
-      acc.onObservation(t, 'G01', ['C1C', 'L1C'], [23456789.0 + i, 123456789.0 + i]);
+      acc.onObservation(
+        t,
+        'G01',
+        ['C1C', 'L1C'],
+        [23456789.0 + i, 123456789.0 + i],
+      );
     }
 
     const result = acc.finalize();
@@ -204,7 +229,12 @@ describe('MultipathAccumulator', () => {
     for (let i = 0; i < 20; i++) {
       const t = i * 30 * 1000;
       // L2W is always null
-      acc.onObservation(t, 'G01', ['C1C', 'L1C', 'C2W', 'L2W'], [23456789.0, 123456789.0, 0, null]);
+      acc.onObservation(
+        t,
+        'G01',
+        ['C1C', 'L1C', 'C2W', 'L2W'],
+        [23456789.0, 123456789.0, 0, null],
+      );
     }
 
     const result = acc.finalize();
@@ -218,7 +248,12 @@ describe('MultipathAccumulator', () => {
     // Feed NaN/Infinity values — should be silently ignored
     for (let i = 0; i < 20; i++) {
       const t = i * 30 * 1000;
-      acc.onObservation(t, 'G01', ['C1C', 'L1C', 'C2W', 'L2W'], [NaN, Infinity, -Infinity, 0]);
+      acc.onObservation(
+        t,
+        'G01',
+        ['C1C', 'L1C', 'C2W', 'L2W'],
+        [NaN, Infinity, -Infinity, 0],
+      );
     }
 
     const result = acc.finalize();

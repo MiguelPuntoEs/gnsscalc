@@ -59,7 +59,10 @@ export default {
         responseHeaders.set('Content-Type', 'application/gzip');
         const cl = upstream.headers.get('Content-Length');
         if (cl) responseHeaders.set('Content-Length', cl);
-        return new Response(upstream.body, { status: 200, headers: responseHeaders });
+        return new Response(upstream.body, {
+          status: 200,
+          headers: responseHeaders,
+        });
       } catch (err) {
         return new Response(`Proxy error: ${err.message}`, {
           status: 502,
@@ -100,7 +103,8 @@ export default {
         lower === 'cf-worker' ||
         lower.startsWith('x-forwarded-') ||
         lower === 'cdn-loop'
-      ) continue;
+      )
+        continue;
       forwardHeaders.set(key, value);
     }
 
@@ -113,7 +117,10 @@ export default {
       const casterRes = await fetch(targetUrl, {
         method: request.method,
         headers: forwardHeaders,
-        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
+        body:
+          request.method !== 'GET' && request.method !== 'HEAD'
+            ? request.body
+            : undefined,
         // Don't follow redirects automatically
         redirect: 'manual',
       });

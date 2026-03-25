@@ -1,9 +1,10 @@
 import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
-import type { EpochSkyData, SatAzEl, AllPositionsData } from '../util/orbit';
-import { computeDop } from '../util/orbit';
-import { systemName, systemCmp } from '../util/rinex';
+import type { EpochSkyData, SatAzEl, AllPositionsData } from 'gnss-js/orbit';
+import { computeDop } from 'gnss-js/orbit';
+import { systemName, systemCmp } from 'gnss-js/rinex';
 import type { EpochGrid } from '../util/epoch-grid';
-import { SYSTEM_COLORS, DEFAULT_ELEV_MASK_DEG } from '../util/gnss-constants';
+import { SYSTEM_COLORS } from '../util/gnss-constants';
+import { DEFAULT_ELEV_MASK_DEG } from 'gnss-js/constants';
 import PolarSkyPlot from './PolarSkyPlot';
 import type { TrackPoint, TrackSegments } from './PolarSkyPlot';
 import GroundTrackMap from './GroundTrackMap';
@@ -24,13 +25,13 @@ export default function SkyPlotCharts({
 }) {
   const { prns, times, positions } = allPositions;
   const numEpochs = times.length;
-  if (numEpochs === 0) return null;
 
-  const hasRxPos = !!rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0);
+  const hasRxPos =
+    !!rxPos && (rxPos[0] !== 0 || rxPos[1] !== 0 || rxPos[2] !== 0);
   const hasObs = !!observedPrns && observedPrns.length > 0;
 
   const [elevMaskDeg, setElevMaskDeg] = useState(DEFAULT_ELEV_MASK_DEG);
-  const elevMaskRad = elevMaskDeg * Math.PI / 180;
+  const elevMaskRad = (elevMaskDeg * Math.PI) / 180;
 
   const [epochIdx, setEpochIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -43,11 +44,15 @@ export default function SkyPlotCharts({
     return [...set].sort(systemCmp);
   }, [prns]);
 
-  const [enabledSystems, setEnabledSystems] = useState<Set<string>>(() => new Set(allSystems));
-  useEffect(() => { setEnabledSystems(new Set(allSystems)); }, [allSystems]);
+  const [enabledSystems, setEnabledSystems] = useState<Set<string>>(
+    () => new Set(allSystems),
+  );
+  useEffect(() => {
+    setEnabledSystems(new Set(allSystems));
+  }, [allSystems]);
 
   const toggleSystem = useCallback((sys: string) => {
-    setEnabledSystems(prev => {
+    setEnabledSystems((prev) => {
       const next = new Set(prev);
       if (next.has(sys)) next.delete(sys);
       else next.add(sys);
@@ -64,12 +69,14 @@ export default function SkyPlotCharts({
     const step = (ts: number) => {
       if (ts - lastFrameRef.current > 50) {
         lastFrameRef.current = ts;
-        setEpochIdx(prev => (prev + 1) % numEpochs);
+        setEpochIdx((prev) => (prev + 1) % numEpochs);
       }
       animRef.current = requestAnimationFrame(step);
     };
     animRef.current = requestAnimationFrame(step);
-    return () => { if (animRef.current != null) cancelAnimationFrame(animRef.current); };
+    return () => {
+      if (animRef.current != null) cancelAnimationFrame(animRef.current);
+    };
   }, [playing, numEpochs]);
 
   const fullGroundTracks = useMemo(() => {
@@ -81,8 +88,14 @@ export default function SkyPlotCharts({
       let currentSeg: TrackPoint[] | null = null;
       for (let i = 0; i < pts.length; i++) {
         const pt = pts[i];
-        if (!pt) { currentSeg = null; continue; }
-        if (!currentSeg) { currentSeg = []; segs[prn]!.push(currentSeg); }
+        if (!pt) {
+          currentSeg = null;
+          continue;
+        }
+        if (!currentSeg) {
+          currentSeg = [];
+          segs[prn].push(currentSeg);
+        }
         currentSeg.push({ az: 0, el: 0, lat: pt.lat, lon: pt.lon, epoch: i });
       }
     }
@@ -90,7 +103,12 @@ export default function SkyPlotCharts({
   }, [prns, positions, enabledSystems]);
 
   const { skyTracks, skyCurrentPositions, skyCurrentObserved } = useMemo(() => {
-    if (!hasRxPos) return { skyTracks: {} as TrackSegments, skyCurrentPositions: {} as Record<string, SatAzEl>, skyCurrentObserved: new Set<string>() };
+    if (!hasRxPos)
+      return {
+        skyTracks: {} as TrackSegments,
+        skyCurrentPositions: {} as Record<string, SatAzEl>,
+        skyCurrentObserved: new Set<string>(),
+      };
     const segs: TrackSegments = {};
     const wasAbove: Record<string, boolean> = {};
     for (let i = 0; i <= epochIdx && i < numEpochs; i++) {
@@ -101,8 +119,14 @@ export default function SkyPlotCharts({
         if (!pt || pt.el < elevMaskRad) continue;
         aboveNow.add(prn);
         if (!segs[prn]) segs[prn] = [];
-        if (!wasAbove[prn]) segs[prn]!.push([]);
-        segs[prn]!.at(-1)!.push({ az: pt.az, el: pt.el, lat: pt.lat, lon: pt.lon, epoch: i });
+        if (!wasAbove[prn]) segs[prn].push([]);
+        segs[prn].at(-1)!.push({
+          az: pt.az,
+          el: pt.el,
+          lat: pt.lat,
+          lon: pt.lon,
+          epoch: i,
+        });
       }
       for (const prn of Object.keys(segs)) {
         wasAbove[prn] = aboveNow.has(prn);
@@ -121,8 +145,21 @@ export default function SkyPlotCharts({
         if (epochObs?.has(prn)) obs.add(prn);
       }
     }
-    return { skyTracks: segs, skyCurrentPositions: cur, skyCurrentObserved: obs };
-  }, [epochIdx, prns, positions, enabledSystems, hasRxPos, observedPrns, numEpochs, elevMaskRad]);
+    return {
+      skyTracks: segs,
+      skyCurrentPositions: cur,
+      skyCurrentObserved: obs,
+    };
+  }, [
+    epochIdx,
+    prns,
+    positions,
+    enabledSystems,
+    hasRxPos,
+    observedPrns,
+    numEpochs,
+    elevMaskRad,
+  ]);
 
   const { groundTracks, groundCurrentPositions } = useMemo(() => {
     const sliced: TrackSegments = {};
@@ -135,7 +172,10 @@ export default function SkyPlotCharts({
         } else {
           let end = seg.length;
           for (let j = 0; j < seg.length; j++) {
-            if (seg[j]!.epoch > epochIdx) { end = j; break; }
+            if (seg[j]!.epoch > epochIdx) {
+              end = j;
+              break;
+            }
           }
           if (end > 0) prnSegs.push(seg.slice(0, end));
           break;
@@ -158,7 +198,7 @@ export default function SkyPlotCharts({
     const result: EpochSkyData[] = [];
     for (let i = 0; i < numEpochs; i++) {
       const sats: SatAzEl[] = [];
-      const epochObs = observedPrns![i];
+      const epochObs = observedPrns[i];
       if (epochObs) {
         for (const prn of epochObs) {
           const pt = positions[prn]?.[i];
@@ -170,7 +210,15 @@ export default function SkyPlotCharts({
       result.push({ time: times[i]!, satellites: sats, dop });
     }
     return result;
-  }, [positions, times, observedPrns, hasRxPos, hasObs, numEpochs, elevMaskRad]);
+  }, [
+    positions,
+    times,
+    observedPrns,
+    hasRxPos,
+    hasObs,
+    numEpochs,
+    elevMaskRad,
+  ]);
 
   const currentTime = useMemo(() => {
     if (epochIdx < 0 || epochIdx >= numEpochs) return '';
@@ -189,6 +237,8 @@ export default function SkyPlotCharts({
 
   const satCount = Object.keys(skyCurrentPositions).length;
 
+  if (numEpochs === 0) return null;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">
@@ -197,17 +247,25 @@ export default function SkyPlotCharts({
             {hasRxPos ? 'Sky plot' : 'Satellite orbits'}
           </span>
           <div className="flex items-center gap-2 text-[11px] text-fg/40 font-mono">
-            {hasRxPos && <><span>{satCount} SVs</span><span className="text-fg/20">|</span></>}
+            {hasRxPos && (
+              <>
+                <span>{satCount} SVs</span>
+                <span className="text-fg/20">|</span>
+              </>
+            )}
             <span>{currentTime}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3 mb-3 flex-wrap">
-          {allSystems.map(sys => {
+          {allSystems.map((sys) => {
             const color = SYSTEM_COLORS[sys] ?? '#7c8aff';
             const enabled = enabledSystems.has(sys);
             return (
-              <label key={sys} className="flex items-center gap-1.5 cursor-pointer select-none">
+              <label
+                key={sys}
+                className="flex items-center gap-1.5 cursor-pointer select-none"
+              >
                 <span
                   className="size-3 rounded-sm border flex items-center justify-center transition-colors"
                   style={{
@@ -217,12 +275,26 @@ export default function SkyPlotCharts({
                 >
                   {enabled && (
                     <svg viewBox="0 0 12 12" fill="none" className="size-2.5">
-                      <path d="M2.5 6l2.5 2.5 4.5-5" stroke="#1a1a24" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M2.5 6l2.5 2.5 4.5-5"
+                        stroke="#1a1a24"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   )}
                 </span>
-                <input type="checkbox" checked={enabled} onChange={() => toggleSystem(sys)} className="sr-only" />
-                <span className="text-[11px] text-fg/50" style={{ color: enabled ? color : undefined }}>
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={() => toggleSystem(sys)}
+                  className="sr-only"
+                />
+                <span
+                  className="text-[11px] text-fg/50"
+                  style={{ color: enabled ? color : undefined }}
+                >
                   {systemName(sys)}
                 </span>
               </label>
@@ -230,16 +302,41 @@ export default function SkyPlotCharts({
           })}
         </div>
 
-        {hasRxPos && <PolarSkyPlot tracks={skyTracks} currentPositions={skyCurrentPositions} observedPrns={skyCurrentObserved} elevMaskDeg={elevMaskDeg} />}
+        {hasRxPos && (
+          <PolarSkyPlot
+            tracks={skyTracks}
+            currentPositions={skyCurrentPositions}
+            observedPrns={skyCurrentObserved}
+            elevMaskDeg={elevMaskDeg}
+          />
+        )}
 
         {hasRxPos && (
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-[10px] text-fg/40 whitespace-nowrap">Elev. mask</span>
-            <div className="flex-1 relative h-5 flex items-center group cursor-pointer"
+            <span className="text-[10px] text-fg/40 whitespace-nowrap">
+              Elev. mask
+            </span>
+            <div
+              role="slider"
+              aria-valuemin={0}
+              aria-valuemax={45}
+              aria-valuenow={elevMaskDeg}
+              aria-label="Elevation mask"
+              tabIndex={0}
+              className="flex-1 relative h-5 flex items-center group cursor-pointer"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
-                const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                const pct = Math.max(
+                  0,
+                  Math.min(1, (e.clientX - rect.left) / rect.width),
+                );
                 setElevMaskDeg(Math.round(pct * 45));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowUp')
+                  setElevMaskDeg((v) => Math.min(45, v + 1));
+                else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown')
+                  setElevMaskDeg((v) => Math.max(0, v - 1));
               }}
             >
               <div className="absolute inset-x-0 h-[3px] rounded-full bg-border/40" />
@@ -268,7 +365,9 @@ export default function SkyPlotCharts({
                 className="absolute inset-0 w-full opacity-0 cursor-pointer"
               />
             </div>
-            <span className="text-[10px] text-fg/50 font-mono w-6 text-right">{elevMaskDeg}°</span>
+            <span className="text-[10px] text-fg/50 font-mono w-6 text-right">
+              {elevMaskDeg}°
+            </span>
           </div>
         )}
 
@@ -276,25 +375,51 @@ export default function SkyPlotCharts({
           <button
             type="button"
             className="flex items-center justify-center size-7 rounded-md bg-fg/5 hover:bg-fg/10 text-fg/50 hover:text-fg/70 transition-colors"
-            onClick={() => setPlaying(p => !p)}
+            onClick={() => setPlaying((p) => !p)}
             title={playing ? 'Pause' : 'Play'}
           >
             {playing ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-3.5">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="size-3.5"
+              >
                 <path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z" />
               </svg>
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-3.5">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="size-3.5"
+              >
                 <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
               </svg>
             )}
           </button>
-          <div className="flex-1 relative h-5 flex items-center group cursor-pointer"
+          <div
+            role="slider"
+            aria-valuemin={0}
+            aria-valuemax={numEpochs - 1}
+            aria-valuenow={epochIdx}
+            aria-label="Epoch timeline"
+            tabIndex={0}
+            className="flex-1 relative h-5 flex items-center group cursor-pointer"
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              const pct = Math.max(
+                0,
+                Math.min(1, (e.clientX - rect.left) / rect.width),
+              );
               setEpochIdx(Math.round(pct * (numEpochs - 1)));
               setPlaying(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowUp')
+                setEpochIdx((v) => Math.min(numEpochs - 1, v + 1));
+              else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown')
+                setEpochIdx((v) => Math.max(0, v - 1));
             }}
           >
             <div className="absolute inset-x-0 h-[3px] rounded-full bg-border/40" />
@@ -319,7 +444,10 @@ export default function SkyPlotCharts({
               min={0}
               max={numEpochs - 1}
               value={epochIdx}
-              onChange={(e) => { setEpochIdx(Number(e.target.value)); setPlaying(false); }}
+              onChange={(e) => {
+                setEpochIdx(Number(e.target.value));
+                setPlaying(false);
+              }}
               className="absolute inset-0 w-full opacity-0 cursor-pointer"
             />
           </div>
@@ -327,7 +455,9 @@ export default function SkyPlotCharts({
       </div>
 
       <div className="rounded-xl bg-bg-raised/60 border border-border/40 p-4">
-        <span className="text-xs font-semibold uppercase tracking-wide text-fg/50 mb-3 block">Ground tracks</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-fg/50 mb-3 block">
+          Ground tracks
+        </span>
         <GroundTrackMap
           tracks={groundTracks}
           currentPositions={groundCurrentPositions}
@@ -337,7 +467,9 @@ export default function SkyPlotCharts({
       </div>
 
       {epochSkyData && <ElevationHeatmap skyData={epochSkyData} />}
-      {epochSkyData && grid && <ElevationCn0 epochSkyData={epochSkyData} grid={grid} />}
+      {epochSkyData && grid && (
+        <ElevationCn0 epochSkyData={epochSkyData} grid={grid} />
+      )}
       {epochSkyData && <DopTimeline skyData={epochSkyData} />}
     </div>
   );

@@ -1,4 +1,4 @@
-import type { TimeDifference } from 'gnss-js';
+import type { TimeDifference } from 'gnss-js/time';
 import {
   MILLISECONDS_IN_DAY,
   MILLISECONDS_IN_HOUR,
@@ -7,7 +7,7 @@ import {
 } from '../constants/time';
 
 export default function useTimeDifferenceCalculator(
-  timeDifference: number
+  timeDifference: number,
 ): TimeDifference {
   const timeDifferenceSign = Math.sign(timeDifference);
   const timeDifferenceAbsolute = Math.abs(timeDifference);
@@ -19,12 +19,12 @@ export default function useTimeDifferenceCalculator(
   const minutes =
     timeDifferenceSign *
     Math.floor(
-      (timeDifferenceAbsolute % MILLISECONDS_IN_HOUR) / MILLISECONDS_IN_MINUTE
+      (timeDifferenceAbsolute % MILLISECONDS_IN_HOUR) / MILLISECONDS_IN_MINUTE,
     );
   const hours =
     timeDifferenceSign *
     Math.floor(
-      (timeDifferenceAbsolute % MILLISECONDS_IN_DAY) / MILLISECONDS_IN_HOUR
+      (timeDifferenceAbsolute % MILLISECONDS_IN_DAY) / MILLISECONDS_IN_HOUR,
     );
   const days =
     timeDifferenceSign *

@@ -49,7 +49,14 @@ const server = http.createServer((clientReq, clientRes) => {
   const forwardHeaders = {};
   for (const [key, value] of Object.entries(clientReq.headers)) {
     const lower = key.toLowerCase();
-    if (lower === 'host' || lower === 'x-ntrip-host' || lower === 'x-ntrip-port' || lower === 'origin' || lower === 'referer') continue;
+    if (
+      lower === 'host' ||
+      lower === 'x-ntrip-host' ||
+      lower === 'x-ntrip-port' ||
+      lower === 'origin' ||
+      lower === 'referer'
+    )
+      continue;
     forwardHeaders[key] = value;
   }
   // NTRIP casters check User-Agent
@@ -81,7 +88,7 @@ const server = http.createServer((clientReq, clientRes) => {
 
       clientRes.writeHead(proxyRes.statusCode || 200, responseHeaders);
       proxyRes.pipe(clientRes);
-    }
+    },
   );
 
   proxyReq.on('error', (err) => {
@@ -96,5 +103,7 @@ const server = http.createServer((clientReq, clientRes) => {
 
 server.listen(PORT, () => {
   console.log(`NTRIP CORS proxy listening on http://localhost:${PORT}`);
-  console.log('The browser app will use this automatically when running locally.');
+  console.log(
+    'The browser app will use this automatically when running locally.',
+  );
 });

@@ -1,166 +1,78 @@
-import { lazy, Suspense, useState, useCallback, useRef, useEffect, useMemo, startTransition } from 'react';
-import type { RinexHeader, RinexStats } from '../util/rinex';
-import type { QualityResult } from '../util/quality-analysis';
-import type { RinexWarnings } from '../util/rinex-warnings';
-import { EMPTY_WARNINGS } from '../util/rinex-warnings';
+import {
+  lazy,
+  Suspense,
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+  startTransition,
+} from 'react';
+import type { RinexHeader, RinexStats } from 'gnss-js/rinex';
+import type { QualityResult } from 'gnss-js/analysis';
+import type { RinexWarnings } from 'gnss-js/rinex';
+import { EMPTY_WARNINGS } from 'gnss-js/rinex';
 import type { EpochGrid } from '../util/epoch-grid';
-import { systemName, systemCmp } from '../util/rinex';
+import { systemName, systemCmp } from 'gnss-js/rinex';
 import { CONSTELLATION_COLORS } from '../util/gnss-constants';
 import ConstellationBadges from './ConstellationBadges';
-import type { NavResult } from '../util/nav';
-import type { AllPositionsData } from '../util/orbit';
+import type { NavResult } from 'gnss-js/rinex';
+import type { AllPositionsData } from 'gnss-js/orbit';
 import {
-  addObsFiles, addNavFiles,
-  exportObs, exportNav, clearWorker, applyFilters,
-  recomputePositions, rinex3Filename,
+  addObsFiles,
+  addNavFiles,
+  exportObs,
+  exportNav,
+  clearWorker,
+  applyFilters,
+  recomputePositions,
+  rinex3Filename,
 } from '../util/rinex-client';
-import type { FilterState, ExportFormat, FilenameOptions, HeaderOverrides } from '../util/rinex-client';
+import type {
+  FilterState,
+  ExportFormat,
+  FilenameOptions,
+  HeaderOverrides,
+} from '../util/rinex-client';
 import { DEFAULT_FILTER } from '../util/rinex-client';
 import type { EditableHeaderFields } from '../util/rinex-header-edit';
 import CopyableInput from './CopyableInput';
 import ErrorBoundary from './ErrorBoundary';
 import FilterBar from './FilterBar';
 import ExportPanel from './ExportPanel';
-import ObsTypeMatrix from './ObsTypeMatrix';
 import type { ReportData } from '../util/report-types';
+import {
+  formatDuration,
+  formatTime,
+  formatFileSize,
+  isNavFileName,
+  sniffFileType,
+  navFileConstellation,
+  constellationLabel,
+  fetchIgsEphemeris,
+  OBS_ACCEPT,
+  NAV_ACCEPT,
+} from '../util/rinex-helpers';
+import RinexChartsSection from './RinexChartsSection';
 
-const RinexCharts = lazy(() => import('./RinexCharts'));
 const SkyPlotCharts = lazy(() => import('./SkyPlot'));
 const RinexHeaderEditor = lazy(() => import('./RinexHeaderEditor'));
-const MultipathCharts = lazy(() => import('./MultipathCharts'));
-const CycleSlipCharts = lazy(() => import('./CycleSlipCharts'));
-const CompletenessCharts = lazy(() => import('./CompletenessCharts'));
 const SatAvailabilityChart = lazy(() => import('./SatAvailabilityChart'));
-
-/* ─── Helpers ─────────────────────────────────────────────────────── */
-
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
-
-function formatTime(d: Date): string {
-  return d.toISOString().replace('T', ' ').replace('Z', ' UTC');
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(2)} GB`;
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
-  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(0)} KB`;
-  return `${bytes} B`;
-}
-
-/* ─── File type detection ─────────────────────────────────────────── */
-
-function isNavFileName(name: string): boolean {
-  const lower = name.toLowerCase();
-  if (/_[MGRECJI]N\.rnx(\.gz)?$/i.test(lower)) return true;
-  if (/\.\d{2}[nglpfhiq](\.gz)?$/i.test(lower)) return true;
-  if (lower.endsWith('.nav') || lower.endsWith('.nnav') || lower.endsWith('.gnav')) return true;
-  return false;
-}
-
-async function sniffFileType(file: File): Promise<'nav' | 'obs' | 'unknown'> {
-  let text: string;
-  if (file.name.toLowerCase().endsWith('.gz')) {
-    try {
-      const ds = new DecompressionStream('gzip');
-      const decompressed = file.stream().pipeThrough(ds);
-      const reader = decompressed.getReader();
-      const decoder = new TextDecoder();
-      let head = '';
-      while (head.length < 4096) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        head += decoder.decode(value, { stream: true });
-      }
-      reader.cancel();
-      text = head;
-    } catch {
-      return 'unknown';
-    }
-  } else {
-    text = await file.slice(0, 4096).text();
-  }
-  if (/N:\s*(GNSS NAV|GPS NAV|GLO NAV|GAL NAV|GEO NAV|BDS NAV|MIXED NAV)/i.test(text)) return 'nav';
-  if (/NAVIGATION DATA/i.test(text)) return 'nav';
-  if (/OBSERVATION DATA|COMPACT RINEX/i.test(text)) return 'obs';
-  return 'unknown';
-}
-
-
-/** Guess constellation from a nav file name. Returns system letter (G/R/E/C/J/I/S) or null. */
-function navFileConstellation(name: string): string | null {
-  const lower = name.toLowerCase();
-  // RINEX 3/4 long name: _GN, _RN, _EN, _CN, _JN, _IN, _SN, _MN
-  const r3 = lower.match(/_([grecjism])n\.rnx/i);
-  if (r3) {
-    const map: Record<string, string> = { g: 'G', r: 'R', e: 'E', c: 'C', j: 'J', i: 'I', s: 'S', m: 'M' };
-    return map[r3[1]!.toLowerCase()] ?? null;
-  }
-  // Legacy .YYx extension
-  const leg = lower.match(/\.\d{2}([nglpfhiq])(?:\.gz)?$/);
-  if (leg) {
-    const map: Record<string, string> = { n: 'G', g: 'R', l: 'E', f: 'C', q: 'J', i: 'I', h: 'S', p: 'M' };
-    return map[leg[1]!] ?? null;
-  }
-  return null;
-}
-
-/** Human label for a constellation letter */
-function constellationLabel(sys: string): string {
-  const labels: Record<string, string> = {
-    G: 'GPS', R: 'GLONASS', E: 'Galileo', C: 'BeiDou',
-    J: 'QZSS', I: 'NavIC', S: 'SBAS', M: 'Mixed',
-  };
-  return labels[sys] ?? sys;
-}
-
-/* ─── IGS broadcast ephemeris download ────────────────────────────── */
-
-function dayOfYear(d: Date): number {
-  const start = Date.UTC(d.getUTCFullYear(), 0, 1);
-  return Math.floor((d.getTime() - start) / 86_400_000) + 1;
-}
-
-const IGS_PROXY = 'https://ntrip-proxy.gnsscalc.com';
-
-async function fetchIgsEphemeris(date: Date): Promise<File> {
-  const yyyy = String(date.getUTCFullYear());
-  const doy = String(dayOfYear(date)).padStart(3, '0');
-  const name = `BRDC00IGS_R_${yyyy}${doy}0000_01D_MN.rnx`;
-
-  const res = await fetch(IGS_PROXY, {
-    headers: { 'X-Igs-Brdc': `${yyyy}/${doy}` },
-  });
-  if (!res.ok) throw new Error(`Failed to download ephemeris (HTTP ${res.status})`);
-
-  const ds = new DecompressionStream('gzip');
-  const decompressed = res.body!.pipeThrough(ds);
-  const blob = await new Response(decompressed).blob();
-  return new File([blob], name, { type: 'text/plain' });
-}
-
-/* ─── Multi-obs merge ─────────────────────────────────────────────── */
-
-const OBS_ACCEPT = ".obs,.rnx,.crx,.gz,.Z,.26o,.25o,.24o,.23o,.22o,.21o,.20o,.19o,.18o,.17o,.16o,.15o,.14o,.13o,.12o,.11o,.10o,.09o,.08o,.07o,.06o,.05o,.04o,.03o,.02o,.01o,.00o,.26d,.25d,.24d,.23d,.22d,.21d,.20d,.19d,.18d,.17d,.16d,.15d,.14d,.13d,.12d,.11d,.10d,.09d,.08d,.07d,.06d,.05d,.04d,.03d,.02d,.01d,.00d";
-const NAV_ACCEPT = [
-  ".rnx,.nav,.nnav,.gnav,.gz",
-  // Legacy per-constellation nav extensions (.YYx): n=GPS, g=GLONASS, l=Galileo, f=BeiDou, h=SBAS, i=NavIC, q=QZSS, p=mixed
-  ...['n','g','l','f','h','i','q','p'].flatMap(c =>
-    Array.from({ length: 27 }, (_, y) => `.${String(y).padStart(2, '0')}${c}`)
-  ),
-].join(',');
 
 /* ─── Icons ───────────────────────────────────────────────────────── */
 
 function UploadIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="17 8 12 3 7 8" />
       <line x1="12" y1="3" x2="12" y2="15" />
@@ -168,12 +80,22 @@ function UploadIcon({ className }: { className?: string }) {
   );
 }
 
-
 function SpinnerIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
     </svg>
   );
 }
@@ -203,9 +125,12 @@ function UploadDropZone({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) onFiles(e.target.files);
-  }, [onFiles]);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) onFiles(e.target.files);
+    },
+    [onFiles],
+  );
 
   // Show loading state
   if (loading || navLoading) {
@@ -220,13 +145,17 @@ function UploadDropZone({
           </p>
           {navFileNames.length > 0 && (
             <p className="text-[10px] text-fg/25 mt-1 mb-0">
-              + {navFileNames.length} nav file{navFileNames.length > 1 ? 's' : ''}
+              + {navFileNames.length} nav file
+              {navFileNames.length > 1 ? 's' : ''}
             </p>
           )}
         </div>
         {loading && progress > 0 && (
           <div className="w-48 h-1 bg-border/40 rounded-full overflow-hidden">
-            <div className="h-full bg-accent rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+            <div
+              className="h-full bg-accent rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         )}
       </div>
@@ -235,6 +164,14 @@ function UploadDropZone({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
       className={`card flex flex-col items-center justify-center gap-3 py-12 border-dashed cursor-pointer transition-colors ${
         isDragging ? 'border-accent bg-accent/10' : ''
       }`}
@@ -251,7 +188,8 @@ function UploadDropZone({
         </p>
       </div>
       <p className="text-[10px] text-fg/15 mb-0">
-        .obs .rnx .YYo .YYn .YYg .YYl .YYf &middot; RINEX 2/3/4 &middot; Hatanaka &middot; gzip
+        .obs .rnx .YYo .YYn .YYg .YYl .YYf &middot; RINEX 2/3/4 &middot;
+        Hatanaka &middot; gzip
       </p>
       <input
         ref={inputRef}
@@ -279,9 +217,9 @@ function StatPill({ label, value }: { label: string; value: string }) {
 /* ─── Validation warnings panel ───────────────────────────────────── */
 
 const SEVERITY_STYLE: Record<string, { dot: string; text: string }> = {
-  error:   { dot: 'bg-red-400',    text: 'text-red-400' },
+  error: { dot: 'bg-red-400', text: 'text-red-400' },
   warning: { dot: 'bg-orange-400', text: 'text-orange-400' },
-  info:    { dot: 'bg-fg/20',      text: 'text-fg/40' },
+  info: { dot: 'bg-fg/20', text: 'text-fg/40' },
 };
 
 function WarningsPanel({ warnings }: { warnings: RinexWarnings }) {
@@ -292,44 +230,66 @@ function WarningsPanel({ warnings }: { warnings: RinexWarnings }) {
       <button
         type="button"
         className="flex items-center gap-2 text-[11px] text-fg/50 hover:text-fg/70 transition-colors"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-fg/30">
-          <path fillRule="evenodd" d="M6.701 2.25c.577-1 2.02-1 2.598 0l5.196 9a1.5 1.5 0 0 1-1.299 2.25H2.804a1.5 1.5 0 0 1-1.3-2.25l5.197-9ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          className="size-3.5 text-fg/30"
+        >
+          <path
+            fillRule="evenodd"
+            d="M6.701 2.25c.577-1 2.02-1 2.598 0l5.196 9a1.5 1.5 0 0 1-1.299 2.25H2.804a1.5 1.5 0 0 1-1.3-2.25l5.197-9ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+            clipRule="evenodd"
+          />
         </svg>
         <span>Validation</span>
         {warnings.errorCount > 0 && (
           <span className="inline-flex items-center gap-0.5 text-red-400">
-            <span className="size-1.5 rounded-full bg-red-400" />{warnings.errorCount}
+            <span className="size-1.5 rounded-full bg-red-400" />
+            {warnings.errorCount}
           </span>
         )}
         {warnings.warningCount > 0 && (
           <span className="inline-flex items-center gap-0.5 text-orange-400">
-            <span className="size-1.5 rounded-full bg-orange-400" />{warnings.warningCount}
+            <span className="size-1.5 rounded-full bg-orange-400" />
+            {warnings.warningCount}
           </span>
         )}
         {warnings.infoCount > 0 && (
           <span className="inline-flex items-center gap-0.5 text-fg/30">
-            <span className="size-1.5 rounded-full bg-fg/20" />{warnings.infoCount}
+            <span className="size-1.5 rounded-full bg-fg/20" />
+            {warnings.infoCount}
           </span>
         )}
         <svg
-          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
           className={`size-3 text-fg/30 transition-transform ${open ? 'rotate-180' : ''}`}
         >
-          <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+          <path
+            fillRule="evenodd"
+            d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z"
+            clipRule="evenodd"
+          />
         </svg>
       </button>
       {open && (
         <div className="mt-1.5 flex flex-col gap-1">
-          {warnings.items.map(w => {
+          {warnings.items.map((w) => {
             const style = SEVERITY_STYLE[w.severity] ?? SEVERITY_STYLE.info!;
             return (
               <div key={w.code} className="flex items-start gap-2 text-[11px]">
-                <span className={`size-1.5 rounded-full mt-1.5 shrink-0 ${style.dot}`} />
+                <span
+                  className={`size-1.5 rounded-full mt-1.5 shrink-0 ${style.dot}`}
+                />
                 <div className="min-w-0">
                   <span className="text-fg/60">{w.message}</span>
-                  {w.count > 1 && <span className="text-fg/25 ml-1">({w.count}x)</span>}
+                  {w.count > 1 && (
+                    <span className="text-fg/25 ml-1">({w.count}x)</span>
+                  )}
                   {w.examples && w.examples.length > 0 && (
                     <div className="text-[10px] text-fg/25 mt-0.5 font-mono truncate">
                       {w.examples.join(' · ')}
@@ -351,7 +311,8 @@ function NavSummary({ navResult }: { navResult: NavResult }) {
   const { header, ephemerides } = navResult;
 
   const stats = useMemo(() => {
-    let minT = Infinity, maxT = -Infinity;
+    let minT = Infinity,
+      maxT = -Infinity;
     const satsBySystem: Record<string, Set<string>> = {};
     const ephCountBySystem: Record<string, number> = {};
 
@@ -361,15 +322,21 @@ function NavSummary({ navResult }: { navResult: NavResult }) {
       if (t > maxT) maxT = t;
       const sys = eph.prn.charAt(0);
       if (!satsBySystem[sys]) satsBySystem[sys] = new Set();
-      satsBySystem[sys]!.add(eph.prn);
+      satsBySystem[sys].add(eph.prn);
       ephCountBySystem[sys] = (ephCountBySystem[sys] ?? 0) + 1;
     }
 
     const systems: string[] = Object.keys(satsBySystem).sort(systemCmp);
-    const totalSats = systems.reduce((s, sys) => s + satsBySystem[sys]!.size, 0);
+    const totalSats = systems.reduce(
+      (s, sys) => s + satsBySystem[sys]!.size,
+      0,
+    );
 
     return {
-      systems, satsBySystem, ephCountBySystem, totalSats,
+      systems,
+      satsBySystem,
+      ephCountBySystem,
+      totalSats,
       startTime: isFinite(minT) ? new Date(minT) : null,
       endTime: isFinite(maxT) ? new Date(maxT) : null,
       duration: isFinite(minT) && isFinite(maxT) ? (maxT - minT) / 1000 : null,
@@ -379,38 +346,65 @@ function NavSummary({ navResult }: { navResult: NavResult }) {
   return (
     <div className="card-output">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-fg">Navigation Summary</span>
+        <span className="text-sm font-semibold text-fg">
+          Navigation Summary
+        </span>
       </div>
       <div className="card-fields">
-        <label>RINEX version</label>
+        <span>RINEX version</span>
         <CopyableInput value={header.version.toFixed(2)} />
-        <label>Constellations</label>
+        <span>Constellations</span>
         <ConstellationBadges activeSystems={stats.systems} />
-        {stats.startTime && (<><label>Start</label><CopyableInput value={formatTime(stats.startTime)} /></>)}
-        {stats.endTime && stats.duration !== null && stats.duration > 0 && (
-          <><label>End</label><CopyableInput value={formatTime(stats.endTime)} />
-          <label>Duration</label><CopyableInput value={formatDuration(stats.duration)} /></>
+        {stats.startTime && (
+          <>
+            <span>Start</span>
+            <CopyableInput value={formatTime(stats.startTime)} />
+          </>
         )}
-        <div className="section-divider" /><div className="section-label">Satellites</div>
-        <label>Ephemerides</label><CopyableInput value={`${ephemerides.length} records`} />
-        <label>Unique satellites</label><CopyableInput value={String(stats.totalSats)} />
-        {stats.systems.map(sys => (
+        {stats.endTime && stats.duration !== null && stats.duration > 0 && (
+          <>
+            <span>End</span>
+            <CopyableInput value={formatTime(stats.endTime)} />
+            <span>Duration</span>
+            <CopyableInput value={formatDuration(stats.duration)} />
+          </>
+        )}
+        <div className="section-divider" />
+        <div className="section-label">Satellites</div>
+        <span>Ephemerides</span>
+        <CopyableInput value={`${ephemerides.length} records`} />
+        <span>Unique satellites</span>
+        <CopyableInput value={String(stats.totalSats)} />
+        {stats.systems.map((sys) => (
           <div key={sys} className="contents">
-            <label>{systemName(sys)}</label>
-            <CopyableInput value={`${stats.satsBySystem[sys]!.size} SVs · ${stats.ephCountBySystem[sys]} eph`} />
+            <span>{systemName(sys)}</span>
+            <CopyableInput
+              value={`${stats.satsBySystem[sys]!.size} SVs · ${stats.ephCountBySystem[sys]} eph`}
+            />
           </div>
         ))}
         {header.leapSeconds != null && (
-          <><div className="section-divider" /><div className="section-label">Parameters</div>
-          <label>Leap seconds</label><CopyableInput value={`${header.leapSeconds} s`} /></>
+          <>
+            <div className="section-divider" />
+            <div className="section-label">Parameters</div>
+            <span>Leap seconds</span>
+            <CopyableInput value={`${header.leapSeconds} s`} />
+          </>
         )}
         {Object.keys(header.ionoCorrections).length > 0 && (
           <>
-            {header.leapSeconds == null && <><div className="section-divider" /><div className="section-label">Parameters</div></>}
+            {header.leapSeconds == null && (
+              <>
+                <div className="section-divider" />
+                <div className="section-label">Parameters</div>
+              </>
+            )}
             {Object.entries(header.ionoCorrections).map(([key, vals]) => (
               <div key={key} className="contents">
-                <label>{key}</label>
-                <CopyableInput value={vals.map(v => v.toExponential(4)).join('  ')} />
+                <span>{key}</span>
+                <CopyableInput
+                  value={vals.map((v) => v.toExponential(4)).join('  ')}
+                />
               </div>
             ))}
           </>
@@ -422,17 +416,37 @@ function NavSummary({ navResult }: { navResult: NavResult }) {
 
 /* ─── File panel (collapsible manifest of loaded files) ───────────── */
 
-function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
+function ChevronIcon({
+  open,
+  className,
+}: {
+  open: boolean;
+  className?: string;
+}) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className={`${className ?? ''} transition-transform ${open ? 'rotate-90' : ''}`}>
-      <path fillRule="evenodd" d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L8.94 8 6.22 5.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className={`${className ?? ''} transition-transform ${open ? 'rotate-90' : ''}`}
+    >
+      <path
+        fillRule="evenodd"
+        d="M6.22 4.22a.75.75 0 011.06 0l3.25 3.25a.75.75 0 010 1.06l-3.25 3.25a.75.75 0 01-1.06-1.06L8.94 8 6.22 5.28a.75.75 0 010-1.06z"
+        clipRule="evenodd"
+      />
     </svg>
   );
 }
 
 function DownloadIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className={className}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className={className}
+    >
       <path d="M8 1a.75.75 0 01.75.75v6.69l1.72-1.72a.75.75 0 111.06 1.06l-3 3a.75.75 0 01-1.06 0l-3-3a.75.75 0 011.06-1.06l1.72 1.72V1.75A.75.75 0 018 1zM2.75 9.5a.75.75 0 01.75.75v2c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-2a.75.75 0 011.5 0v2A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-2a.75.75 0 01.75-.75z" />
     </svg>
   );
@@ -450,11 +464,13 @@ function FilePanel({
   computing: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(),
+  );
   const initializedRef = useRef(false);
 
-  const obsFiles = files.filter(f => f.type === 'obs');
-  const navFiles = files.filter(f => f.type === 'nav');
+  const obsFiles = files.filter((f) => f.type === 'obs');
+  const navFiles = files.filter((f) => f.type === 'nav');
 
   // Group nav by constellation
   const navGroups = useMemo(() => {
@@ -466,13 +482,15 @@ function FilePanel({
       groups.set(sys, arr);
     }
     const sysOrder = ['G', 'R', 'E', 'C', 'J', 'I', 'S', 'M', '?'];
-    return sysOrder.filter(s => groups.has(s)).map(s => ({ sys: s, files: groups.get(s)! }));
+    return sysOrder
+      .filter((s) => groups.has(s))
+      .map((s) => ({ sys: s, files: groups.get(s)! }));
   }, [navFiles]);
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 
   const toggleSection = useCallback((key: string) => {
-    setExpandedSections(prev => {
+    setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -487,7 +505,7 @@ function FilePanel({
     if (files.length < 14) {
       setOpen(true);
       const sections = new Set<string>();
-      if (files.some(f => f.type === 'obs')) sections.add('obs');
+      if (files.some((f) => f.type === 'obs')) sections.add('obs');
       const navSystems = new Set<string>();
       for (const f of files) {
         if (f.type === 'nav') navSystems.add(f.constellation ?? '?');
@@ -508,33 +526,54 @@ function FilePanel({
         <button
           type="button"
           className="flex items-center gap-1 text-[11px] text-fg/40 hover:text-fg/60 transition-colors"
-          onClick={() => setOpen(o => !o)}
+          onClick={() => setOpen((o) => !o)}
         >
           <ChevronIcon open={open} className="size-3" />
           <span>
             {obsFiles.length > 0 && (
-              <span style={{ color: OBS_COLOR, opacity: 0.7 }}>{obsFiles.length === 1 ? '1 obs' : `${obsFiles.length} obs`}</span>
+              <span style={{ color: OBS_COLOR, opacity: 0.7 }}>
+                {obsFiles.length === 1 ? '1 obs' : `${obsFiles.length} obs`}
+              </span>
             )}
-            {obsFiles.length > 0 && navFiles.length > 0 && <span className="text-fg/20"> · </span>}
+            {obsFiles.length > 0 && navFiles.length > 0 && (
+              <span className="text-fg/20"> · </span>
+            )}
             {navGroups.map((g, i) => {
               const color = CONSTELLATION_COLORS[g.sys] ?? '#94a3b8';
               return (
                 <span key={g.sys}>
                   {i > 0 && <span className="text-fg/20"> · </span>}
                   <span style={{ color, opacity: 0.7 }}>
-                    {constellationLabel(g.sys)}{g.files.length > 1 && <span style={{ opacity: 0.5 }}> ×{g.files.length}</span>}
+                    {constellationLabel(g.sys)}
+                    {g.files.length > 1 && (
+                      <span style={{ opacity: 0.5 }}> ×{g.files.length}</span>
+                    )}
                   </span>
                 </span>
               );
             })}
           </span>
-          {totalSize > 0 && <span className="text-fg/20 ml-1">{formatFileSize(totalSize)}</span>}
+          {totalSize > 0 && (
+            <span className="text-fg/20 ml-1">{formatFileSize(totalSize)}</span>
+          )}
         </button>
 
         {/* Loading spinners */}
-        {loading && <span className="inline-flex items-center gap-1 text-[10px] text-fg/30"><SpinnerIcon className="size-2.5 animate-spin" /> obs</span>}
-        {navLoading && <span className="inline-flex items-center gap-1 text-[10px] text-fg/30"><SpinnerIcon className="size-2.5 animate-spin" /> nav</span>}
-        {computing && <span className="inline-flex items-center gap-1 text-[10px] text-fg/30"><SpinnerIcon className="size-2.5 animate-spin" /> orbits</span>}
+        {loading && (
+          <span className="inline-flex items-center gap-1 text-[10px] text-fg/30">
+            <SpinnerIcon className="size-2.5 animate-spin" /> obs
+          </span>
+        )}
+        {navLoading && (
+          <span className="inline-flex items-center gap-1 text-[10px] text-fg/30">
+            <SpinnerIcon className="size-2.5 animate-spin" /> nav
+          </span>
+        )}
+        {computing && (
+          <span className="inline-flex items-center gap-1 text-[10px] text-fg/30">
+            <SpinnerIcon className="size-2.5 animate-spin" /> orbits
+          </span>
+        )}
       </div>
 
       {/* Expanded file list */}
@@ -549,20 +588,34 @@ function FilePanel({
                 style={{ color: OBS_COLOR, opacity: 0.8 }}
                 onClick={() => toggleSection('obs')}
               >
-                <ChevronIcon open={expandedSections.has('obs')} className="size-2.5 shrink-0" />
+                <ChevronIcon
+                  open={expandedSections.has('obs')}
+                  className="size-2.5 shrink-0"
+                />
                 Observations
-                <span className="font-normal text-fg/25">{obsFiles.length} file{obsFiles.length > 1 ? 's' : ''} · {formatFileSize(obsFiles.reduce((s, f) => s + f.size, 0))}</span>
+                <span className="font-normal text-fg/25">
+                  {obsFiles.length} file{obsFiles.length > 1 ? 's' : ''} ·{' '}
+                  {formatFileSize(obsFiles.reduce((s, f) => s + f.size, 0))}
+                </span>
               </button>
-              {expandedSections.has('obs') && obsFiles.map(f => (
-                <div key={f.name} className="flex items-center justify-between px-3 pl-7 py-1 border-b border-border/5 hover:bg-fg/[0.02]">
-                  <span className="font-mono text-fg/50 truncate">{f.name}</span>
-                  <span className="text-fg/20 shrink-0 ml-3">{formatFileSize(f.size)}</span>
-                </div>
-              ))}
+              {expandedSections.has('obs') &&
+                obsFiles.map((f) => (
+                  <div
+                    key={f.name}
+                    className="flex items-center justify-between px-3 pl-7 py-1 border-b border-border/5 hover:bg-fg/[0.02]"
+                  >
+                    <span className="font-mono text-fg/50 truncate">
+                      {f.name}
+                    </span>
+                    <span className="text-fg/20 shrink-0 ml-3">
+                      {formatFileSize(f.size)}
+                    </span>
+                  </div>
+                ))}
             </div>
           )}
           {/* Navigation — per constellation */}
-          {navGroups.map(g => {
+          {navGroups.map((g) => {
             const color = CONSTELLATION_COLORS[g.sys] ?? '#94a3b8';
             const sectionKey = `nav-${g.sys}`;
             return (
@@ -573,22 +626,35 @@ function FilePanel({
                   style={{ color, opacity: 0.8 }}
                   onClick={() => toggleSection(sectionKey)}
                 >
-                  <ChevronIcon open={expandedSections.has(sectionKey)} className="size-2.5 shrink-0" />
+                  <ChevronIcon
+                    open={expandedSections.has(sectionKey)}
+                    className="size-2.5 shrink-0"
+                  />
                   {constellationLabel(g.sys)}
-                  <span className="font-normal text-fg/25">{g.files.length} file{g.files.length > 1 ? 's' : ''} · {formatFileSize(g.files.reduce((s, f) => s + f.size, 0))}</span>
+                  <span className="font-normal text-fg/25">
+                    {g.files.length} file{g.files.length > 1 ? 's' : ''} ·{' '}
+                    {formatFileSize(g.files.reduce((s, f) => s + f.size, 0))}
+                  </span>
                 </button>
-                {expandedSections.has(sectionKey) && g.files.map(f => (
-                  <div key={f.name} className="flex items-center justify-between px-3 pl-7 py-1 border-b border-border/5 hover:bg-fg/[0.02]">
-                    <span className="font-mono text-fg/50 truncate">{f.name}</span>
-                    <span className="text-fg/20 shrink-0 ml-3">{formatFileSize(f.size)}</span>
-                  </div>
-                ))}
+                {expandedSections.has(sectionKey) &&
+                  g.files.map((f) => (
+                    <div
+                      key={f.name}
+                      className="flex items-center justify-between px-3 pl-7 py-1 border-b border-border/5 hover:bg-fg/[0.02]"
+                    >
+                      <span className="font-mono text-fg/50 truncate">
+                        {f.name}
+                      </span>
+                      <span className="text-fg/20 shrink-0 ml-3">
+                        {formatFileSize(f.size)}
+                      </span>
+                    </div>
+                  ))}
               </div>
             );
           })}
         </div>
       )}
-
     </div>
   );
 }
@@ -625,7 +691,9 @@ export default function RinexReaderPage() {
   const [navResult, setNavResult] = useState<NavResult | null>(null);
   const [navFileNames, setNavFileNames] = useState<string[]>([]);
   const [loadedFiles, setLoadedFiles] = useState<LoadedFileInfo[]>([]);
-  const [allPositions, setAllPositions] = useState<AllPositionsData | null>(null);
+  const [allPositions, setAllPositions] = useState<AllPositionsData | null>(
+    null,
+  );
   const [observedPrns, setObservedPrns] = useState<Set<string>[] | null>(null);
 
   // UI state
@@ -643,13 +711,24 @@ export default function RinexReaderPage() {
   // Filter state
   const [filters, setFilters] = useState<FilterState>({ ...DEFAULT_FILTER });
   const [availablePrns, setAvailablePrns] = useState<string[]>([]);
-  const [availableCodes, setAvailableCodes] = useState<Record<string, string[]>>({});
+  const [availableCodes, setAvailableCodes] = useState<
+    Record<string, string[]>
+  >({});
   const [filtering, setFiltering] = useState(false);
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterVersionRef = useRef(0);
 
   // Header edit overrides (null = no edits)
-  const [headerEdits, setHeaderEdits] = useState<EditableHeaderFields | null>(null);
+  const [headerEdits, setHeaderEdits] = useState<EditableHeaderFields | null>(
+    null,
+  );
+
+  // Clean up worker memory on unmount (navigation away from page)
+  useEffect(() => {
+    return () => {
+      clearWorker();
+    };
+  }, []);
 
   // PDF report generation
   const [reportGenerating, setReportGenerating] = useState(false);
@@ -659,14 +738,29 @@ export default function RinexReaderPage() {
     try {
       const { generateReport, downloadReport } = await import('./PdfReport');
       const reportData: ReportData = {
-        header, stats, warnings, grid,
-        allPositions, observedPrns,
-        qaResult: qaResult ? { multipath: qaResult.multipath, cycleSlips: qaResult.cycleSlips, completeness: qaResult.completeness } : null,
-        obsFileNames, navFileNames,
+        header,
+        stats,
+        warnings,
+        grid,
+        allPositions,
+        observedPrns,
+        qaResult: qaResult
+          ? {
+              multipath: qaResult.multipath,
+              cycleSlips: qaResult.cycleSlips,
+              completeness: qaResult.completeness,
+            }
+          : null,
+        obsFileNames,
+        navFileNames,
       };
       const blob = await generateReport(reportData);
       const fname = rinex3Filename(
-        header.markerName, stats.startTime ?? null, stats.duration ?? null, stats.interval ?? null, 'MO',
+        header.markerName,
+        stats.startTime ?? null,
+        stats.duration ?? null,
+        stats.interval ?? null,
+        'MO',
       ).replace(/_MO\.rnx$/, '.pdf');
       downloadReport(blob, fname);
     } catch (e: unknown) {
@@ -674,7 +768,17 @@ export default function RinexReaderPage() {
     } finally {
       setReportGenerating(false);
     }
-  }, [header, stats, warnings, grid, allPositions, observedPrns, qaResult, obsFileNames, navFileNames]);
+  }, [
+    header,
+    stats,
+    warnings,
+    grid,
+    allPositions,
+    observedPrns,
+    qaResult,
+    obsFileNames,
+    navFileNames,
+  ]);
 
   // Recompute satellite positions when edited reference position changes
   const hasPositions = !!allPositions;
@@ -682,57 +786,81 @@ export default function RinexReaderPage() {
     if (!hasPositions) return; // no positions to recompute
     const rxPos: [number, number, number] | undefined = headerEdits
       ? [headerEdits.positionX, headerEdits.positionY, headerEdits.positionZ]
-      : header?.approxPosition ?? undefined;
+      : (header?.approxPosition ?? undefined);
     let cancelled = false;
-    recomputePositions(rxPos).then(r => {
+    void recomputePositions(rxPos).then((r) => {
       if (cancelled) return;
       if (r.positions) {
         setAllPositions(r.positions);
         if (r.observedPrns) setObservedPrns(r.observedPrns);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // Only re-run when position fields change, not on every headerEdits change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPositions, headerEdits?.positionX, headerEdits?.positionY, headerEdits?.positionZ]);
+  }, [
+    hasPositions,
+    headerEdits?.positionX,
+    headerEdits?.positionY,
+    headerEdits?.positionZ,
+  ]);
 
   /** Classify files and add to staged manifest */
-  const stageFiles = useCallback(async (fileList: FileList | File[]) => {
-    const files = Array.from(fileList);
-    const newStaged: StagedFile[] = [];
+  const stageFiles = useCallback(
+    async (fileList: FileList | File[]) => {
+      const files = Array.from(fileList);
+      const newStaged: StagedFile[] = [];
 
-    for (const f of files) {
-      // Skip duplicates
-      if (staged.some(s => s.name === f.name) || newStaged.some(s => s.name === f.name)) continue;
+      for (const f of files) {
+        // Skip duplicates
+        if (
+          staged.some((s) => s.name === f.name) ||
+          newStaged.some((s) => s.name === f.name)
+        )
+          continue;
 
-      let type: 'obs' | 'nav' | 'unknown';
-      let constellation: string | null = null;
+        let type: 'obs' | 'nav' | 'unknown';
+        let constellation: string | null = null;
 
-      if (isNavFileName(f.name)) {
-        type = 'nav';
-        constellation = navFileConstellation(f.name);
-      } else {
-        const lower = f.name.toLowerCase();
-        if (lower.endsWith('.rnx') || lower.endsWith('.rnx.gz') || lower.endsWith('.gz')) {
-          const sniffed = await sniffFileType(f);
-          type = sniffed === 'unknown' ? 'obs' : sniffed; // default ambiguous to obs
-          if (type === 'nav') constellation = navFileConstellation(f.name);
+        if (isNavFileName(f.name)) {
+          type = 'nav';
+          constellation = navFileConstellation(f.name);
         } else {
-          type = 'obs';
+          const lower = f.name.toLowerCase();
+          if (
+            lower.endsWith('.rnx') ||
+            lower.endsWith('.rnx.gz') ||
+            lower.endsWith('.gz')
+          ) {
+            const sniffed = await sniffFileType(f);
+            type = sniffed === 'unknown' ? 'obs' : sniffed; // default ambiguous to obs
+            if (type === 'nav') constellation = navFileConstellation(f.name);
+          } else {
+            type = 'obs';
+          }
         }
+        newStaged.push({
+          file: f,
+          type,
+          constellation,
+          name: f.name,
+          size: f.size,
+        });
       }
-      newStaged.push({ file: f, type, constellation, name: f.name, size: f.size });
-    }
 
-    if (newStaged.length > 0) {
-      setStaged(prev => [...prev, ...newStaged]);
-    }
-  }, [staged]);
+      if (newStaged.length > 0) {
+        setStaged((prev) => [...prev, ...newStaged]);
+      }
+    },
+    [staged],
+  );
 
   /** Process all staged files — parse obs and nav */
   const processStaged = useCallback(async () => {
-    const obsEntries = staged.filter(s => s.type === 'obs');
-    const navEntries = staged.filter(s => s.type === 'nav');
+    const obsEntries = staged.filter((s) => s.type === 'obs');
+    const navEntries = staged.filter((s) => s.type === 'nav');
 
     if (obsEntries.length === 0 && navEntries.length === 0) return;
 
@@ -740,14 +868,19 @@ export default function RinexReaderPage() {
 
     // Process observation files (incremental — worker accumulates)
     if (obsEntries.length > 0) {
-      const newObsEntries = obsEntries.filter(e => !obsFileNames.includes(e.name));
+      const newObsEntries = obsEntries.filter(
+        (e) => !obsFileNames.includes(e.name),
+      );
 
       if (newObsEntries.length > 0) {
         setLoading(true);
         setProgress(0);
 
         try {
-          const result = await addObsFiles(newObsEntries.map(e => e.file), setProgress);
+          const result = await addObsFiles(
+            newObsEntries.map((e) => e.file),
+            setProgress,
+          );
           setHeader(result.header);
           setStats(result.stats);
           setAllSystems(result.stats.systems);
@@ -756,10 +889,20 @@ export default function RinexReaderPage() {
           setWarnings(result.warnings);
           setAvailablePrns(result.availablePrns);
           setAvailableCodes(result.availableCodes);
-          setObsFileNames(prev => [...prev, ...newObsEntries.map(e => e.name)]);
-          if (result.positions) { setAllPositions(result.positions); setObservedPrns(result.observedPrns); }
+          setObsFileNames((prev) => [
+            ...prev,
+            ...newObsEntries.map((e) => e.name),
+          ]);
+          if (result.positions) {
+            setAllPositions(result.positions);
+            setObservedPrns(result.observedPrns);
+          }
         } catch (e: unknown) {
-          setError(e instanceof Error ? e.message : 'Failed to parse observation file(s).');
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Failed to parse observation file(s).',
+          );
         } finally {
           setLoading(false);
         }
@@ -768,19 +911,34 @@ export default function RinexReaderPage() {
 
     // Process nav files (incremental — worker accumulates)
     if (navEntries.length > 0) {
-      const newNavEntries = navEntries.filter(e => !navFileNames.includes(e.name));
+      const newNavEntries = navEntries.filter(
+        (e) => !navFileNames.includes(e.name),
+      );
 
       if (newNavEntries.length > 0) {
         setNavLoading(true);
         try {
           setComputing(true);
-          const { navResult: merged, positions, observedPrns: prns } =
-            await addNavFiles(newNavEntries.map(e => e.file));
+          const {
+            navResult: merged,
+            positions,
+            observedPrns: prns,
+          } = await addNavFiles(newNavEntries.map((e) => e.file));
           setNavResult(merged);
-          setNavFileNames(prev => [...prev, ...newNavEntries.map(e => e.name)]);
-          if (positions) { setAllPositions(positions); setObservedPrns(prns); }
+          setNavFileNames((prev) => [
+            ...prev,
+            ...newNavEntries.map((e) => e.name),
+          ]);
+          if (positions) {
+            setAllPositions(positions);
+            setObservedPrns(prns);
+          }
         } catch (e: unknown) {
-          setError(e instanceof Error ? e.message : 'Failed to parse navigation file(s).');
+          setError(
+            e instanceof Error
+              ? e.message
+              : 'Failed to parse navigation file(s).',
+          );
         } finally {
           setComputing(false);
           setNavLoading(false);
@@ -789,11 +947,16 @@ export default function RinexReaderPage() {
     }
 
     // Preserve file metadata for display, then clear staged
-    setLoadedFiles(prev => [
+    setLoadedFiles((prev) => [
       ...prev,
       ...staged
-        .filter(s => s.type === 'obs' || s.type === 'nav')
-        .map(s => ({ name: s.name, size: s.size, type: s.type as 'obs' | 'nav', constellation: s.constellation })),
+        .filter((s) => s.type === 'obs' || s.type === 'nav')
+        .map((s) => ({
+          name: s.name,
+          size: s.size,
+          type: s.type as 'obs' | 'nav',
+          constellation: s.constellation,
+        })),
     ]);
     setStaged([]);
   }, [staged, obsFileNames, navFileNames]);
@@ -805,24 +968,33 @@ export default function RinexReaderPage() {
     pendingProcess.current = true;
     // Small delay to batch rapid drops
     const timer = setTimeout(() => {
-      processStaged();
+      void processStaged();
       pendingProcess.current = false;
     }, 150);
-    return () => { clearTimeout(timer); pendingProcess.current = false; };
+    return () => {
+      clearTimeout(timer);
+      pendingProcess.current = false;
+    };
   }, [staged, processStaged]);
 
   /** Add more files (from drop or picker) on already-loaded page */
-  const addMoreFiles = useCallback(async (fileList: FileList | File[]) => {
-    await stageFiles(fileList);
-  }, [stageFiles]);
+  const addMoreFiles = useCallback(
+    async (fileList: FileList | File[]) => {
+      await stageFiles(fileList);
+    },
+    [stageFiles],
+  );
 
-  const handleGlobalDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = e.dataTransfer.files;
-    if (!files || files.length === 0) return;
-    stageFiles(files);
-  }, [stageFiles]);
+  const handleGlobalDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const files = e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+      void stageFiles(files);
+    },
+    [stageFiles],
+  );
 
   const handleGlobalDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -830,13 +1002,25 @@ export default function RinexReaderPage() {
   }, []);
 
   const handleReset = useCallback(() => {
-    setStaged([]); setHeader(null); setStats(null); setAllSystems([]); setGrid(null);
-    setNavResult(null); setAllPositions(null); setObservedPrns(null);
-    setError(null); setObsFileNames([]);
-    setNavFileNames([]); setLoadedFiles([]);
-    setProgress(0); setQaResult(null); setWarnings(EMPTY_WARNINGS);
-    setFilters({ ...DEFAULT_FILTER }); setHeaderEdits(null);
-    setAvailablePrns([]); setAvailableCodes({});
+    setStaged([]);
+    setHeader(null);
+    setStats(null);
+    setAllSystems([]);
+    setGrid(null);
+    setNavResult(null);
+    setAllPositions(null);
+    setObservedPrns(null);
+    setError(null);
+    setObsFileNames([]);
+    setNavFileNames([]);
+    setLoadedFiles([]);
+    setProgress(0);
+    setQaResult(null);
+    setWarnings(EMPTY_WARNINGS);
+    setFilters({ ...DEFAULT_FILTER });
+    setHeaderEdits(null);
+    setAvailablePrns([]);
+    setAvailableCodes({});
     clearWorker();
   }, []);
 
@@ -845,24 +1029,29 @@ export default function RinexReaderPage() {
     setFilters(next);
     if (filterTimerRef.current) clearTimeout(filterTimerRef.current);
     const version = ++filterVersionRef.current;
-    filterTimerRef.current = setTimeout(async () => {
-      setFiltering(true);
-      try {
-        const r = await applyFilters(next);
-        // Discard if a newer filter was applied while we were computing
-        if (filterVersionRef.current !== version) return;
-        startTransition(() => {
-          setStats(r.stats);
-          setGrid(r.grid);
-          setQaResult(r.qaResult);
-          if (r.positions) { setAllPositions(r.positions); setObservedPrns(r.observedPrns); }
-        });
-      } catch (e: unknown) {
-        if (filterVersionRef.current !== version) return;
-        setError(e instanceof Error ? e.message : 'Filter error');
-      } finally {
-        if (filterVersionRef.current === version) setFiltering(false);
-      }
+    filterTimerRef.current = setTimeout(() => {
+      void (async () => {
+        setFiltering(true);
+        try {
+          const r = await applyFilters(next);
+          // Discard if a newer filter was applied while we were computing
+          if (filterVersionRef.current !== version) return;
+          startTransition(() => {
+            setStats(r.stats);
+            setGrid(r.grid);
+            setQaResult(r.qaResult);
+            if (r.positions) {
+              setAllPositions(r.positions);
+              setObservedPrns(r.observedPrns);
+            }
+          });
+        } catch (e: unknown) {
+          if (filterVersionRef.current !== version) return;
+          setError(e instanceof Error ? e.message : 'Filter error');
+        } finally {
+          if (filterVersionRef.current === version) setFiltering(false);
+        }
+      })();
     }, 300);
   }, []);
 
@@ -875,78 +1064,113 @@ export default function RinexReaderPage() {
     try {
       // Collect all days spanned by the observation
       const endDate = stats?.endTime ?? startDate;
-      const startDay = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate());
-      const endDay = Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate());
+      const startDay = Date.UTC(
+        startDate.getUTCFullYear(),
+        startDate.getUTCMonth(),
+        startDate.getUTCDate(),
+      );
+      const endDay = Date.UTC(
+        endDate.getUTCFullYear(),
+        endDate.getUTCMonth(),
+        endDate.getUTCDate(),
+      );
       const days: Date[] = [];
       for (let d = startDay; d <= endDay; d += 86_400_000) {
         days.push(new Date(d));
       }
-      const files = await Promise.all(days.map(d => fetchIgsEphemeris(d)));
+      const files = await Promise.all(days.map((d) => fetchIgsEphemeris(d)));
       await stageFiles(files);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch IGS ephemeris.');
+      setError(
+        e instanceof Error ? e.message : 'Failed to fetch IGS ephemeris.',
+      );
     } finally {
       setIgsLoading(false);
     }
   }, [stats, navResult, stageFiles]);
 
   const [navExporting, setNavExporting] = useState(false);
-  const handleDownloadNav = useCallback(async (fnOpts?: FilenameOptions) => {
-    if (!navResult) return;
-    setNavExporting(true);
-    try {
-      await exportNav(header?.markerName || '', fnOpts);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to export navigation file.');
-    } finally {
-      setNavExporting(false);
-    }
-  }, [navResult, header]);
+  const handleDownloadNav = useCallback(
+    async (fnOpts?: FilenameOptions) => {
+      if (!navResult) return;
+      setNavExporting(true);
+      try {
+        await exportNav(header?.markerName || '', fnOpts);
+      } catch (e: unknown) {
+        setError(
+          e instanceof Error ? e.message : 'Failed to export navigation file.',
+        );
+      } finally {
+        setNavExporting(false);
+      }
+    },
+    [navResult, header],
+  );
 
   const [obsExporting, setObsExporting] = useState(false);
-  const handleDownloadObs = useCallback(async (format: ExportFormat = 'rinex3', splitInterval: number | null = null, fnOpts?: FilenameOptions) => {
-    if (!header) return;
-    setObsExporting(true);
-    try {
-      const hasFilters = filters.excludedSystems.length > 0
-        || filters.excludedPrns.length > 0
-        || filters.excludedSignalTypes.length > 0
-        || filters.excludedBands.length > 0
-        || Object.keys(filters.excludedSignalsPerSystem).length > 0
-        || filters.timeStart != null || filters.timeEnd != null
-        || filters.samplingInterval != null || filters.sparseThreshold > 0;
+  const handleDownloadObs = useCallback(
+    async (
+      format: ExportFormat = 'rinex3',
+      splitInterval: number | null = null,
+      fnOpts?: FilenameOptions,
+    ) => {
+      if (!header) return;
+      setObsExporting(true);
+      try {
+        const hasFilters =
+          filters.excludedSystems.length > 0 ||
+          filters.excludedPrns.length > 0 ||
+          filters.excludedSignalTypes.length > 0 ||
+          filters.excludedBands.length > 0 ||
+          Object.keys(filters.excludedSignalsPerSystem).length > 0 ||
+          filters.timeStart != null ||
+          filters.timeEnd != null ||
+          filters.samplingInterval != null ||
+          filters.sparseThreshold > 0;
 
-      // Convert EditableHeaderFields to HeaderOverrides
-      let headerOverrides: HeaderOverrides | undefined;
-      if (headerEdits) {
-        headerOverrides = {
-          markerName: headerEdits.markerName,
-          markerType: headerEdits.markerType,
-          receiverNumber: headerEdits.receiverNumber,
-          receiverType: headerEdits.receiverType,
-          receiverVersion: headerEdits.receiverVersion,
-          antNumber: headerEdits.antNumber,
-          antType: headerEdits.antType,
-          approxPosition: [headerEdits.positionX, headerEdits.positionY, headerEdits.positionZ],
-          antDelta: [headerEdits.antDeltaH, headerEdits.antDeltaE, headerEdits.antDeltaN],
-          observer: headerEdits.observer,
-          agency: headerEdits.agency,
-        };
+        // Convert EditableHeaderFields to HeaderOverrides
+        let headerOverrides: HeaderOverrides | undefined;
+        if (headerEdits) {
+          headerOverrides = {
+            markerName: headerEdits.markerName,
+            markerType: headerEdits.markerType,
+            receiverNumber: headerEdits.receiverNumber,
+            receiverType: headerEdits.receiverType,
+            receiverVersion: headerEdits.receiverVersion,
+            antNumber: headerEdits.antNumber,
+            antType: headerEdits.antType,
+            approxPosition: [
+              headerEdits.positionX,
+              headerEdits.positionY,
+              headerEdits.positionZ,
+            ],
+            antDelta: [
+              headerEdits.antDeltaH,
+              headerEdits.antDeltaE,
+              headerEdits.antDeltaN,
+            ],
+            observer: headerEdits.observer,
+            agency: headerEdits.agency,
+          };
+        }
+
+        await exportObs({
+          format,
+          splitInterval,
+          filters: hasFilters ? filters : undefined,
+          filename: fnOpts,
+          headerOverrides,
+        });
+      } catch (e: unknown) {
+        setError(
+          e instanceof Error ? e.message : 'Failed to export observation file.',
+        );
+      } finally {
+        setObsExporting(false);
       }
-
-      await exportObs({
-        format,
-        splitInterval,
-        filters: hasFilters ? filters : undefined,
-        filename: fnOpts,
-        headerOverrides,
-      });
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to export observation file.');
-    } finally {
-      setObsExporting(false);
-    }
-  }, [header, filters, headerEdits]);
+    },
+    [header, filters, headerEdits],
+  );
 
   /* ─── Initial upload state (nothing loaded yet) ─────────────── */
   const hasAnyData = !!header || !!navResult;
@@ -962,18 +1186,23 @@ export default function RinexReaderPage() {
           onDrop={handleGlobalDrop}
           onDragOver={handleGlobalDragOver}
           onDragLeave={() => setIsDragging(false)}
-          onFiles={stageFiles}
+          onFiles={(files) => void stageFiles(files)}
         />
 
         {error && (
-          <div className="card border-red-500/40 bg-red-500/10 text-red-400 text-sm">{error}</div>
+          <div className="card border-red-500/40 bg-red-500/10 text-red-400 text-sm">
+            {error}
+          </div>
         )}
       </section>
     );
   }
 
   /* ─── Loaded / loading state ────────────────────────────────── */
-  const obsLabel = obsFileNames.length > 1 ? `${obsFileNames.length} obs files` : obsFileNames[0] ?? null;
+  const obsLabel =
+    obsFileNames.length > 1
+      ? `${obsFileNames.length} obs files`
+      : (obsFileNames[0] ?? null);
 
   return (
     <section className="flex flex-col gap-4">
@@ -988,17 +1217,24 @@ export default function RinexReaderPage() {
         <div className="flex items-center gap-3 min-w-0">
           {header ? (
             <>
-              <span className="text-sm font-semibold text-fg truncate shrink min-w-0" title={header.markerName || obsLabel || undefined}>
+              <span
+                className="text-sm font-semibold text-fg truncate shrink min-w-0"
+                title={header.markerName || obsLabel || undefined}
+              >
                 {header.markerName || obsLabel}
               </span>
-              <span className="text-[10px] text-fg/30 shrink-0">v{header.version.toFixed(0)}</span>
+              <span className="text-[10px] text-fg/30 shrink-0">
+                v{header.version.toFixed(0)}
+              </span>
             </>
           ) : navResult ? (
             <>
               <span className="text-sm font-semibold text-fg truncate shrink min-w-0">
                 Navigation Data
               </span>
-              <span className="text-[10px] text-fg/30 shrink-0">v{navResult.header.version.toFixed(0)}</span>
+              <span className="text-[10px] text-fg/30 shrink-0">
+                v{navResult.header.version.toFixed(0)}
+              </span>
             </>
           ) : (
             <div className="flex items-center gap-2">
@@ -1017,7 +1253,12 @@ export default function RinexReaderPage() {
               onClick={handleReset}
               title="Clear all files"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="size-4"
+              >
                 <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
               </svg>
             </button>
@@ -1031,15 +1272,27 @@ export default function RinexReaderPage() {
               <StatPill label="Start" value={formatTime(stats.startTime)} />
             )}
             {stats.duration !== null && stats.duration > 0 && (
-              <StatPill label="Duration" value={formatDuration(stats.duration)} />
+              <StatPill
+                label="Duration"
+                value={formatDuration(stats.duration)}
+              />
             )}
             {stats.interval !== null && (
               <StatPill label="Interval" value={`${stats.interval}s`} />
             )}
-            <StatPill label="Epochs" value={stats.totalEpochs.toLocaleString()} />
-            <StatPill label="SVs" value={`${stats.uniqueSatellites} (avg ${stats.meanSatellites.toFixed(1)})`} />
+            <StatPill
+              label="Epochs"
+              value={stats.totalEpochs.toLocaleString()}
+            />
+            <StatPill
+              label="SVs"
+              value={`${stats.uniqueSatellites} (avg ${stats.meanSatellites.toFixed(1)})`}
+            />
             {stats.meanSnr !== null && (
-              <StatPill label="C/N0" value={`${stats.meanSnr.toFixed(1)} dB-Hz`} />
+              <StatPill
+                label="C/N0"
+                value={`${stats.meanSnr.toFixed(1)} dB-Hz`}
+              />
             )}
           </div>
         )}
@@ -1052,7 +1305,10 @@ export default function RinexReaderPage() {
           <div className="mt-2 pt-2 border-t border-border/20">
             <ErrorBoundary>
               <Suspense fallback={null}>
-                <RinexHeaderEditor header={header} onFieldsChange={setHeaderEdits} />
+                <RinexHeaderEditor
+                  header={header}
+                  onFieldsChange={setHeaderEdits}
+                />
               </Suspense>
             </ErrorBoundary>
           </div>
@@ -1065,12 +1321,19 @@ export default function RinexReaderPage() {
             <button
               type="button"
               className="inline-flex items-center gap-1.5 text-[11px] text-accent/70 hover:text-accent px-2.5 py-1 rounded-md border border-accent/20 hover:border-accent/40 transition-colors disabled:opacity-50"
-              onClick={handleFetchIgs}
+              onClick={() => void handleFetchIgs()}
               disabled={igsLoading}
             >
-              {igsLoading
-                ? <><SpinnerIcon className="size-3 animate-spin" /> Fetching…</>
-                : <><DownloadIcon className="size-3" /> Fetch IGS broadcast ephemeris</>}
+              {igsLoading ? (
+                <>
+                  <SpinnerIcon className="size-3 animate-spin" /> Fetching…
+                </>
+              ) : (
+                <>
+                  <DownloadIcon className="size-3" /> Fetch IGS broadcast
+                  ephemeris
+                </>
+              )}
             </button>
           </div>
         )}
@@ -1096,8 +1359,8 @@ export default function RinexReaderPage() {
           startTime={stats?.startTime}
           durationSec={stats?.duration}
           intervalSec={stats?.interval}
-          onExportObs={handleDownloadObs}
-          onExportNav={handleDownloadNav}
+          onExportObs={(...args) => void handleDownloadObs(...args)}
+          onExportNav={(...args) => void handleDownloadNav(...args)}
         />
 
         {/* PDF report */}
@@ -1106,12 +1369,18 @@ export default function RinexReaderPage() {
             <button
               type="button"
               className="inline-flex items-center gap-1.5 text-[11px] text-accent/70 hover:text-accent px-2.5 py-1 rounded-md border border-accent/20 hover:border-accent/40 transition-colors disabled:opacity-50"
-              onClick={handleGenerateReport}
+              onClick={() => void handleGenerateReport()}
               disabled={reportGenerating}
             >
-              {reportGenerating
-                ? <><SpinnerIcon className="size-3 animate-spin" /> Generating…</>
-                : <><DownloadIcon className="size-3" /> Generate PDF Report</>}
+              {reportGenerating ? (
+                <>
+                  <SpinnerIcon className="size-3 animate-spin" /> Generating…
+                </>
+              ) : (
+                <>
+                  <DownloadIcon className="size-3" /> Generate PDF Report
+                </>
+              )}
             </button>
           </div>
         )}
@@ -1119,8 +1388,18 @@ export default function RinexReaderPage() {
 
       {/* Drop zone — always visible for adding more files */}
       <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            addFilesInputRef.current?.click();
+          }
+        }}
         className={`rounded-xl border border-dashed px-4 py-2.5 flex items-center justify-center gap-2 text-[11px] cursor-pointer transition-colors ${
-          isDragging ? 'border-accent bg-accent/5 text-accent/60' : 'border-border/30 text-fg/25 hover:border-fg/20 hover:text-fg/40'
+          isDragging
+            ? 'border-accent bg-accent/5 text-accent/60'
+            : 'border-border/30 text-fg/25 hover:border-fg/20 hover:text-fg/40'
         }`}
         onClick={() => addFilesInputRef.current?.click()}
         onDrop={handleGlobalDrop}
@@ -1129,13 +1408,23 @@ export default function RinexReaderPage() {
       >
         <UploadIcon className="size-3.5" />
         Drop more files or click to add
-        <input ref={addFilesInputRef} type="file" accept={`${OBS_ACCEPT},${NAV_ACCEPT}`} multiple className="hidden" onChange={(e) => {
-          if (e.target.files && e.target.files.length > 0) addMoreFiles(e.target.files);
-        }} />
+        <input
+          ref={addFilesInputRef}
+          type="file"
+          accept={`${OBS_ACCEPT},${NAV_ACCEPT}`}
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0)
+              void addMoreFiles(e.target.files);
+          }}
+        />
       </div>
 
       {error && (
-        <div className="card border-red-500/40 bg-red-500/10 text-red-400 text-sm">{error}</div>
+        <div className="card border-red-500/40 bg-red-500/10 text-red-400 text-sm">
+          {error}
+        </div>
       )}
 
       {/* ── Filter bar ─────────────────────────────────────────── */}
@@ -1159,87 +1448,16 @@ export default function RinexReaderPage() {
       )}
 
       {header && stats && grid && (
-        <>
-          {/* ── Observation inventory (standalone card) ─────────── */}
-          {header.obsTypes && Object.keys(header.obsTypes).length > 0 && (
-            <div className="rounded-xl bg-bg-raised/60 border border-border/40 px-4 py-3">
-              <div className="text-sm font-semibold text-fg mb-1">Observation Inventory</div>
-              <ObsTypeMatrix obsTypes={header.obsTypes} systems={stats.systems} />
-            </div>
-          )}
-
-          {/* ── Charts (the main content — immediately visible) ── */}
-          <ErrorBoundary>
-            <Suspense
-              fallback={
-                <div className="flex flex-col gap-4">
-                  {Array.from({ length: 3 }, (_, i) => (
-                    <div key={i} className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-                      <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                      <div className="flex items-center justify-center" style={{ height: 180 }}>
-                        <SpinnerIcon className="size-5 animate-spin text-fg/20" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              }
-            >
-              <RinexCharts grid={grid} systems={stats.systems} />
-            </Suspense>
-          </ErrorBoundary>
-
-          {/* ── Signal quality analysis (multipath + cycle slips + completeness) ── */}
-          {qaResult && (
-            <ErrorBoundary>
-              <Suspense fallback={
-                <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-                  <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                  <div className="flex items-center justify-center" style={{ height: 180 }}>
-                    <SpinnerIcon className="size-5 animate-spin text-fg/20" />
-                  </div>
-                </div>
-              }>
-                <MultipathCharts result={qaResult.multipath} allPositions={allPositions} />
-                <CycleSlipCharts result={qaResult.cycleSlips} />
-                <CompletenessCharts result={qaResult.completeness} />
-              </Suspense>
-            </ErrorBoundary>
-          )}
-
-          {/* ── Satellite availability & health ─────────────────── */}
-          {navResult && (
-            <ErrorBoundary>
-              <Suspense fallback={null}>
-                <SatAvailabilityChart ephemerides={navResult.ephemerides} grid={grid} />
-              </Suspense>
-            </ErrorBoundary>
-          )}
-
-          {/* ── Sky Plot, Ground Tracks & DOP ──────────────────── */}
-          {allPositions && (
-            <ErrorBoundary>
-              <Suspense
-                fallback={
-                  <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
-                    <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                    <div className="flex items-center justify-center" style={{ height: 360 }}>
-                      <SpinnerIcon className="size-5 animate-spin text-fg/20" />
-                    </div>
-                  </div>
-                }
-              >
-                <SkyPlotCharts
-                  allPositions={allPositions}
-                  observedPrns={observedPrns}
-                  rxPos={headerEdits
-                    ? [headerEdits.positionX, headerEdits.positionY, headerEdits.positionZ]
-                    : header.approxPosition ?? undefined}
-                  grid={grid}
-                />
-              </Suspense>
-            </ErrorBoundary>
-          )}
-        </>
+        <RinexChartsSection
+          header={header}
+          stats={stats}
+          grid={grid}
+          qaResult={qaResult}
+          allPositions={allPositions}
+          observedPrns={observedPrns}
+          headerEdits={headerEdits}
+          navResult={navResult}
+        />
       )}
 
       {/* ── Nav-only: availability, sky plot + nav summary ─────── */}
@@ -1248,7 +1466,10 @@ export default function RinexReaderPage() {
           <NavSummary navResult={navResult} />
           <ErrorBoundary>
             <Suspense fallback={null}>
-              <SatAvailabilityChart ephemerides={navResult.ephemerides} grid={null} />
+              <SatAvailabilityChart
+                ephemerides={navResult.ephemerides}
+                grid={null}
+              />
             </Suspense>
           </ErrorBoundary>
           {allPositions && (
@@ -1257,7 +1478,10 @@ export default function RinexReaderPage() {
                 fallback={
                   <div className="rounded-xl border border-border/40 bg-bg-raised/60 p-4">
                     <div className="h-3 w-40 rounded bg-fg/5 mb-3" />
-                    <div className="flex items-center justify-center" style={{ height: 360 }}>
+                    <div
+                      className="flex items-center justify-center"
+                      style={{ height: 360 }}
+                    >
                       <SpinnerIcon className="size-5 animate-spin text-fg/20" />
                     </div>
                   </div>

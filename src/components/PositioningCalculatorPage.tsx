@@ -1,6 +1,11 @@
 import { lazy, Suspense, useState, useCallback } from 'react';
 import type { Position } from '../types/position';
-import { usePositionCalculator, useAerCalculator, useENUCalculator, useDistanceCalculator } from '../hooks/positioning';
+import {
+  usePositionCalculator,
+  useAerCalculator,
+  useENUCalculator,
+  useDistanceCalculator,
+} from '../hooks/positioning';
 
 import PositionForm from './PositionForm/PositionForm';
 import AERForm from './AERForm/AERForm';
@@ -37,31 +42,50 @@ export default function PositioningCalculatorPage() {
   const enu = useENUCalculator(position, refPosition);
   const dist = useDistanceCalculator(position, refPosition);
 
-  const buildExportData = useCallback(() => ({
-    position: {
-      ecef: { x: position[0], y: position[1], z: position[2] },
-      geodetic: { latitude: posGeo.latitude.value, longitude: posGeo.longitude.value, height: posGeo.height },
-    },
-    reference: {
-      ecef: { x: refPosition[0], y: refPosition[1], z: refPosition[2] },
-      geodetic: { latitude: refGeo.latitude.value, longitude: refGeo.longitude.value, height: refGeo.height },
-    },
-    aer: { elevation_deg: aer.elevationDeg, azimuth_deg: aer.azimuthDeg, slant_m: aer.slant },
-    enu: { east_m: enu.deltaE, north_m: enu.deltaN, up_m: enu.deltaU },
-    distances: {
-      orthodromic_m: dist.orthodromic,
-      loxodromic_m: dist.loxodromic,
-      euclidean_m: dist.euclidean,
-      initial_bearing_deg: dist.initialBearing,
-      final_bearing_deg: dist.finalBearing,
-      rhumb_bearing_deg: dist.rhumbBearing,
-      midpoint: { latitude: dist.midpoint[0], longitude: dist.midpoint[1] },
-    },
-  }), [position, refPosition, posGeo, refGeo, aer, enu, dist]);
+  const buildExportData = useCallback(
+    () => ({
+      position: {
+        ecef: { x: position[0], y: position[1], z: position[2] },
+        geodetic: {
+          latitude: posGeo.latitude.value,
+          longitude: posGeo.longitude.value,
+          height: posGeo.height,
+        },
+      },
+      reference: {
+        ecef: { x: refPosition[0], y: refPosition[1], z: refPosition[2] },
+        geodetic: {
+          latitude: refGeo.latitude.value,
+          longitude: refGeo.longitude.value,
+          height: refGeo.height,
+        },
+      },
+      aer: {
+        elevation_deg: aer.elevationDeg,
+        azimuth_deg: aer.azimuthDeg,
+        slant_m: aer.slant,
+      },
+      enu: { east_m: enu.deltaE, north_m: enu.deltaN, up_m: enu.deltaU },
+      distances: {
+        orthodromic_m: dist.orthodromic,
+        loxodromic_m: dist.loxodromic,
+        euclidean_m: dist.euclidean,
+        initial_bearing_deg: dist.initialBearing,
+        final_bearing_deg: dist.finalBearing,
+        rhumb_bearing_deg: dist.rhumbBearing,
+        midpoint: { latitude: dist.midpoint[0], longitude: dist.midpoint[1] },
+      },
+    }),
+    [position, refPosition, posGeo, refGeo, aer, enu, dist],
+  );
 
   const handleExportJSON = useCallback(() => {
     const data = buildExportData();
-    downloadBlob(JSON.stringify(data, null, 2), 'positioning-results.json', 'application/json');
+    downloadBlob(
+      JSON.stringify(data, null, 2),
+      'positioning-results.json',
+      'application/json',
+    );
   }, [buildExportData]);
 
   const handleExportCSV = useCallback(() => {
@@ -95,7 +119,7 @@ export default function PositioningCalculatorPage() {
       ['midpoint_latitude', d.distances.midpoint.latitude],
       ['midpoint_longitude', d.distances.midpoint.longitude],
     ];
-    const csv = rows.map(r => r.join(',')).join('\n');
+    const csv = rows.map((r) => r.join(',')).join('\n');
     downloadBlob(csv, 'positioning-results.csv', 'text/csv');
   }, [buildExportData]);
 
@@ -134,8 +158,17 @@ export default function PositioningCalculatorPage() {
           className="hidden md:flex self-center mt-8 p-2 rounded-full bg-bg-raised border border-border/60 text-fg/50 hover:text-fg hover:border-fg/50 transition-colors"
           onClick={handleSwap}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4">
-            <path fillRule="evenodd" d="M13.2 2.24a.75.75 0 00.04 1.06l2.1 1.95H6.75a.75.75 0 000 1.5h8.59l-2.1 1.95a.75.75 0 101.02 1.1l3.5-3.25a.75.75 0 000-1.1l-3.5-3.25a.75.75 0 00-1.06.04zm-6.4 8a.75.75 0 00-1.06-.04l-3.5 3.25a.75.75 0 000 1.1l3.5 3.25a.75.75 0 101.02-1.1l-2.1-1.95h8.59a.75.75 0 000-1.5H4.66l2.1-1.95a.75.75 0 00.04-1.06z" clipRule="evenodd" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="size-4"
+          >
+            <path
+              fillRule="evenodd"
+              d="M13.2 2.24a.75.75 0 00.04 1.06l2.1 1.95H6.75a.75.75 0 000 1.5h8.59l-2.1 1.95a.75.75 0 101.02 1.1l3.5-3.25a.75.75 0 000-1.1l-3.5-3.25a.75.75 0 00-1.06.04zm-6.4 8a.75.75 0 00-1.06-.04l-3.5 3.25a.75.75 0 000 1.1l3.5 3.25a.75.75 0 101.02-1.1l-2.1-1.95h8.59a.75.75 0 000-1.5H4.66l2.1-1.95a.75.75 0 00.04-1.06z"
+              clipRule="evenodd"
+            />
           </svg>
         </button>
 
@@ -145,8 +178,17 @@ export default function PositioningCalculatorPage() {
           className="md:hidden btn-secondary flex items-center justify-center gap-1.5 text-xs"
           onClick={handleSwap}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-3.5">
-            <path fillRule="evenodd" d="M13.2 2.24a.75.75 0 00.04 1.06l2.1 1.95H6.75a.75.75 0 000 1.5h8.59l-2.1 1.95a.75.75 0 101.02 1.1l3.5-3.25a.75.75 0 000-1.1l-3.5-3.25a.75.75 0 00-1.06.04zm-6.4 8a.75.75 0 00-1.06-.04l-3.5 3.25a.75.75 0 000 1.1l3.5 3.25a.75.75 0 101.02-1.1l-2.1-1.95h8.59a.75.75 0 000-1.5H4.66l2.1-1.95a.75.75 0 00.04-1.06z" clipRule="evenodd" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="size-3.5"
+          >
+            <path
+              fillRule="evenodd"
+              d="M13.2 2.24a.75.75 0 00.04 1.06l2.1 1.95H6.75a.75.75 0 000 1.5h8.59l-2.1 1.95a.75.75 0 101.02 1.1l3.5-3.25a.75.75 0 000-1.1l-3.5-3.25a.75.75 0 00-1.06.04zm-6.4 8a.75.75 0 00-1.06-.04l-3.5 3.25a.75.75 0 000 1.1l3.5 3.25a.75.75 0 101.02-1.1l-2.1-1.95h8.59a.75.75 0 000-1.5H4.66l2.1-1.95a.75.75 0 00.04-1.06z"
+              clipRule="evenodd"
+            />
           </svg>
           Swap positions
         </button>
@@ -172,16 +214,8 @@ export default function PositioningCalculatorPage() {
         </Suspense>
 
         <div className="flex flex-col gap-4 md:w-56">
-          <AERForm
-            title="AER"
-            position={position}
-            refPosition={refPosition}
-          />
-          <ENUForm
-            title="ENU"
-            position={position}
-            refPosition={refPosition}
-          />
+          <AERForm title="AER" position={position} refPosition={refPosition} />
+          <ENUForm title="ENU" position={position} refPosition={refPosition} />
         </div>
       </div>
 

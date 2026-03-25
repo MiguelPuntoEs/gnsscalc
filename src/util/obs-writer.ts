@@ -5,8 +5,8 @@
  * uncompressed output in memory. Returns a gzip-compressed Blob.
  */
 
-import type { RinexHeader } from './rinex';
-import { padL, padR, fmtF, hdrLine } from './rinex-format';
+import type { RinexHeader } from 'gnss-js/rinex';
+import { padL, padR, fmtF, hdrLine } from 'gnss-js/rinex';
 
 /* ================================================================== */
 /*  Types                                                              */
@@ -69,48 +69,62 @@ export async function writeRinexObsBlob(
 
   // ── Header ──
 
-  batch.push(hdrLine(
-    `     3.04           OBSERVATION DATA    ${sysChar}`,
-    'RINEX VERSION / TYPE',
-  ));
+  batch.push(
+    hdrLine(
+      `     3.04           OBSERVATION DATA    ${sysChar}`,
+      'RINEX VERSION / TYPE',
+    ),
+  );
 
   const now = new Date();
   const dateStr = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')} ${String(now.getUTCHours()).padStart(2, '0')}${String(now.getUTCMinutes()).padStart(2, '0')}${String(now.getUTCSeconds()).padStart(2, '0')} UTC`;
-  batch.push(hdrLine(
-    `${padL('GNSSCalc', 20)}${padL('', 20)}${dateStr}`,
-    'PGM / RUN BY / DATE',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL('GNSSCalc', 20)}${padL('', 20)}${dateStr}`,
+      'PGM / RUN BY / DATE',
+    ),
+  );
 
   batch.push(hdrLine('Merged from multiple RINEX files', 'COMMENT'));
   batch.push(hdrLine(header.markerName || 'UNKNOWN', 'MARKER NAME'));
   batch.push(hdrLine('', 'MARKER NUMBER'));
 
-  batch.push(hdrLine(
-    `${padL(header.observer || '', 20)}${padL(header.agency || '', 40)}`,
-    'OBSERVER / AGENCY',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL(header.observer || '', 20)}${padL(header.agency || '', 40)}`,
+      'OBSERVER / AGENCY',
+    ),
+  );
 
-  batch.push(hdrLine(
-    `${padL(header.receiverNumber || '', 20)}${padL(header.receiverType || '', 20)}${padL(header.receiverVersion || '', 20)}`,
-    'REC # / TYPE / VERS',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL(header.receiverNumber || '', 20)}${padL(header.receiverType || '', 20)}${padL(header.receiverVersion || '', 20)}`,
+      'REC # / TYPE / VERS',
+    ),
+  );
 
-  batch.push(hdrLine(
-    `${padL(header.antNumber || '', 20)}${padL(header.antType || '', 20)}`,
-    'ANT # / TYPE',
-  ));
+  batch.push(
+    hdrLine(
+      `${padL(header.antNumber || '', 20)}${padL(header.antType || '', 20)}`,
+      'ANT # / TYPE',
+    ),
+  );
 
   const pos = header.approxPosition ?? [0, 0, 0];
-  batch.push(hdrLine(
-    `${fmtF(pos[0], 14, 4)}${fmtF(pos[1], 14, 4)}${fmtF(pos[2], 14, 4)}`,
-    'APPROX POSITION XYZ',
-  ));
+  batch.push(
+    hdrLine(
+      `${fmtF(pos[0], 14, 4)}${fmtF(pos[1], 14, 4)}${fmtF(pos[2], 14, 4)}`,
+      'APPROX POSITION XYZ',
+    ),
+  );
 
   const delta = header.antDelta ?? [0, 0, 0];
-  batch.push(hdrLine(
-    `${fmtF(delta[0], 14, 4)}${fmtF(delta[1], 14, 4)}${fmtF(delta[2], 14, 4)}`,
-    'ANTENNA: DELTA H/E/N',
-  ));
+  batch.push(
+    hdrLine(
+      `${fmtF(delta[0], 14, 4)}${fmtF(delta[1], 14, 4)}${fmtF(delta[2], 14, 4)}`,
+      'ANTENNA: DELTA H/E/N',
+    ),
+  );
 
   for (const [sys, types] of obsTypes) {
     for (let i = 0; i < types.length; i += 13) {
@@ -121,23 +135,27 @@ export async function writeRinexObsBlob(
       } else {
         content = '      ';
       }
-      content += chunk.map(t => ` ${padL(t, 3)}`).join('');
+      content += chunk.map((t) => ` ${padL(t, 3)}`).join('');
       batch.push(hdrLine(content, 'SYS / # / OBS TYPES'));
     }
   }
 
   const first = new Date(epochs[0]!.time);
   const timeSys = systems.includes('R') && systems.length === 1 ? 'GLO' : 'GPS';
-  batch.push(hdrLine(
-    `  ${first.getUTCFullYear()}    ${String(first.getUTCMonth() + 1).padStart(2)}    ${String(first.getUTCDate()).padStart(2)}    ${String(first.getUTCHours()).padStart(2)}    ${String(first.getUTCMinutes()).padStart(2)}   ${(first.getUTCSeconds() + first.getUTCMilliseconds() / 1000).toFixed(7).padStart(10)}     ${timeSys}`,
-    'TIME OF FIRST OBS',
-  ));
+  batch.push(
+    hdrLine(
+      `  ${first.getUTCFullYear()}    ${String(first.getUTCMonth() + 1).padStart(2)}    ${String(first.getUTCDate()).padStart(2)}    ${String(first.getUTCHours()).padStart(2)}    ${String(first.getUTCMinutes()).padStart(2)}   ${(first.getUTCSeconds() + first.getUTCMilliseconds() / 1000).toFixed(7).padStart(10)}     ${timeSys}`,
+      'TIME OF FIRST OBS',
+    ),
+  );
 
   const last = new Date(epochs[epochs.length - 1]!.time);
-  batch.push(hdrLine(
-    `  ${last.getUTCFullYear()}    ${String(last.getUTCMonth() + 1).padStart(2)}    ${String(last.getUTCDate()).padStart(2)}    ${String(last.getUTCHours()).padStart(2)}    ${String(last.getUTCMinutes()).padStart(2)}   ${(last.getUTCSeconds() + last.getUTCMilliseconds() / 1000).toFixed(7).padStart(10)}     ${timeSys}`,
-    'TIME OF LAST OBS',
-  ));
+  batch.push(
+    hdrLine(
+      `  ${last.getUTCFullYear()}    ${String(last.getUTCMonth() + 1).padStart(2)}    ${String(last.getUTCDate()).padStart(2)}    ${String(last.getUTCHours()).padStart(2)}    ${String(last.getUTCMinutes()).padStart(2)}   ${(last.getUTCSeconds() + last.getUTCMilliseconds() / 1000).toFixed(7).padStart(10)}     ${timeSys}`,
+      'TIME OF LAST OBS',
+    ),
+  );
 
   if (epochs.length >= 2) {
     const interval = (epochs[1]!.time - epochs[0]!.time) / 1000;
@@ -147,7 +165,9 @@ export async function writeRinexObsBlob(
   }
 
   if (header.glonassSlots && Object.keys(header.glonassSlots).length > 0) {
-    const entries = Object.entries(header.glonassSlots).sort(([a], [b]) => Number(a) - Number(b));
+    const entries = Object.entries(header.glonassSlots).sort(
+      ([a], [b]) => Number(a) - Number(b),
+    );
     for (let i = 0; i < entries.length; i += 8) {
       const chunk = entries.slice(i, i + 8);
       let content = i === 0 ? padR(String(entries.length), 3) + ' ' : '    ';
@@ -169,7 +189,9 @@ export async function writeRinexObsBlob(
     const sec = t.getUTCSeconds() + t.getUTCMilliseconds() / 1000;
     const prns = [...epoch.sats.keys()].sort();
 
-    batch.push(`> ${t.getUTCFullYear()} ${String(t.getUTCMonth() + 1).padStart(2, '0')} ${String(t.getUTCDate()).padStart(2, '0')} ${String(t.getUTCHours()).padStart(2, '0')} ${String(t.getUTCMinutes()).padStart(2, '0')}${fmtF(sec, 11, 7)}  0${padR(String(prns.length), 3)}`);
+    batch.push(
+      `> ${t.getUTCFullYear()} ${String(t.getUTCMonth() + 1).padStart(2, '0')} ${String(t.getUTCDate()).padStart(2, '0')} ${String(t.getUTCHours()).padStart(2, '0')} ${String(t.getUTCMinutes()).padStart(2, '0')}${fmtF(sec, 11, 7)}  0${padR(String(prns.length), 3)}`,
+    );
 
     for (const prn of prns) {
       const sys = prn[0]!;

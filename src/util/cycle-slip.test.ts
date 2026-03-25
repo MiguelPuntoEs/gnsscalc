@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { CycleSlipAccumulator } from './cycle-slip';
-import type { RinexHeader } from './rinex';
-import { C_LIGHT, FREQ } from './gnss-constants';
+import { CycleSlipAccumulator } from 'gnss-js/analysis';
+import type { RinexHeader } from 'gnss-js/rinex';
+import { C_LIGHT, FREQ } from 'gnss-js/constants';
 
-function makeHeader(obsTypes: Record<string, string[]>, interval = 30): RinexHeader {
+function makeHeader(
+  obsTypes: Record<string, string[]>,
+  interval = 30,
+): RinexHeader {
   return {
     version: 3.03,
     type: 'O',
@@ -125,11 +128,14 @@ describe('CycleSlipAccumulator', () => {
       const slipEpoch = 5;
       const t = slipEpoch * 30_000;
       const range = baseRange + rangeRate * slipEpoch * 30;
-      acc.onObservation(t, 'G01', codes, [range, range / lam1 + 1_000_000 + 50]);
+      acc.onObservation(t, 'G01', codes, [
+        range,
+        range / lam1 + 1_000_000 + 50,
+      ]);
 
       const result = acc.finalize();
       expect(result.events.length).toBeGreaterThanOrEqual(1);
-      const sfEvent = result.events.find(e => e.prn === 'G01');
+      const sfEvent = result.events.find((e) => e.prn === 'G01');
       expect(sfEvent).toBeDefined();
       expect(sfEvent!.magnitude).toBeGreaterThan(3);
     });
@@ -173,7 +179,10 @@ describe('CycleSlipAccumulator', () => {
       // Inject slip
       const t = 5 * 30_000;
       const range = baseRange + rangeRate * 5 * 30;
-      acc.onObservation(t, 'G01', codes, [range, range / lam1 + 1_000_000 + 50]);
+      acc.onObservation(t, 'G01', codes, [
+        range,
+        range / lam1 + 1_000_000 + 50,
+      ]);
 
       acc.finalize();
       expect(slipCalls.length).toBeGreaterThanOrEqual(1);
@@ -191,11 +200,17 @@ describe('CycleSlipAccumulator', () => {
       // 20 smooth epochs, then 1 slip
       for (let i = 0; i < 20; i++) {
         const range = baseRange + 800 * i * 30;
-        acc.onObservation(i * 30_000, 'G01', codes, [range, range / lam1 + 1e6]);
+        acc.onObservation(i * 30_000, 'G01', codes, [
+          range,
+          range / lam1 + 1e6,
+        ]);
       }
       // Slip at epoch 20
       const range = baseRange + 800 * 20 * 30;
-      acc.onObservation(20 * 30_000, 'G01', codes, [range, range / lam1 + 1e6 + 100]);
+      acc.onObservation(20 * 30_000, 'G01', codes, [
+        range,
+        range / lam1 + 1e6 + 100,
+      ]);
 
       const result = acc.finalize();
       if (result.signalStats.length > 0) {
@@ -221,17 +236,37 @@ describe('CycleSlipAccumulator', () => {
       for (let i = 0; i < 5; i++) {
         const t = i * 30_000;
         const range = baseRange + 800 * i * 30;
-        acc.onObservation(t, 'G01', ['C1C', 'L1C'], [range, range / lam1 + 1e6]);
-        acc.onObservation(t, 'E11', ['C1C', 'L1C'], [range, range / lamE1 + 1e6]);
+        acc.onObservation(
+          t,
+          'G01',
+          ['C1C', 'L1C'],
+          [range, range / lam1 + 1e6],
+        );
+        acc.onObservation(
+          t,
+          'E11',
+          ['C1C', 'L1C'],
+          [range, range / lamE1 + 1e6],
+        );
       }
       // Slip on both
       const range = baseRange + 800 * 5 * 30;
-      acc.onObservation(5 * 30_000, 'G01', ['C1C', 'L1C'], [range, range / lam1 + 1e6 + 100]);
-      acc.onObservation(5 * 30_000, 'E11', ['C1C', 'L1C'], [range, range / lamE1 + 1e6 + 100]);
+      acc.onObservation(
+        5 * 30_000,
+        'G01',
+        ['C1C', 'L1C'],
+        [range, range / lam1 + 1e6 + 100],
+      );
+      acc.onObservation(
+        5 * 30_000,
+        'E11',
+        ['C1C', 'L1C'],
+        [range, range / lamE1 + 1e6 + 100],
+      );
 
       const result = acc.finalize();
       if (result.signalStats.length >= 2) {
-        const systems = result.signalStats.map(s => s.system);
+        const systems = result.signalStats.map((s) => s.system);
         const gIdx = systems.indexOf('G');
         const eIdx = systems.indexOf('E');
         if (gIdx >= 0 && eIdx >= 0) {
@@ -250,13 +285,25 @@ describe('CycleSlipAccumulator', () => {
 
       for (let i = 0; i < 5; i++) {
         const range = baseRange + 800 * i * 30;
-        acc.onObservation(i * 30_000, 'G01', codes, [range, range / lam1 + 1e6]);
-        acc.onObservation(i * 30_000, 'G03', codes, [range + 100, (range + 100) / lam1 + 1e6]);
+        acc.onObservation(i * 30_000, 'G01', codes, [
+          range,
+          range / lam1 + 1e6,
+        ]);
+        acc.onObservation(i * 30_000, 'G03', codes, [
+          range + 100,
+          (range + 100) / lam1 + 1e6,
+        ]);
       }
       // Slip on G01 only
       const range = baseRange + 800 * 5 * 30;
-      acc.onObservation(5 * 30_000, 'G01', codes, [range, range / lam1 + 1e6 + 100]);
-      acc.onObservation(5 * 30_000, 'G03', codes, [range + 100, (range + 100) / lam1 + 1e6]);
+      acc.onObservation(5 * 30_000, 'G01', codes, [
+        range,
+        range / lam1 + 1e6 + 100,
+      ]);
+      acc.onObservation(5 * 30_000, 'G03', codes, [
+        range + 100,
+        (range + 100) / lam1 + 1e6,
+      ]);
 
       const result = acc.finalize();
       if (result.events.length > 0) {

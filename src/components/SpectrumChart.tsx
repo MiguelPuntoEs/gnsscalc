@@ -4,13 +4,18 @@ import {
   type SignalDef,
   CONSTELLATIONS,
   BAND_PRESETS,
-} from '../util/gnss-signals';
-import { BDS_SATELLITES } from '../util/gnss-constants';
-import { phiBPSK, phiBOCs, phiBOCc, phiAltBOC, computePsdDb } from '../util/psd';
+} from 'gnss-js/signals';
+import { BDS_SATELLITES } from 'gnss-js/constants';
+import {
+  phiBPSK,
+  phiBOCs,
+  phiBOCc,
+  phiAltBOC,
+  computePsdDb,
+} from 'gnss-js/signals';
 import { useChartTheme, getChartTheme } from '../hooks/useChartTheme';
 
 const F0 = 1.023e6;
-const HZ_IN_MHZ = 1e6;
 const NUM_POINTS = 2000;
 const PSD_OFFSET = 110; // dB offset to make values positive for plotting
 const ROW_HEIGHT = 110;
@@ -38,11 +43,16 @@ function makePsdFn(sig: SignalDef): (fHz: number) => number {
   }
   const p = sig.params;
   switch (sig.modulation) {
-    case 'BPSK': return (fHz: number) => phiBPSK(fHz, F0, p[0]!);
-    case 'BOCs': return (fHz: number) => phiBOCs(fHz, F0, p[0]!, p[1]!);
-    case 'BOCc': return (fHz: number) => phiBOCc(fHz, F0, p[0]!, p[1]!);
-    case 'AltBOC': return (fHz: number) => phiAltBOC(fHz, F0, p[0]!, p[1]!);
-    default: return () => 0;
+    case 'BPSK':
+      return (fHz: number) => phiBPSK(fHz, F0, p[0]!);
+    case 'BOCs':
+      return (fHz: number) => phiBOCs(fHz, F0, p[0]!, p[1]!);
+    case 'BOCc':
+      return (fHz: number) => phiBOCc(fHz, F0, p[0]!, p[1]!);
+    case 'AltBOC':
+      return (fHz: number) => phiAltBOC(fHz, F0, p[0]!, p[1]!);
+    default:
+      return () => 0;
   }
 }
 
@@ -52,7 +62,9 @@ interface PrecomputedSignal {
   psdDb: Float64Array;
 }
 
-function precomputeSignals(constellations: ConstellationRow[]): Map<string, PrecomputedSignal[]> {
+function precomputeSignals(
+  constellations: ConstellationRow[],
+): Map<string, PrecomputedSignal[]> {
   const map = new Map<string, PrecomputedSignal[]>();
   for (const row of constellations) {
     const signals: PrecomputedSignal[] = [];
@@ -189,7 +201,7 @@ export default function SpectrumChart() {
         const rowPad = 4;
         const halfRow = (ROW_HEIGHT - 2 * rowPad) / 2;
         // Shear angle for Q/pilot (horizontal) components — matches Python's THETA_VAL
-        const THETA = 30 * Math.PI / 180;
+        const THETA = (30 * Math.PI) / 180;
         const sinT = Math.sin(THETA);
         const cosT = Math.cos(THETA) * 0.8;
 
@@ -252,7 +264,8 @@ export default function SpectrumChart() {
               if (dbVal < dbMin) continue;
               const amp = toAmp(dbVal);
               const [px, py] = toXY(xBase, amp);
-              if (i === 0 || toX(freqsMHz[i - 1]!) < plotLeft - 10) ctx.moveTo(px, py);
+              if (i === 0 || toX(freqsMHz[i - 1]!) < plotLeft - 10)
+                ctx.moveTo(px, py);
               else ctx.lineTo(px, py);
             }
             ctx.stroke();
@@ -269,7 +282,10 @@ export default function SpectrumChart() {
       ctx.stroke();
 
       // Frequency reference lines
-      const refFreqs = [1176.45, 1191.795, 1207.14, 1227.6, 1246.0, 1268.52, 1278.75, 1561.098, 1575.42, 1600.995, 1602.0];
+      const refFreqs = [
+        1176.45, 1191.795, 1207.14, 1227.6, 1246.0, 1268.52, 1278.75, 1561.098,
+        1575.42, 1600.995, 1602.0,
+      ];
       ctx.save();
       ctx.setLineDash([4, 4]);
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
@@ -294,7 +310,8 @@ export default function SpectrumChart() {
       ctx.fillStyle = t.canvasText + '0.5)';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      const tickStep = maxMHz - minMHz > 200 ? 50 : maxMHz - minMHz > 80 ? 20 : 10;
+      const tickStep =
+        maxMHz - minMHz > 200 ? 50 : maxMHz - minMHz > 80 ? 20 : 10;
       const firstTick = Math.ceil(minMHz / tickStep) * tickStep;
       for (let f = firstTick; f <= maxMHz; f += tickStep) {
         const x = toX(f);
@@ -363,9 +380,10 @@ export default function SpectrumChart() {
           label: hit.sig.label,
           constellation: hit.row.label,
           freq: `${fMHz.toFixed(2)} MHz`,
-          modulation: hit.sig.modulation === 'composite'
-            ? 'CBOC'
-            : `${hit.sig.modulation}(${hit.sig.params.join(',')})`,
+          modulation:
+            hit.sig.modulation === 'composite'
+              ? 'CBOC'
+              : `${hit.sig.modulation}(${hit.sig.params.join(',')})`,
           color: hit.sig.color,
         });
       } else {
@@ -418,7 +436,9 @@ export default function SpectrumChart() {
             <span
               className="inline-block w-2.5 h-2.5 rounded-sm"
               style={{
-                backgroundColor: enabled[c.key] ? c.color : 'rgba(var(--color-fg) / 0.1)',
+                backgroundColor: enabled[c.key]
+                  ? c.color
+                  : 'rgba(var(--color-fg) / 0.1)',
               }}
             />
             {c.label}
@@ -427,7 +447,10 @@ export default function SpectrumChart() {
       </div>
 
       {/* Canvas */}
-      <div ref={containerRef} className="relative w-full rounded-xl bg-bg-raised/60 border border-border/40 overflow-hidden">
+      <div
+        ref={containerRef}
+        className="relative w-full rounded-xl bg-bg-raised/60 border border-border/40 overflow-hidden"
+      >
         <canvas
           ref={canvasRef}
           onMouseMove={handleMouse}
@@ -449,7 +472,10 @@ export default function SpectrumChart() {
             }}
           >
             <div className="font-medium flex items-center gap-1.5">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: tooltip.color }} />
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                style={{ backgroundColor: tooltip.color }}
+              />
               {tooltip.constellation} — {tooltip.label}
             </div>
             <div className="text-fg/50">{tooltip.freq}</div>
@@ -479,9 +505,13 @@ export default function SpectrumChart() {
             <tbody>
               {Object.entries(BDS_GROUPS).map(([group, prns]) => (
                 <tr key={group} className="border-b border-border/20">
-                  <td className="py-1.5 pr-4 text-fg/70 whitespace-nowrap font-medium">{group}</td>
+                  <td className="py-1.5 pr-4 text-fg/70 whitespace-nowrap font-medium">
+                    {group}
+                  </td>
                   <td className="py-1.5 pr-4 text-fg/50 whitespace-nowrap">
-                    {group.startsWith('BDS-2') ? 'B1I, B2I, B3I' : 'B1C, B1I, B2a, B2b, B3I'}
+                    {group.startsWith('BDS-2')
+                      ? 'B1I, B2I, B3I'
+                      : 'B1C, B1I, B2a, B2b, B3I'}
                   </td>
                   <td className="py-1.5 text-fg/60">{prns.join(', ')}</td>
                 </tr>

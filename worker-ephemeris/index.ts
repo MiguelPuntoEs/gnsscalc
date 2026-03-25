@@ -8,9 +8,7 @@
  * site deploys never restart the DO or interrupt the NTRIP stream.
  */
 
-import { Rtcm3Decoder } from '../src/util/rtcm3-decoder';
-import { decodeEphemeris } from '../src/util/rtcm3-ephemeris';
-import type { EphemerisInfo } from '../src/util/rtcm3-ephemeris';
+import { Rtcm3Decoder, decodeEphemeris, type EphemerisInfo } from 'gnss-js';
 
 /* ── Config ───────────────────────────────────────────────────── */
 
@@ -76,7 +74,9 @@ export class EphemerisCollector implements DurableObject {
 
     // Exponential backoff: 2s, 4s, 8s, 16s, 32s, 60s max
     const delay = Math.min(2_000 * 2 ** this.consecutiveFailures, 60_000);
-    console.log(`Alarm: stream ended, re-arming in ${delay / 1000}s (failures: ${this.consecutiveFailures})`);
+    console.log(
+      `Alarm: stream ended, re-arming in ${delay / 1000}s (failures: ${this.consecutiveFailures})`,
+    );
     await this.state.storage.setAlarm(Date.now() + delay);
   }
 
@@ -91,7 +91,9 @@ export class EphemerisCollector implements DurableObject {
         'User-Agent': 'NTRIP GNSSCalc/1.0',
         'X-Ntrip-Host': CASTER_HOST,
         'X-Ntrip-Port': String(CASTER_PORT),
-        'Authorization': 'Basic ' + btoa(`${this.env.NTRIP_USERNAME}:${this.env.NTRIP_PASSWORD}`),
+        Authorization:
+          'Basic ' +
+          btoa(`${this.env.NTRIP_USERNAME}:${this.env.NTRIP_PASSWORD}`),
       };
 
       const res = await fetch(`${NTRIP_PROXY}/${MOUNTPOINT}`, {

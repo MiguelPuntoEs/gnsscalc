@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-fg: #d0d0d3;
@@ -9,8 +9,6 @@
   --color-border: #4a4a5a;
   --color-accent: #7c8aff;
 }
-
-
 
 @layer base {
   html {
@@ -86,7 +84,6 @@
 @utility card {
   @apply rounded-xl bg-bg-raised border border-border/60 p-5 self-start;
 }
-
 
 @utility card-fields {
   @apply grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 items-center;

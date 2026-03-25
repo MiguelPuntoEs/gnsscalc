@@ -12,7 +12,7 @@ export function parseDate(dateStr: string, timeStr: string): Date | undefined {
 export function getDateFromWeekOfYear(
   weekOfYear: number,
   dateStr: string,
-  timeStr: string
+  timeStr: string,
 ): Date | undefined {
   const parsed = parseDate(dateStr, timeStr);
   if (!parsed) return undefined;
@@ -31,7 +31,7 @@ export function getDateFromWeekOfYear(
       second: baseDate.second,
       millisecond: baseDate.millisecond,
     },
-    { zone: 'utc' }
+    { zone: 'utc' },
   );
 
   return dt.isValid ? dt.toJSDate() : undefined;
